@@ -1,0 +1,6 @@
+/target
+/Cargo.lock
+*.pyd
+*.pyc
+*.bat
+*.sh
