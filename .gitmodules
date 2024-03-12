@@ -1,0 +1,3 @@
+[submodule "xc3_model_py"]
+	path = xc3_model_py
+	url = https://github.com/ScanMountGoat/xc3_model_py
