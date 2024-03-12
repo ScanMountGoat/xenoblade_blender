@@ -9,11 +9,13 @@ xenoblade_blender uses [xc3_model_py](https://github.com/ScanMountGoat/xc3_model
 **Blender 4.0 on Windows**  
 ```
 set PYO3_PYTHON = "C:\Program Files\Blender Foundation\Blender 4.0\4.0\python\bin\python.exe"
+cd xc3_model_py
 cargo build --release
 ```
 
 **Blender 4.0 on MacOS**  
 ```
 export PYO3_PYTHON="/Applications/Blender.app/Contents/Resources/4.0/python/bin/python3.10"
+cd xc3_model_py
 cargo build --release
 ```
