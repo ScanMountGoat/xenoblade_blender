@@ -1,0 +1,275 @@
+import bpy
+import numpy as np
+import os
+
+from . import xc3_model_py
+from mathutils import Matrix
+
+
+def get_database_path(version: str) -> str:
+    files = {'XC1': "xc1.json", 'XC2': "xc2.json", 'XC3': "xc3.json"}
+    return os.path.join(os.path.dirname(__file__), files[version])
+
+
+def import_armature(context, root, name: str):
+    armature = bpy.data.objects.new(name, bpy.data.armatures.new(name))
+    armature.data.display_type = 'STICK'
+    bpy.context.collection.objects.link(armature)
+
+    context.view_layer.objects.active = armature
+    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
+    if root.skeleton is not None:
+        # TODO: Do this in python bindings?
+        # TODO: Don't assume bones appear after their parents?
+        bone_world = [b.transform for b in root.skeleton.bones]
+        for i, bone in enumerate(root.skeleton.bones):
+            if bone.parent_index is not None:
+                bone_world[i] = bone_world[i] @ bone_world[bone.parent_index]
+
+        for bone, transform in zip(root.skeleton.bones, bone_world):
+            new_bone = armature.data.edit_bones.new(name=bone.name)
+            # TODO: Point bones towards their child?
+            new_bone.head = [0, 0, 0]
+            new_bone.tail = [0, 1, 0]
+            new_bone.matrix = Matrix(transform).transposed()
+
+        for bone in root.skeleton.bones:
+            if bone.parent_index is not None:
+                parent_bone_name = root.skeleton.bones[bone.parent_index].name
+                parent_bone = armature.data.edit_bones.get(parent_bone_name)
+                armature.data.edit_bones.get(bone.name).parent = parent_bone
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    return armature
+
+
+def import_images(root):
+    blender_images = []
+
+    for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
+        name = image.name if image.name is not None else 'image'
+        blender_image = bpy.data.images.new(
+            name, image.width, image.height)
+        blender_image.pixels.foreach_set(decoded)
+        blender_images.append(blender_image)
+
+    return blender_images
+
+
+def import_root(root, blender_images, root_obj):
+    for group in root.groups:
+        for models in group.models:
+            materials = import_materials(blender_images, models)
+
+            for model in models.models:
+                # TODO: import_mesh function?
+                for mesh in model.meshes:
+                    # TODO: check actual base lod
+                    # TODO: Include all meshes for proper exporting later?
+                    material = materials[mesh.material_index]
+                    if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
+                        continue
+                    blender_mesh = bpy.data.meshes.new(material.name)
+
+                    buffers = group.buffers[model.model_buffers_index]
+                    # Vertex buffers are shared with multiple index buffers.
+                    # In practice, only a small range of vertices are used.
+                    # Reindex the vertices to eliminate most loose vertices.
+                    index_buffer = buffers.index_buffers[mesh.index_buffer_index]
+                    min_index = index_buffer.indices.min()
+                    max_index = index_buffer.indices.max()
+
+                    vertex_indices = index_buffer.indices.astype(
+                        np.uint32) - min_index
+                    loop_start = np.arange(
+                        0, vertex_indices.shape[0], 3, dtype=np.uint32)
+                    loop_total = np.full(
+                        loop_start.shape[0], 3, dtype=np.uint32)
+
+                    blender_mesh.loops.add(vertex_indices.shape[0])
+                    blender_mesh.loops.foreach_set(
+                        'vertex_index', vertex_indices)
+
+                    blender_mesh.polygons.add(loop_start.shape[0])
+                    blender_mesh.polygons.foreach_set(
+                        'loop_start', loop_start)
+                    blender_mesh.polygons.foreach_set(
+                        'loop_total', loop_total)
+
+                    # Set vertex attributes.
+                    # TODO: Set remaining attributes
+                    # TODO: Helper functions for setting each attribute type.
+                    vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
+                    for attribute in vertex_buffer.attributes:
+                        if attribute.attribute_type == xc3_model_py.AttributeType.Position:
+                            data = attribute.data[min_index:max_index+1]
+                            blender_mesh.vertices.add(data.shape[0])
+                            blender_mesh.vertices.foreach_set(
+                                'co', data.reshape(-1))
+                        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord0:
+                            data = attribute.data[min_index:max_index+1]
+
+                            uv_layer = blender_mesh.uv_layers.new(
+                                name="TexCoord0")
+                            # This is set per loop rather than per vertex.
+                            loop_uvs = data[vertex_indices].reshape(-1)
+                            uv_layer.data.foreach_set('uv', loop_uvs)
+
+                    # TODO: Will this mess up indexing for weight groups?
+                    blender_mesh.update()
+                    blender_mesh.validate()
+
+                    # Assign materials from the current group.
+                    blender_mesh.materials.append(material)
+
+                    # Instances technically apply to the entire model.
+                    # Just instance each mesh for now for simplicity.
+                    for transform in model.instances:
+                        obj = bpy.data.objects.new(
+                            blender_mesh.name, blender_mesh)
+                        obj.matrix_local = Matrix(
+                            transform).transposed()
+
+                        # TODO: Is there a way to not do this for every instance?
+                        # Only non instanced character meshes are skinned in practice.
+                        if buffers.weights is not None:
+                            # Calculate the index offset based on the weight group for this mesh.
+                            pass_type = models.materials[mesh.material_index].pass_type
+                            start_index = buffers.weights.weights_start_index(
+                                mesh.skin_flags, mesh.lod, pass_type)
+
+                            import_weight_groups(
+                                buffers.weights, start_index, obj, vertex_buffer, min_index, max_index)
+
+                        # Attach the mesh to the armature or empty.
+                        # Assume the root_obj is an armature if there are weights.
+                        # TODO: Find a more reliable way of checking this.
+                        obj.parent = root_obj
+                        if buffers.weights is not None:
+                            modifier = obj.modifiers.new(
+                                root_obj.data.name, type='ARMATURE')
+                            modifier.object = root_obj
+
+                        bpy.context.collection.objects.link(obj)
+
+
+def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer, min_index: int, max_index: int):
+    # The weights use a bone ordering that may not match the skeleton.
+    bone_names = weights.skin_weights.bone_names
+
+    # Find the per vertex skinning information.
+    for attribute in vertex_buffer.attributes:
+        if attribute.attribute_type == xc3_model_py.AttributeType.WeightIndex:
+            # Account for adjusting vertex indices in a previous step.
+            weight_indices = attribute.data[min_index:max_index +
+                                            1] + start_index
+
+            # Set the vertex skin weights for each bone.
+            # TODO: Is there a faster way than setting weights per vertex?
+            # TODO: Avoid looping here?
+            for i, index in enumerate(weight_indices):
+                bone_indices = weights.skin_weights.bone_indices[index]
+                skin_weights = weights.skin_weights.weights[index]
+
+                for index, weight in zip(bone_indices, skin_weights):
+                    if weight > 0.0:
+                        # Lazily load only used vertex groups.
+                        name = bone_names[index]
+                        group = blender_mesh.vertex_groups.get(name)
+                        if group is None:
+                            group = blender_mesh.vertex_groups.new(name=name)
+                        blender_mesh.vertex_groups[name].add(
+                            [i], weight, 'REPLACE')
+
+
+def import_materials(blender_images, models):
+    materials = []
+    for material in models.materials:
+        blender_material = import_material(material, blender_images)
+        materials.append(blender_material)
+
+    return materials
+
+
+def import_material(material, blender_images):
+    blender_material = bpy.data.materials.new(material.name)
+    blender_material.use_nodes = True
+
+    nodes = blender_material.node_tree.nodes
+    links = blender_material.node_tree.links
+
+    bsdf = blender_material.node_tree.nodes["Principled BSDF"]
+
+    # Get information on how the decompiled shader code assigns outputs.
+    # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
+    # TODO: Textures for fallback assignments
+    assignments = material.output_assignments(textures=[]).assignments
+
+    texture_nodes = []
+    textures_rgb = []
+    for texture in material.textures:
+        texture_node = nodes.new('ShaderNodeTexImage')
+        texture_node.image = blender_images[texture.image_texture_index]
+        texture_nodes.append(texture_node)
+
+        texture_rgb_node = nodes.new('ShaderNodeSeparateColor')
+        textures_rgb.append(texture_rgb_node)
+        links.new(texture_node.outputs['Color'],
+                  texture_rgb_node.inputs['Color'])
+
+    # TODO: Alpha testing.
+    # TODO: Select UV map and scale for each texture.
+    # TODO: Set color space for images?
+
+    base_color = nodes.new('ShaderNodeCombineColor')
+    assign_channel(assignments[0].x, links, textures_rgb, base_color, 'Red')
+    assign_channel(assignments[0].y, links, textures_rgb, base_color, 'Green')
+    assign_channel(assignments[0].z, links, textures_rgb, base_color, 'Blue')
+    links.new(base_color.outputs['Color'], bsdf.inputs['Base Color'])
+
+    # TODO: Calculate normal Z from XY.
+    normal = nodes.new('ShaderNodeNormalMap')
+    normal_xyz = nodes.new('ShaderNodeCombineColor')
+    assign_channel(assignments[2].x, links, textures_rgb, normal_xyz, 'Red')
+    assign_channel(assignments[2].y, links, textures_rgb, normal_xyz, 'Green')
+    normal_xyz.inputs['Blue'].default_value = 1.0
+    links.new(normal_xyz.outputs['Color'], normal.inputs['Color'])
+    links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
+
+    assign_channel(assignments[1].x, links, textures_rgb, bsdf, 'Metallic')
+
+    # Invert glossiness to get roughness.
+    invert = nodes.new('ShaderNodeMath')
+    invert.operation = 'SUBTRACT'
+    invert.inputs[0].default_value = 1.0
+    assign_channel(assignments[1].y, links, textures_rgb, invert, 1)
+    links.new(invert.outputs['Value'], bsdf.inputs['Roughness'])
+
+    return blender_material
+
+
+def assign_channel(channel_assignment, links, texture_rgb_nodes, output_node, output_channel):
+    # Assign one output channel from a texture channel or constant.
+    if channel_assignment is not None:
+        texture_assignment = channel_assignment.texture()
+        value = channel_assignment.value()
+
+        if texture_assignment is not None:
+            # TODO: Alpha isn't part of the RGB node.
+            input_channels = ['Red', 'Green', 'Blue', 'Alpha']
+            input_channel = input_channels[texture_assignment.channel_index]
+
+            # Only handle sampler uniforms for material textures for now.
+            sampler_to_index = {f's{i}': i for i in range(10)}
+            texture_index = sampler_to_index.get(texture_assignment.name)
+            if texture_index is not None:
+                try:
+                    input = texture_rgb_nodes[texture_index].outputs[input_channel]
+                    output = output_node.inputs[output_channel]
+                    links.new(input, output)
+                except IndexError:
+                    print(f'Texture index {texture_index} out of range')
+        elif value is not None:
+            output_node.inputs[output_channel].default_value = value
