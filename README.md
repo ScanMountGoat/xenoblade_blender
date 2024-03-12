@@ -1,5 +1,5 @@
 # xenoblade_blender
-A Blender addon for importing Xenoblade models and maps from Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3 are supported.
+A Blender addon for importing Xenoblade models and maps from Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3.
 
 ## Building
 Clone the repository with `git clone https://github.com/ScanMountGoat/xenoblade_blender --recursive`. 
