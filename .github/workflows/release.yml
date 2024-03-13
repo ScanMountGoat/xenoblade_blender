@@ -1,0 +1,115 @@
+name: Compile Release
+
+on: 
+  release:
+    types: [created]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Build
+      run: |
+        cd xc3_model_py
+        cargo build --release
+    - name: Create Release Zip
+      run: |
+        cp xc3_model_py/target/release/libxc3_model_py.so xenoblade_blender/xc3_model_py.so
+        zip -r xenoblade_blender_linux_x64.zip xenoblade_blender
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: xenoblade_blender_linux
+        path: xenoblade_blender_linux_x64.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: xenoblade_blender_linux_x64.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Build
+      run: cargo build --release
+    - name: Create Release Zip
+      run: |
+        cp xc3_model_py/target/release/xc3_model_py.dll xenoblade_blender/xc3_model_py.pyd
+        Compress-Archive -path xenoblade_blender -destinationPath xenoblade_blender_win_x64.zip 
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: xenoblade_blender_win
+        path: xenoblade_blender_win_x64.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: xenoblade_blender_win_x64.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [x86_64-apple-darwin]
+        desc: [intel]
+        include:
+          - target: aarch64-apple-darwin
+            desc: apple_silicon
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Install maturin
+      run: |
+        python -m pip install --upgrade pip
+        pip install maturin
+    - name: Install Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{matrix.target}}
+    - name: Build
+      run: |
+        cd xc3_model_py 
+        maturin build --release --target=${{matrix.target}}
+        cd ..
+    - name: Create Release Zip
+      run: |
+        cp xc3_model_py/target/${{matrix.target}}/release/libxc3_model_py.dylib xenoblade_blender/xc3_model_py.so
+        zip -r xenoblade_blender_macos_${{matrix.desc}}.zip xenoblade_blender
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: xenoblade_blender_macos_${{matrix.desc}}
+        path: xenoblade_blender_macos_${{matrix.desc}}.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: xenoblade_blender_macos_${{matrix.desc}}.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
