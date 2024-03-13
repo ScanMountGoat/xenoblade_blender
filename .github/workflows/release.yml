@@ -49,7 +49,9 @@ jobs:
       with:
         python-version: '3.10'
     - name: Build
-      run: cargo build --release
+      run: |
+        cd xc3_model_py
+        cargo build --release
     - name: Create Release Zip
       run: |
         cp xc3_model_py/target/release/xc3_model_py.dll xenoblade_blender/xc3_model_py.pyd
