@@ -10,8 +10,8 @@ bl_info = {
     "blender": (4, 0, 0),
     "location": "File > Import",
     "warning": "",
-    "doc_url": "https://github.com/ScanMountGoat/xeno_blender/wiki",
-    "tracker_url": "https://github.com/ScanMountGoat/xeno_blender/issues",
+    "doc_url": "https://github.com/ScanMountGoat/xenoblade_blender/wiki",
+    "tracker_url": "https://github.com/ScanMountGoat/xenoblade_blender/issues",
     "category": "Import-Export"
 }
 
