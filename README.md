@@ -1,5 +1,27 @@
-# xenoblade_blender
-A Blender addon for importing Xenoblade models and maps from Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3.
+# xenoblade_blender [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ScanMountGoat/xenoblade_blender?include_prereleases)](https://github.com/ScanMountGoat/xenoblade_blender/releases/latest)
+A Blender addon for importing Xenoblade models and maps from Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3. Report bugs or request new features in [issues](https://github.com/ScanMountGoat/xenoblade_blender/issues). Download the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Check the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki) for more usage information.
+
+## Features
+* Faster and more accurate than intermediate formats like FBX or glTF
+* Import characters, objects, enemies, and weapon models from .wimdo files
+* Import maps from .wismhd files
+* Import character animations from .mot files
+* Decoded RGBA textures for use in Blender
+* Material parameters, textures, and texture channel assignments based on decompiled in game shader code.
+
+## Getting Started
+* Download the latest version of the addon supported by your Blender version from releases.
+* Install the .zip file in Blender using Edit > Preferences > Addons > Install...
+* Enable the addon if it is not already enabled.
+* Import any of the supported file types using the new menu options under File > Import.
+* Select the appropriate game version before importing for correct material texture assignments.
+
+## Planned Features
+* Exporting models and animations
+* Fixed handling of different animation types
+* Improvements to import times and memory usage
+
+The goal of this addon is to provide import and export operations with good performance and minimal configuration. Quality of life features requiring more complex UI are better handled using traditional pure Python addons.
 
 ## Building
 Clone the repository with `git clone https://github.com/ScanMountGoat/xenoblade_blender --recursive`. 
