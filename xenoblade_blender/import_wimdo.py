@@ -53,11 +53,10 @@ def import_wimdo(context: bpy.types.Context, path: str, database_path: str):
     root = xc3_model_py.load_model(path, database_path)
 
     end = time.time()
-    print(f'Load Root: {end - start}')
+    print(f"Load Root: {end - start}")
 
     start = time.time()
 
-    # TODO: Create a module for code shared with import_wismhd
     model_name = os.path.basename(path)
     blender_images = import_images(root)
     armature = import_armature(context, root, model_name)
@@ -67,4 +66,4 @@ def import_wimdo(context: bpy.types.Context, path: str, database_path: str):
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
 
     end = time.time()
-    print(f'Import Blender Scene: {end - start}')
+    print(f"Import Blender Scene: {end - start}")
