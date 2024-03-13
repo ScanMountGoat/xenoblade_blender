@@ -247,6 +247,17 @@ def import_material(material, blender_images):
     assign_channel(assignments[1].y, links, textures_rgb, invert, 1)
     links.new(invert.outputs['Value'], bsdf.inputs['Roughness'])
 
+    if material.alpha_test is not None:
+        # TODO: Handle the case where the input alpha channel is assigned.
+        texture = material.alpha_test
+        channel = ['Red', 'Green', 'Blue', 'Alpha'][texture.channel_index]
+        input = textures_rgb[texture.texture_index].outputs[channel]
+        links.new(input, bsdf.inputs['Alpha'])
+
+        # TODO: Support alpha blending?
+        blender_material.blend_method = 'CLIP'
+        blender_material.shadow_method = 'CLIP'
+
     return blender_material
 
 
