@@ -28,7 +28,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
     game_version: EnumProperty(
         name="Game Version",
-        description="Choose between two items",
+        description="The game version for the shader database",
         items=(
             ('XC1', "Xenoblade 1 DE", "Xenoblade Chronicles 1 Definitive Edition"),
             ('XC2', "Xenoblade 2", "Xenoblade Chronicles 2"),
