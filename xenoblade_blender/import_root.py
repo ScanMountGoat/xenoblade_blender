@@ -20,14 +20,9 @@ def import_armature(context, root, name: str):
     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
     if root.skeleton is not None:
-        # TODO: Do this in python bindings?
-        # TODO: Don't assume bones appear after their parents?
-        bone_world = [b.transform for b in root.skeleton.bones]
-        for i, bone in enumerate(root.skeleton.bones):
-            if bone.parent_index is not None:
-                bone_world[i] = bone_world[i] @ bone_world[bone.parent_index]
+        transforms = root.skeleton.model_space_transforms()
 
-        for bone, transform in zip(root.skeleton.bones, bone_world):
+        for bone, transform in zip(root.skeleton.bones, transforms):
             new_bone = armature.data.edit_bones.new(name=bone.name)
             # TODO: Point bones towards their child?
             new_bone.head = [0, 0, 0]
@@ -205,14 +200,14 @@ def import_material(material, blender_images):
     # Get information on how the decompiled shader code assigns outputs.
     # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
     # TODO: Textures for fallback assignments
-    assignments = material.output_assignments(textures=[]).assignments
+    assignments = material.output_assignments([]).assignments
 
-    texture_nodes = []
+    textures = []
     textures_rgb = []
     for texture in material.textures:
         texture_node = nodes.new('ShaderNodeTexImage')
         texture_node.image = blender_images[texture.image_texture_index]
-        texture_nodes.append(texture_node)
+        textures.append(texture_node)
 
         texture_rgb_node = nodes.new('ShaderNodeSeparateColor')
         textures_rgb.append(texture_rgb_node)
@@ -224,34 +219,42 @@ def import_material(material, blender_images):
     # TODO: Set color space for images?
 
     base_color = nodes.new('ShaderNodeCombineColor')
-    assign_channel(assignments[0].x, links, textures_rgb, base_color, 'Red')
-    assign_channel(assignments[0].y, links, textures_rgb, base_color, 'Green')
-    assign_channel(assignments[0].z, links, textures_rgb, base_color, 'Blue')
+    assign_channel(assignments[0].x, links, textures,
+                   textures_rgb, base_color, 'Red')
+    assign_channel(assignments[0].y, links, textures,
+                   textures_rgb, base_color, 'Green')
+    assign_channel(assignments[0].z, links, textures,
+                   textures_rgb, base_color, 'Blue')
     links.new(base_color.outputs['Color'], bsdf.inputs['Base Color'])
 
     # TODO: Calculate normal Z from XY.
     normal = nodes.new('ShaderNodeNormalMap')
     normal_xyz = nodes.new('ShaderNodeCombineColor')
-    assign_channel(assignments[2].x, links, textures_rgb, normal_xyz, 'Red')
-    assign_channel(assignments[2].y, links, textures_rgb, normal_xyz, 'Green')
+    assign_channel(assignments[2].x, links, textures,
+                   textures_rgb, normal_xyz, 'Red')
+    assign_channel(assignments[2].y, links, textures,
+                   textures_rgb, normal_xyz, 'Green')
     normal_xyz.inputs['Blue'].default_value = 1.0
     links.new(normal_xyz.outputs['Color'], normal.inputs['Color'])
     links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
 
-    assign_channel(assignments[1].x, links, textures_rgb, bsdf, 'Metallic')
+    assign_channel(assignments[1].x, links, textures,
+                   textures_rgb, bsdf, 'Metallic')
 
     # Invert glossiness to get roughness.
     invert = nodes.new('ShaderNodeMath')
     invert.operation = 'SUBTRACT'
     invert.inputs[0].default_value = 1.0
-    assign_channel(assignments[1].y, links, textures_rgb, invert, 1)
+    assign_channel(assignments[1].y, links, textures, textures_rgb, invert, 1)
     links.new(invert.outputs['Value'], bsdf.inputs['Roughness'])
 
     if material.alpha_test is not None:
-        # TODO: Handle the case where the input alpha channel is assigned.
         texture = material.alpha_test
         channel = ['Red', 'Green', 'Blue', 'Alpha'][texture.channel_index]
-        input = textures_rgb[texture.texture_index].outputs[channel]
+        if channel == 'Alpha':
+            input = textures[texture.texture_index].outputs['Alpha']
+        else:
+            input = textures_rgb[texture.texture_index].outputs[channel]
         links.new(input, bsdf.inputs['Alpha'])
 
         # TODO: Support alpha blending?
@@ -261,14 +264,13 @@ def import_material(material, blender_images):
     return blender_material
 
 
-def assign_channel(channel_assignment, links, texture_rgb_nodes, output_node, output_channel):
+def assign_channel(channel_assignment, links, textures, textures_rgb, output_node, output_channel):
     # Assign one output channel from a texture channel or constant.
     if channel_assignment is not None:
         texture_assignment = channel_assignment.texture()
         value = channel_assignment.value()
 
         if texture_assignment is not None:
-            # TODO: Alpha isn't part of the RGB node.
             input_channels = ['Red', 'Green', 'Blue', 'Alpha']
             input_channel = input_channels[texture_assignment.channel_index]
 
@@ -277,7 +279,11 @@ def assign_channel(channel_assignment, links, texture_rgb_nodes, output_node, ou
             texture_index = sampler_to_index.get(texture_assignment.name)
             if texture_index is not None:
                 try:
-                    input = texture_rgb_nodes[texture_index].outputs[input_channel]
+                    # Alpha isn't part of the RGB node.
+                    if input_channel == 'Alpha':
+                        input = textures[texture_index].outputs['Alpha']
+                    else:
+                        input = textures_rgb[texture_index].outputs[input_channel]
                     output = output_node.inputs[output_channel]
                     links.new(input, output)
                 except IndexError:
