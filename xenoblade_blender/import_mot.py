@@ -1,12 +1,14 @@
 import bpy
 import time
 import logging
+import numpy as np
 
 from . import xc3_model_py
+from .export_root import export_skeleton
 
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Matrix, Quaternion
 
 
 class ImportMot(bpy.types.Operator, ImportHelper):
@@ -46,75 +48,74 @@ def import_mot(context: bpy.types.Context, path: str):
     if armature.animation_data is None:
         armature.animation_data_create()
 
+    skeleton = export_skeleton(armature)
+
+    # TODO: Will this order always match the xc3_model skeleton order?
+    # TODO: Will bones always appear after their parents?
+    bone_names = [bone.name for bone in skeleton.bones]
+    for i, bone in enumerate(skeleton.bones):
+        if bone.parent_index is not None and bone.parent_index > i:
+            print(f'invalid index {bone.parent_index} > {i}')
+    hash_to_name = {xc3_model_py.murmur3(name): name for name in bone_names}
+
     # TODO: Is this the best way to load all animations?
+    # TODO: Optimize this.
     for animation in animations:
         action = bpy.data.actions.new(animation.name)
 
-        # TODO: Will this order always match the xc3_model skeleton order?
-        bone_names = [bone.name for bone in armature.data.bones.values()]
-        hash_to_name = {xc3_model_py.murmur3(
-            name): name for name in bone_names}
+        # Assume each bone appears in only one track.
+        animated_bone_names = {get_bone_name(
+            t, bone_names, hash_to_name) for t in animation.tracks}
 
-        for track in animation.tracks:
-            import_track(track, animation, armature,
-                         action, bone_names, hash_to_name)
+        # Collect keyframes for the appropriate bones.
+        positions = {name: [] for name in animated_bone_names}
+        rotations_wxyz = {name: [] for name in animated_bone_names}
+        scales = {name: [] for name in animated_bone_names}
+
+        for frame in range(animation.frame_count):
+            # Calculate the transforms in model space to handle model space anims.
+            transforms = animation.model_space_transforms(skeleton, frame)
+
+            # Transforms need to be relative to the parent bone to animate properly.
+            # TODO: Move this to xc3_model?
+            # TODO: Why is this necessary?
+            transforms = [Matrix(t).transposed() for t in transforms]
+            new_transforms = []
+            for i, bone in enumerate(skeleton.bones):
+                if bone.parent_index is not None:
+                    new_transforms.append(
+                        transforms[bone.parent_index].inverted() @ transforms[i])
+                else:
+                    new_transforms.append(transforms[i])
+
+            for name, transform in zip(bone_names, new_transforms):
+                if name not in animated_bone_names:
+                    continue
+                pose_bone = armature.pose.bones.get(name)
+                if pose_bone.parent is not None:
+                    pose_bone.matrix = pose_bone.parent.matrix @ transform
+                else:
+                    pose_bone.matrix = transform
+                pose_bone = armature.pose.bones.get(name)
+                t, r, s = pose_bone.matrix_basis.decompose()
+                positions[name].append(t)
+                rotations_wxyz[name].append(r)
+                scales[name].append(s)
+
+        for name in animated_bone_names:
+            if name is None:
+                continue
+
+            # TODO: Use actual cubic keyframes instead of baking at each frame?
+            set_fcurves(action, name, "location", positions[name], 3)
+            set_fcurves(action, name, "rotation_quaternion",
+                        rotations_wxyz[name], 4)
+            set_fcurves(action, name, "scale", scales[name], 3)
 
         armature.animation_data.action = action
 
     end = time.time()
     print(f"Import Blender Animation: {end - start}")
-
-
-def import_track(track, animation, armature, action, bone_names, hash_to_name):
-    # TODO: Handle missing bones?
-    bone = get_bone_name(track, bone_names, hash_to_name)
-    if bone is None:
-        print("Failed to assign track for bone")
-        return
-
-    # Assume each bone appears in only one track.
-    # TODO: Use actual cubic keyframes instead of baking at each frame?
-    pose_bone = armature.pose.bones.get(bone)
-    if pose_bone is not None:
-        # Workaround for fcurves setting the values for bone.matrix_basis.
-        # These values are relative to the parent transform and bone rest pose.
-        # TODO: handle this in xc3_model_py instead?
-        positions = []
-        rotations_wxyz = []
-        scales = []
-
-        count = animation.frame_count
-        for frame in range(count):
-            position = track.sample_translation(frame)
-            rotation_xyzw = track.sample_rotation(frame)
-            scale = track.sample_scale(frame)
-
-            matrix = animation_transform(position, rotation_xyzw, scale)
-            if pose_bone.parent is not None:
-                pose_bone.matrix = pose_bone.parent.matrix @ matrix
-            else:
-                pose_bone.matrix = matrix
-
-            t, r, s = pose_bone.matrix_basis.decompose()
-            positions.append(t)
-            rotations_wxyz.append(r)
-            scales.append(s)
-
-        # Assume each bone appears in only one track.
-        # TODO: Use actual cubic keyframes instead of baking at each frame?
-        set_fcurves(action, bone, "location", positions, 3)
-        set_fcurves(action, bone, "rotation_quaternion", rotations_wxyz, 4)
-        set_fcurves(action, bone, "scale", scales, 3)
-
-
-def animation_transform(translation, rotation_xyzw, scale) -> Matrix:
-    tm = Matrix.Translation(translation)
-    qr = Quaternion([rotation_xyzw[3], rotation_xyzw[0],
-                    rotation_xyzw[1], rotation_xyzw[2]])
-    rm = Matrix.Rotation(qr.angle, 4, qr.axis)
-    # Blender doesn't have this built in for some reason.
-    sm = Matrix.Diagonal((scale[0], scale[1], scale[2], 1.0))
-    return tm @ rm @ sm
 
 
 def get_bone_name(track, bone_names: list[str], hash_to_name):
