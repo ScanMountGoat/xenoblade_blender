@@ -59,95 +59,124 @@ def import_root(root, blender_images, root_obj):
             materials = import_materials(blender_images, models)
 
             for model in models.models:
-                # TODO: import_mesh function?
                 for mesh in model.meshes:
                     # TODO: check actual base lod
                     # TODO: Include all meshes for proper exporting later?
                     material = materials[mesh.material_index]
                     if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
                         continue
-                    blender_mesh = bpy.data.meshes.new(material.name)
+                    import_mesh(root_obj, group, models, model, mesh, material)
 
-                    buffers = group.buffers[model.model_buffers_index]
-                    # Vertex buffers are shared with multiple index buffers.
-                    # In practice, only a small range of vertices are used.
-                    # Reindex the vertices to eliminate most loose vertices.
-                    index_buffer = buffers.index_buffers[mesh.index_buffer_index]
-                    min_index = index_buffer.indices.min()
-                    max_index = index_buffer.indices.max()
 
-                    vertex_indices = index_buffer.indices.astype(
-                        np.uint32) - min_index
-                    loop_start = np.arange(
-                        0, vertex_indices.shape[0], 3, dtype=np.uint32)
-                    loop_total = np.full(
-                        loop_start.shape[0], 3, dtype=np.uint32)
+def import_mesh(root_obj, group, models, model, mesh, material):
+    blender_mesh = bpy.data.meshes.new(material.name)
 
-                    blender_mesh.loops.add(vertex_indices.shape[0])
-                    blender_mesh.loops.foreach_set(
-                        'vertex_index', vertex_indices)
+    buffers = group.buffers[model.model_buffers_index]
+    # Vertex buffers are shared with multiple index buffers.
+    # In practice, only a small range of vertices are used.
+    # Reindex the vertices to eliminate most loose vertices.
+    index_buffer = buffers.index_buffers[mesh.index_buffer_index]
+    min_index = index_buffer.indices.min()
+    max_index = index_buffer.indices.max()
 
-                    blender_mesh.polygons.add(loop_start.shape[0])
-                    blender_mesh.polygons.foreach_set(
-                        'loop_start', loop_start)
-                    blender_mesh.polygons.foreach_set(
-                        'loop_total', loop_total)
+    vertex_indices = index_buffer.indices.astype(np.uint32) - min_index
+    loop_start = np.arange(0, vertex_indices.shape[0], 3, dtype=np.uint32)
+    loop_total = np.full(loop_start.shape[0], 3, dtype=np.uint32)
 
-                    # Set vertex attributes.
-                    # TODO: Set remaining attributes
-                    # TODO: Helper functions for setting each attribute type.
-                    vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
-                    for attribute in vertex_buffer.attributes:
-                        if attribute.attribute_type == xc3_model_py.AttributeType.Position:
-                            data = attribute.data[min_index:max_index+1]
-                            blender_mesh.vertices.add(data.shape[0])
-                            blender_mesh.vertices.foreach_set(
-                                'co', data.reshape(-1))
-                        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord0:
-                            data = attribute.data[min_index:max_index+1]
+    blender_mesh.loops.add(vertex_indices.shape[0])
+    blender_mesh.loops.foreach_set('vertex_index', vertex_indices)
 
-                            uv_layer = blender_mesh.uv_layers.new(
-                                name="TexCoord0")
-                            # This is set per loop rather than per vertex.
-                            loop_uvs = data[vertex_indices].reshape(-1)
-                            uv_layer.data.foreach_set('uv', loop_uvs)
+    blender_mesh.polygons.add(loop_start.shape[0])
+    blender_mesh.polygons.foreach_set('loop_start', loop_start)
+    blender_mesh.polygons.foreach_set('loop_total', loop_total)
 
-                    # TODO: Will this mess up indexing for weight groups?
-                    blender_mesh.update()
-                    blender_mesh.validate()
+    # Set vertex attributes.
+    # TODO: Set remaining attributes
+    # TODO: Helper functions for setting each attribute type.
+    vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
+    for attribute in vertex_buffer.attributes:
+        data = attribute.data[min_index:max_index+1]
 
-                    # Assign materials from the current group.
-                    blender_mesh.materials.append(material)
+        if attribute.attribute_type == xc3_model_py.AttributeType.Position:
+            blender_mesh.vertices.add(data.shape[0])
+            blender_mesh.vertices.foreach_set('co', data.reshape(-1))
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord0:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord0')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord1:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord1')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord2:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord2')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord3:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord3')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord4:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord4')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord5:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord5')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord6:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord6')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord7:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord7')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord8:
+            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord8')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.VertexColor:
+            import_colors(blender_mesh, vertex_indices, data, 'VertexColor')
+        elif attribute.attribute_type == xc3_model_py.AttributeType.Blend:
+            import_colors(blender_mesh, vertex_indices, data, 'Blend')
 
-                    # Instances technically apply to the entire model.
-                    # Just instance each mesh for now for simplicity.
-                    for transform in model.instances:
-                        obj = bpy.data.objects.new(
-                            blender_mesh.name, blender_mesh)
-                        obj.matrix_local = Matrix(
-                            transform).transposed()
+    # TODO: Will this mess up indexing for weight groups?
+    blender_mesh.update()
+    blender_mesh.validate()
 
-                        # TODO: Is there a way to not do this for every instance?
-                        # Only non instanced character meshes are skinned in practice.
-                        if buffers.weights is not None:
-                            # Calculate the index offset based on the weight group for this mesh.
-                            pass_type = models.materials[mesh.material_index].pass_type
-                            start_index = buffers.weights.weights_start_index(
-                                mesh.skin_flags, mesh.lod, pass_type)
+    # Assign materials from the current group.
+    blender_mesh.materials.append(material)
 
-                            import_weight_groups(
-                                buffers.weights, start_index, obj, vertex_buffer, min_index, max_index)
+    # Instances technically apply to the entire model.
+    # Just instance each mesh for now for simplicity.
+    for transform in model.instances:
+        obj = bpy.data.objects.new(
+            blender_mesh.name, blender_mesh)
+        obj.matrix_local = Matrix(
+            transform).transposed()
 
-                        # Attach the mesh to the armature or empty.
-                        # Assume the root_obj is an armature if there are weights.
-                        # TODO: Find a more reliable way of checking this.
-                        obj.parent = root_obj
-                        if buffers.weights is not None:
-                            modifier = obj.modifiers.new(
-                                root_obj.data.name, type='ARMATURE')
-                            modifier.object = root_obj
+        # TODO: Is there a way to not do this for every instance?
+        # Only non instanced character meshes are skinned in practice.
+        if buffers.weights is not None:
+            # Calculate the index offset based on the weight group for this mesh.
+            pass_type = models.materials[mesh.material_index].pass_type
+            start_index = buffers.weights.weights_start_index(
+                mesh.skin_flags, mesh.lod, pass_type)
 
-                        bpy.context.collection.objects.link(obj)
+            import_weight_groups(
+                buffers.weights, start_index, obj, vertex_buffer, min_index, max_index)
+
+        # Attach the mesh to the armature or empty.
+        # Assume the root_obj is an armature if there are weights.
+        # TODO: Find a more reliable way of checking this.
+        obj.parent = root_obj
+        if buffers.weights is not None:
+            modifier = obj.modifiers.new(
+                root_obj.data.name, type='ARMATURE')
+            modifier.object = root_obj
+
+        bpy.context.collection.objects.link(obj)
+
+
+def import_uvs(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str):
+    uv_layer = blender_mesh.uv_layers.new(name=name)
+    # This is set per loop rather than per vertex.
+    loop_uvs = data[vertex_indices].reshape(-1)
+    uv_layer.data.foreach_set('uv', loop_uvs)
+
+
+def import_colors(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str):
+    # TODO: Just set this per vertex instead?
+    # Byte color still uses floats but restricts their range to 0.0 to 1.0.
+    attribute = blender_mesh.color_attributes.new(
+        name=name, type='BYTE_COLOR', domain='CORNER')
+
+    # This is set per loop rather than per vertex.
+    loop_colors = data[vertex_indices].flatten()
+    attribute.data.foreach_set('color', loop_colors)
 
 
 def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer, min_index: int, max_index: int):
