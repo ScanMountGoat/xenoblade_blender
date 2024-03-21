@@ -56,7 +56,8 @@ def import_images(root):
 def import_root(root, blender_images, root_obj):
     for group in root.groups:
         for models in group.models:
-            materials = import_materials(blender_images, models)
+            materials = import_materials(
+                blender_images, models, root.image_textures)
 
             for model in models.models:
                 for mesh in model.meshes:
@@ -208,16 +209,17 @@ def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer,
                             [i], weight, 'REPLACE')
 
 
-def import_materials(blender_images, models):
+def import_materials(blender_images, models, image_textures):
     materials = []
     for material in models.materials:
-        blender_material = import_material(material, blender_images)
+        blender_material = import_material(
+            material, blender_images, image_textures)
         materials.append(blender_material)
 
     return materials
 
 
-def import_material(material, blender_images):
+def import_material(material, blender_images, image_textures):
     blender_material = bpy.data.materials.new(material.name)
     blender_material.use_nodes = True
 
@@ -228,8 +230,8 @@ def import_material(material, blender_images):
 
     # Get information on how the decompiled shader code assigns outputs.
     # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
-    # TODO: Textures for fallback assignments
-    assignments = material.output_assignments([]).assignments
+    # Textures provide less accurate fallback assignments based on usage hints.
+    assignments = material.output_assignments(image_textures).assignments
 
     textures = []
     textures_rgb = []
@@ -315,7 +317,11 @@ def assign_channel(channel_assignment, links, textures, textures_rgb, output_nod
                         input = textures_rgb[texture_index].outputs[input_channel]
                     output = output_node.inputs[output_channel]
                     links.new(input, output)
+
+                    if texture_assignment.texcoord_scale is not None:
+                        pass
                 except IndexError:
+                    # TODO: Better error checking.
                     print(f'Texture index {texture_index} out of range')
         elif value is not None:
             output_node.inputs[output_channel].default_value = value
