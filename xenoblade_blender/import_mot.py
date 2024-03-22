@@ -8,7 +8,7 @@ from .export_root import export_skeleton
 
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty
-from mathutils import Matrix, Quaternion
+from mathutils import Matrix
 
 
 class ImportMot(bpy.types.Operator, ImportHelper):
@@ -61,61 +61,57 @@ def import_mot(context: bpy.types.Context, path: str):
     # TODO: Is this the best way to load all animations?
     # TODO: Optimize this.
     for animation in animations:
-        action = bpy.data.actions.new(animation.name)
-
-        # Assume each bone appears in only one track.
-        animated_bone_names = {get_bone_name(
-            t, bone_names, hash_to_name) for t in animation.tracks}
-
-        # Collect keyframes for the appropriate bones.
-        positions = {name: [] for name in animated_bone_names}
-        rotations_wxyz = {name: [] for name in animated_bone_names}
-        scales = {name: [] for name in animated_bone_names}
-
-        for frame in range(animation.frame_count):
-            # Calculate the transforms in model space to handle model space anims.
-            transforms = animation.model_space_transforms(skeleton, frame)
-
-            # Transforms need to be relative to the parent bone to animate properly.
-            # TODO: Move this to xc3_model?
-            # TODO: Why is this necessary?
-            transforms = [Matrix(t).transposed() for t in transforms]
-            new_transforms = []
-            for i, bone in enumerate(skeleton.bones):
-                if bone.parent_index is not None:
-                    new_transforms.append(
-                        transforms[bone.parent_index].inverted() @ transforms[i])
-                else:
-                    new_transforms.append(transforms[i])
-
-            for name, transform in zip(bone_names, new_transforms):
-                if name not in animated_bone_names:
-                    continue
-                pose_bone = armature.pose.bones.get(name)
-                if pose_bone.parent is not None:
-                    pose_bone.matrix = pose_bone.parent.matrix @ transform
-                else:
-                    pose_bone.matrix = transform
-                pose_bone = armature.pose.bones.get(name)
-                t, r, s = pose_bone.matrix_basis.decompose()
-                positions[name].append(t)
-                rotations_wxyz[name].append(r)
-                scales[name].append(s)
-
-        for name in animated_bone_names:
-            if name is None:
-                continue
-
-            # TODO: Use actual cubic keyframes instead of baking at each frame?
-            set_fcurves(action, name, "location", positions[name], 3)
-            set_fcurves(action, name, "rotation_quaternion",
-                        rotations_wxyz[name], 4)
-            set_fcurves(action, name, "scale", scales[name], 3)
-
+        action = import_animation(
+            armature, skeleton, bone_names, hash_to_name, animation)
         armature.animation_data.action = action
 
     end = time.time()
     print(f"Import Blender Animation: {end - start}")
+
+
+def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
+    action = bpy.data.actions.new(animation.name)
+
+    # Assume each bone appears in only one track.
+    animated_bones = {get_bone_name(
+        t, bone_names, hash_to_name) for t in animation.tracks}
+
+    # Collect keyframes for the appropriate bones.
+    positions = {name: [] for name in animated_bones}
+    rotations_wxyz = {name: [] for name in animated_bones}
+    scales = {name: [] for name in animated_bones}
+
+    for frame in range(animation.frame_count):
+        # Use xc3_model_py to efficiently handle different anim types.
+        # Transforms need to be relative to the parent bone to animate properly.
+        transforms = animation.local_space_transforms(skeleton, frame)
+
+        for name, transform in zip(bone_names, transforms):
+            if name not in animated_bones:
+                continue
+
+            pose_bone = armature.pose.bones.get(name)
+            matrix = Matrix(transform).transposed()
+            if pose_bone.parent is not None:
+                pose_bone.matrix = pose_bone.parent.matrix @ matrix
+            else:
+                pose_bone.matrix = matrix
+
+            t, r, s = pose_bone.matrix_basis.decompose()
+            positions[name].append(t)
+            rotations_wxyz[name].append(r)
+            scales[name].append(s)
+
+    for name in animated_bones:
+        if name is None:
+            continue
+
+        # TODO: Use actual cubic keyframes instead of baking at each frame?
+        set_fcurves(action, name, "location", positions[name], 3)
+        set_fcurves(action, name, "rotation_quaternion",
+                    rotations_wxyz[name], 4)
+        set_fcurves(action, name, "scale", scales[name], 3)
+    return action
 
 
 def get_bone_name(track, bone_names: list[str], hash_to_name):
@@ -136,15 +132,13 @@ def get_bone_name(track, bone_names: list[str], hash_to_name):
 
 def set_fcurves(action, bone_name: str, value_name: str, values, component_count):
     for i in range(component_count):
+        # Values can be quickly set in the form [frame, value, frame, value, ...]
+        # Assume one value at each frame index for now.
+        keyframe_points = [val for pair in enumerate(
+            v[i] for v in values) for val in pair]
+
         # Each coordinate of each value has its own fcurve.
         data_path = f"pose.bones[\"{bone_name}\"].{value_name}"
         fcurve = action.fcurves.new(data_path, index=i, action_group=bone_name)
         fcurve.keyframe_points.add(count=len(values))
-        # TODO: List comprehension?
-        # Values can be quickly set in the form [frame, value, frame, value, ...]
-        # Assume one value at each frame index for now.
-        keyframe_points = []
-        for frame, value in enumerate(values):
-            keyframe_points.append(frame)
-            keyframe_points.append(value[i])
         fcurve.keyframe_points.foreach_set('co', keyframe_points)
