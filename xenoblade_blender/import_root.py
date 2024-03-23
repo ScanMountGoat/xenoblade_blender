@@ -181,32 +181,29 @@ def import_colors(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data
 
 
 def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer, min_index: int, max_index: int):
-    # The weights use a bone ordering that may not match the skeleton.
-    bone_names = weights.skin_weights.bone_names
-
     # Find the per vertex skinning information.
+    weight_indices = None
     for attribute in vertex_buffer.attributes:
         if attribute.attribute_type == xc3_model_py.AttributeType.WeightIndex:
             # Account for adjusting vertex indices in a previous step.
             weight_indices = attribute.data[min_index:max_index +
                                             1] + start_index
+            break
 
-            # Set the vertex skin weights for each bone.
-            # TODO: Is there a faster way than setting weights per vertex?
-            # TODO: Avoid looping here?
-            for i, index in enumerate(weight_indices):
-                bone_indices = weights.skin_weights.bone_indices[index]
-                skin_weights = weights.skin_weights.weights[index]
+    if weight_indices is not None:
+        # This automatically removes zero weights.
+        influences = weights.skin_weights.to_influences(weight_indices)
 
-                for index, weight in zip(bone_indices, skin_weights):
-                    if weight > 0.0:
-                        # Lazily load only used vertex groups.
-                        name = bone_names[index]
-                        group = blender_mesh.vertex_groups.get(name)
-                        if group is None:
-                            group = blender_mesh.vertex_groups.new(name=name)
-                        blender_mesh.vertex_groups[name].add(
-                            [i], weight, 'REPLACE')
+        for influence in influences:
+            # Lazily load only used vertex groups.
+            name = influence.bone_name
+            group = blender_mesh.vertex_groups.get(name)
+            if group is None:
+                group = blender_mesh.vertex_groups.new(name=name)
+
+                # TODO: Is there a faster way than setting weights per vertex?
+                for weight in influence.weights:
+                    group.add([weight.vertex_index], weight.weight, 'REPLACE')
 
 
 def import_materials(blender_images, models, image_textures):
