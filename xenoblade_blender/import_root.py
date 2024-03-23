@@ -45,9 +45,11 @@ def import_images(root):
 
     for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
         name = image.name if image.name is not None else 'image'
-        blender_image = bpy.data.images.new(
-            name, image.width, image.height)
+        blender_image = bpy.data.images.new(name, image.width, image.height)
         blender_image.pixels.foreach_set(decoded)
+        # TODO: This should depend on srgb vs linear in format.
+        # TODO: Why does this cause weird issues on saving?
+        blender_image.colorspace_settings.is_data = True
         blender_images.append(blender_image)
 
     return blender_images
@@ -270,16 +272,7 @@ def import_material(material, blender_images, image_textures):
                    textures_rgb, base_color, 'Blue')
     links.new(base_color.outputs['Color'], bsdf.inputs['Base Color'])
 
-    # TODO: Calculate normal Z from XY.
-    normal = nodes.new('ShaderNodeNormalMap')
-    normal_xyz = nodes.new('ShaderNodeCombineColor')
-    assign_channel(assignments[2].x, links, textures,
-                   textures_rgb, normal_xyz, 'Red')
-    assign_channel(assignments[2].y, links, textures,
-                   textures_rgb, normal_xyz, 'Green')
-    normal_xyz.inputs['Blue'].default_value = 1.0
-    links.new(normal_xyz.outputs['Color'], normal.inputs['Color'])
-    links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
+    assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
 
     assign_channel(assignments[1].x, links, textures,
                    textures_rgb, bsdf, 'Metallic')
@@ -305,6 +298,43 @@ def import_material(material, blender_images, image_textures):
         blender_material.shadow_method = 'CLIP'
 
     return blender_material
+
+
+def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
+    if assignments[2].x is None and assignments[2].y is None:
+        return
+
+    normal_xy = nodes.new('ShaderNodeCombineXYZ')
+    assign_channel(assignments[2].x, links, textures,
+                   textures_rgb, normal_xy, 'X')
+    assign_channel(assignments[2].y, links, textures,
+                   textures_rgb, normal_xy, 'Y')
+    normal_xy.inputs['Z'].default_value = 0.0
+
+    length2 = nodes.new('ShaderNodeVectorMath')
+    length2.operation = 'DOT_PRODUCT'
+    links.new(normal_xy.outputs['Vector'], length2.inputs[0])
+    links.new(normal_xy.outputs['Vector'], length2.inputs[1])
+
+    one_minus_length = nodes.new('ShaderNodeMath')
+    one_minus_length.operation = 'SUBTRACT'
+    one_minus_length.inputs[0].default_value = 1.0
+    links.new(length2.outputs['Value'], one_minus_length.inputs[1])
+
+    length = nodes.new('ShaderNodeMath')
+    length.operation = 'SQRT'
+    links.new(one_minus_length.outputs['Value'], length.inputs[0])
+
+    normal_xyz = nodes.new('ShaderNodeCombineXYZ')
+    assign_channel(assignments[2].x, links, textures,
+                   textures_rgb, normal_xyz, 'X')
+    assign_channel(assignments[2].y, links, textures,
+                   textures_rgb, normal_xyz, 'Y')
+    links.new(length.outputs['Value'], normal_xyz.inputs['Z'])
+
+    normal_map = nodes.new('ShaderNodeNormalMap')
+    links.new(normal_xyz.outputs['Vector'], normal_map.inputs['Color'])
+    links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
 
 
 def assign_channel(channel_assignment, links, textures, textures_rgb, output_node, output_channel):
