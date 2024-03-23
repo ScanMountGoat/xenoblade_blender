@@ -99,6 +99,7 @@ def import_mesh(root_obj, group, models, model, mesh, material):
         data = attribute.data[min_index:max_index+1]
 
         if attribute.attribute_type == xc3_model_py.AttributeType.Position:
+            # TODO: Don't assume the first attribute is position to set count.
             blender_mesh.vertices.add(data.shape[0])
             blender_mesh.vertices.foreach_set('co', data.reshape(-1))
         elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord0:
@@ -126,6 +127,20 @@ def import_mesh(root_obj, group, models, model, mesh, material):
 
     # TODO: Will this mess up indexing for weight groups?
     blender_mesh.update()
+
+    # The validate call may modify and reindex geometry.
+    # Assign normals now that the mesh has been updated.
+    for attribute in vertex_buffer.attributes:
+        if attribute.attribute_type == xc3_model_py.AttributeType.Normal:
+            # We can't assume that the attribute data is normalized.
+            data = attribute.data[min_index:max_index+1, :3]
+            lengths = np.linalg.norm(data, ord=2, axis=1)
+            normals = data / lengths.reshape((-1, 1))
+
+            # Auto smooth also enables custom vertex normals.
+            blender_mesh.use_auto_smooth = True
+            blender_mesh.normals_split_custom_set_from_vertices(normals)
+
     blender_mesh.validate()
 
     # Assign materials from the current group.
@@ -176,7 +191,7 @@ def import_colors(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data
         name=name, type='BYTE_COLOR', domain='CORNER')
 
     # This is set per loop rather than per vertex.
-    loop_colors = data[vertex_indices].flatten()
+    loop_colors = data[vertex_indices].reshape(-1)
     attribute.data.foreach_set('color', loop_colors)
 
 
