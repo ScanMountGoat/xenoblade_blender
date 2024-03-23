@@ -18,7 +18,6 @@ A Blender addon for importing Xenoblade models and maps from Xenoblade Chronicle
 
 ## Planned Features
 * Exporting models and animations
-* Fixed handling of different animation types
 * Improvements to import times and memory usage
 
 The goal of this addon is to provide import and export operations with good performance and minimal configuration. Quality of life features requiring more complex UI are better handled using traditional pure Python addons.
