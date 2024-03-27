@@ -138,9 +138,6 @@ def import_mesh(root_obj, group, models, model, mesh, material):
             data = attribute.data[min_index:max_index+1, :3]
             lengths = np.linalg.norm(data, ord=2, axis=1)
             normals = data / lengths.reshape((-1, 1))
-
-            # Auto smooth also enables custom vertex normals.
-            blender_mesh.use_auto_smooth = True
             blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     blender_mesh.validate()

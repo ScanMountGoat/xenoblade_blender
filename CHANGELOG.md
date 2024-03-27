@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 * Optimized import times for models and animations.
 * Improved the accuracy of the generated Z coordinate for normal maps.
+* Changed supported Blender version to 4.1.
 
 ### Fixed
 * Fixed an incorrect description for the Game Version import option.

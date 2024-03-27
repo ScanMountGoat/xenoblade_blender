@@ -9,7 +9,7 @@ bl_info = {
     "description": "Import Xenoblade models, maps, and animations",
     "author": "ScanMountGoat (SMG)",
     "version": (0, 1, 0),
-    "blender": (4, 0, 0),
+    "blender": (4, 1, 0),
     "location": "File > Import",
     "warning": "",
     "doc_url": "https://github.com/ScanMountGoat/xenoblade_blender/wiki",
