@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Fixed an issue where model space anims did not import with correct transforms.
 * Fixed an issue where models did not import with accurate smooth normals.
 * Fixed an issue where models did not import with all vertex color and texture coordinate attributes.
+* Fixed an issue where materials did not use the correct gamma settings for color vs non color textures.
 
 ## 0.1.0 - 2024-03-13
 First public release!

@@ -50,6 +50,8 @@ def import_images(root):
         # TODO: This should depend on srgb vs linear in format.
         # TODO: Why does this cause weird issues on saving?
         blender_image.colorspace_settings.is_data = True
+        # Pack textures to avoid the prompt to save on exit.
+        blender_image.pack()
         blender_images.append(blender_image)
 
     return blender_images
@@ -259,14 +261,14 @@ def import_material(material, blender_images, image_textures):
     # TODO: Alpha testing.
     # TODO: Select UV map and scale for each texture.
     # TODO: Set color space for images?
-
+    # Assume the color texture isn't used as non color data.
     base_color = nodes.new('ShaderNodeCombineColor')
     assign_channel(assignments[0].x, links, textures,
-                   textures_rgb, base_color, 'Red')
+                   textures_rgb, base_color, 'Red', is_data=False)
     assign_channel(assignments[0].y, links, textures,
-                   textures_rgb, base_color, 'Green')
+                   textures_rgb, base_color, 'Green', is_data=False)
     assign_channel(assignments[0].z, links, textures,
-                   textures_rgb, base_color, 'Blue')
+                   textures_rgb, base_color, 'Blue', is_data=False)
     links.new(base_color.outputs['Color'], bsdf.inputs['Base Color'])
 
     assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
@@ -334,7 +336,7 @@ def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
     links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
 
 
-def assign_channel(channel_assignment, links, textures, textures_rgb, output_node, output_channel):
+def assign_channel(channel_assignment, links, textures, textures_rgb, output_node, output_channel, is_data=True):
     # Assign one output channel from a texture channel or constant.
     if channel_assignment is not None:
         texture_assignment = channel_assignment.texture()
@@ -349,6 +351,14 @@ def assign_channel(channel_assignment, links, textures, textures_rgb, output_nod
             texture_index = sampler_to_index.get(texture_assignment.name)
             if texture_index is not None:
                 try:
+                    # TODO: Find a better way to handle color management.
+                    # TODO: Why can't we just set everything to non color?
+                    # TODO: This won't work if users have different color spaces installed like aces.
+                    if is_data:
+                        textures[texture_index].image.colorspace_settings.name = 'Non-Color'
+                    else:
+                        textures[texture_index].image.colorspace_settings.name = 'sRGB'
+
                     # Alpha isn't part of the RGB node.
                     if input_channel == 'Alpha':
                         input = textures[texture_index].outputs['Alpha']
