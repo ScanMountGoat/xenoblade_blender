@@ -102,31 +102,31 @@ def import_mesh(root_obj, group, models, model, mesh, material):
     for attribute in vertex_buffer.attributes:
         data = attribute.data[min_index:max_index+1]
 
-        if attribute.attribute_type == xc3_model_py.AttributeType.Position:
+        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Position:
             # TODO: Don't assume the first attribute is position to set count.
             blender_mesh.vertices.add(data.shape[0])
             blender_mesh.vertices.foreach_set('co', data.reshape(-1))
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord0:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord0')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord1:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord1:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord1')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord2:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord2:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord2')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord3:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord3:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord3')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord4:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord4:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord4')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord5:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord5:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord5')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord6:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord6:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord6')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord7:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord7:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord7')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.TexCoord8:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord8:
             import_uvs(blender_mesh, vertex_indices, data, 'TexCoord8')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.VertexColor:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
             import_colors(blender_mesh, vertex_indices, data, 'VertexColor')
-        elif attribute.attribute_type == xc3_model_py.AttributeType.Blend:
+        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
             import_colors(blender_mesh, vertex_indices, data, 'Blend')
 
     # TODO: Will this mess up indexing for weight groups?
@@ -135,7 +135,7 @@ def import_mesh(root_obj, group, models, model, mesh, material):
     # The validate call may modify and reindex geometry.
     # Assign normals now that the mesh has been updated.
     for attribute in vertex_buffer.attributes:
-        if attribute.attribute_type == xc3_model_py.AttributeType.Normal:
+        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal:
             # We can't assume that the attribute data is normalized.
             data = attribute.data[min_index:max_index+1, :3]
             lengths = np.linalg.norm(data, ord=2, axis=1)
@@ -161,7 +161,7 @@ def import_mesh(root_obj, group, models, model, mesh, material):
             # Calculate the index offset based on the weight group for this mesh.
             pass_type = models.materials[mesh.material_index].pass_type
             start_index = buffers.weights.weights_start_index(
-                mesh.skin_flags, mesh.lod, pass_type)
+                mesh.flags2, mesh.lod, pass_type)
 
             import_weight_groups(
                 buffers.weights, start_index, obj, vertex_buffer, min_index, max_index)
@@ -200,10 +200,10 @@ def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer,
     # Find the per vertex skinning information.
     weight_indices = None
     for attribute in vertex_buffer.attributes:
-        if attribute.attribute_type == xc3_model_py.AttributeType.WeightIndex:
+        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.WeightIndex:
             # Account for adjusting vertex indices in a previous step.
-            weight_indices = attribute.data[min_index:max_index +
-                                            1] + start_index
+            indices = attribute.data[min_index:max_index + 1]
+            weight_indices = indices + start_index
             break
 
     if weight_indices is not None:
