@@ -14,7 +14,7 @@ from mathutils import Matrix
 
 
 class ImportWimdo(bpy.types.Operator, ImportHelper):
-    """Import a Xenoblade model"""
+    """Import a Xenoblade Switch model"""
     bl_idname = "import_scene.wimdo"
     bl_label = "Import Wimdo"
 
