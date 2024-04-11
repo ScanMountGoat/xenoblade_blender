@@ -63,6 +63,7 @@ def import_root(root, blender_images, root_obj):
             materials = import_materials(
                 blender_images, models, root.image_textures)
 
+            # TODO: Cache based on vertex and index buffer indices?
             for model in models.models:
                 for mesh in model.meshes:
                     # TODO: check actual base lod
@@ -99,10 +100,14 @@ def import_mesh(root_obj, group, models, model, mesh, material):
     # TODO: Set remaining attributes
     # TODO: Helper functions for setting each attribute type.
     vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
+    position_data = None
     for attribute in vertex_buffer.attributes:
         data = attribute.data[min_index:max_index+1]
 
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Position:
+            # Shape keys do their own indexing with the full data.
+            position_data = attribute.data
+
             # TODO: Don't assume the first attribute is position to set count.
             blender_mesh.vertices.add(data.shape[0])
             blender_mesh.vertices.foreach_set('co', data.reshape(-1))
@@ -175,7 +180,29 @@ def import_mesh(root_obj, group, models, model, mesh, material):
                 root_obj.data.name, type='ARMATURE')
             modifier.object = root_obj
 
+        # TODO: Is there a way to not do this for every instance?
+        # Only non instanced character meshes have shape keys in practice.
+        if position_data is not None:
+            import_shape_keys(vertex_buffer, position_data,
+                              min_index, max_index, obj)
+
         bpy.context.collection.objects.link(obj)
+
+
+def import_shape_keys(vertex_buffer, position_data, min_index: int, max_index: int, obj):
+    obj.shape_key_add(name="Basis")
+    for target in vertex_buffer.morph_targets:
+        # TODO: name?
+        sk = obj.shape_key_add()
+        if target.vertex_indices.size > 0:
+            # Morph targets are stored as sparse deltas for the base positions.
+            # TODO: Blender doesn't have shape key normals?
+            positions = position_data.copy()
+            positions[target.vertex_indices] += target.position_deltas
+
+            # Account for the unused vertex removal performed for other attributes.
+            final_positions = positions[min_index:max_index+1]
+            sk.points.foreach_set('co', final_positions.reshape(-1))
 
 
 def import_uvs(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str):
