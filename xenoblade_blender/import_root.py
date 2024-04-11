@@ -229,7 +229,7 @@ def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer,
     for attribute in vertex_buffer.attributes:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.WeightIndex:
             # Account for adjusting vertex indices in a previous step.
-            indices = attribute.data[min_index:max_index + 1]
+            indices = attribute.data[min_index:max_index + 1, 0]
             weight_indices = indices + start_index
             break
 

@@ -56,7 +56,7 @@ def import_mot(context: bpy.types.Context, path: str):
     for i, bone in enumerate(skeleton.bones):
         if bone.parent_index is not None and bone.parent_index > i:
             print(f'invalid index {bone.parent_index} > {i}')
-    hash_to_name = {xc3_model_py.murmur3(name): name for name in bone_names}
+    hash_to_name = {xc3_model_py.animation.murmur3(name): name for name in bone_names}
 
     # TODO: Is this the best way to load all animations?
     # TODO: Optimize this.
