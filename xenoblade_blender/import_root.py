@@ -183,17 +183,18 @@ def import_mesh(root_obj, group, models, model, mesh, material):
         # TODO: Is there a way to not do this for every instance?
         # Only non instanced character meshes have shape keys in practice.
         if position_data is not None:
-            import_shape_keys(vertex_buffer, position_data,
-                              min_index, max_index, obj)
+            import_shape_keys(vertex_buffer, models.morph_controller_names,
+                              position_data, min_index, max_index, obj)
 
         bpy.context.collection.objects.link(obj)
 
 
-def import_shape_keys(vertex_buffer, position_data, min_index: int, max_index: int, obj):
+def import_shape_keys(vertex_buffer, names: list[str], position_data, min_index: int, max_index: int, obj):
+    # Shape keys need to be relative to something.
     obj.shape_key_add(name="Basis")
+
     for target in vertex_buffer.morph_targets:
-        # TODO: name?
-        sk = obj.shape_key_add()
+        sk = obj.shape_key_add(name=names[target.morph_controller_index])
         if target.vertex_indices.size > 0:
             # Morph targets are stored as sparse deltas for the base positions.
             # TODO: Blender doesn't have shape key normals?
@@ -229,7 +230,7 @@ def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer,
     for attribute in vertex_buffer.attributes:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.WeightIndex:
             # Account for adjusting vertex indices in a previous step.
-            indices = attribute.data[min_index:max_index + 1, 0]
+            indices = attribute.data[min_index:max_index + 1]
             weight_indices = indices + start_index
             break
 
