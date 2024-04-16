@@ -17,7 +17,8 @@ A Blender addon for importing models and maps from Xenoblade Chronicles X, Xenob
 * Select the appropriate game version before importing for correct material texture assignments.
 
 ## Planned Features
-* Exporting models and animations
+* Improved wimdo export
+* Exporting animations
 * Better support for Xenoblade X models and maps
 * Improvements to import times and memory usage
 

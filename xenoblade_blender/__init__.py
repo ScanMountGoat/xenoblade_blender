@@ -4,6 +4,7 @@ from . import import_mot
 from . import import_wimdo
 from . import import_wismhd
 from . import import_camdo
+from . import export_wimdo
 
 bl_info = {
     "name": "Xenoblade Blender",
@@ -29,6 +30,11 @@ def menu_import_wimdo(self, context):
     self.layout.operator(import_wimdo.ImportWimdo.bl_idname, text=text)
 
 
+def menu_export_wimdo(self, context):
+    text = "Xenoblade Model (.wimdo)"
+    self.layout.operator(export_wimdo.ExportWimdo.bl_idname, text=text)
+
+
 def menu_import_wismhd(self, context):
     text = "Xenoblade Map (.wismhd)"
     self.layout.operator(import_wismhd.ImportWismhd.bl_idname, text=text)
@@ -40,7 +46,7 @@ def menu_import_camdo(self, context):
 
 
 classes = [import_mot.ImportMot,
-           import_wimdo.ImportWimdo, import_wismhd.ImportWismhd, import_camdo.ImportCamdo]
+           import_wimdo.ImportWimdo, import_wismhd.ImportWismhd, import_camdo.ImportCamdo, export_wimdo.ExportWimdo]
 
 
 def register():
@@ -52,6 +58,8 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(menu_import_wismhd)
     bpy.types.TOPBAR_MT_file_import.append(menu_import_camdo)
 
+    bpy.types.TOPBAR_MT_file_export.append(menu_export_wimdo)
+
 
 def unregister():
     for cls in classes:
@@ -61,6 +69,8 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_wimdo)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_wismhd)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_camdo)
+
+    bpy.types.TOPBAR_MT_file_export.remove(menu_export_wimdo)
 
 
 if __name__ == "__main__":
