@@ -46,7 +46,8 @@ def import_images(root):
     for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
         name = image.name if image.name is not None else 'image'
         blender_image = bpy.data.images.new(name, image.width, image.height)
-        blender_image.pixels.foreach_set(decoded)
+        decoded_size = image.width * image.height * 4  # TODO: why is this necessary?
+        blender_image.pixels.foreach_set(decoded[:decoded_size])
         # TODO: This should depend on srgb vs linear in format.
         # TODO: Why does this cause weird issues on saving?
         blender_image.colorspace_settings.is_data = True
