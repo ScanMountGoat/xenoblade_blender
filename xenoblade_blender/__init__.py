@@ -8,11 +8,11 @@ from . import export_wimdo
 
 bl_info = {
     "name": "Xenoblade Blender",
-    "description": "Import Xenoblade models, maps, and animations",
+    "description": "Import and export Xenoblade models, maps, and animations",
     "author": "ScanMountGoat (SMG)",
     "version": (0, 2, 0),
     "blender": (4, 1, 0),
-    "location": "File > Import",
+    "location": "File > Import-Export",
     "warning": "",
     "doc_url": "https://github.com/ScanMountGoat/xenoblade_blender/wiki",
     "tracker_url": "https://github.com/ScanMountGoat/xenoblade_blender/issues",
