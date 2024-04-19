@@ -168,8 +168,11 @@ def import_mesh(root_obj, group, models, model, mesh, material):
             start_index = buffers.weights.weights_start_index(
                 mesh.flags2, mesh.lod, pass_type)
 
-            import_weight_groups(
-                buffers.weights, start_index, obj, vertex_buffer, min_index, max_index)
+            # An extra step is required since some Xenoblade X models have multiple weight buffers.
+            weight_buffer = buffers.weights.weight_buffer(mesh.flags2)
+            if weight_buffer is not None:
+                import_weight_groups(
+                    weight_buffer, start_index, obj, vertex_buffer, min_index, max_index)
 
         # Attach the mesh to the armature or empty.
         # Assume the root_obj is an armature if there are weights.
@@ -224,7 +227,7 @@ def import_colors(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data
     attribute.data.foreach_set('color', loop_colors)
 
 
-def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer, min_index: int, max_index: int):
+def import_weight_groups(skin_weights, start_index: int, blender_mesh, vertex_buffer, min_index: int, max_index: int):
     # Find the per vertex skinning information.
     weight_indices = None
     for attribute in vertex_buffer.attributes:
@@ -236,7 +239,7 @@ def import_weight_groups(weights, start_index: int, blender_mesh, vertex_buffer,
 
     if weight_indices is not None:
         # This automatically removes zero weights.
-        influences = weights.skin_weights.to_influences(weight_indices)
+        influences = skin_weights.to_influences(weight_indices)
 
         for influence in influences:
             # Lazily load only used vertex groups.
