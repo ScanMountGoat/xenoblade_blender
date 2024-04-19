@@ -1,13 +1,14 @@
 # xenoblade_blender [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ScanMountGoat/xenoblade_blender?include_prereleases)](https://github.com/ScanMountGoat/xenoblade_blender/releases/latest)
-A Blender addon for importing models and maps from Xenoblade Chronicles X, Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3. Report bugs or request new features in [issues](https://github.com/ScanMountGoat/xenoblade_blender/issues). Download the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Check the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki) for more usage information.
+A Blender addon for importing and exporting models, maps, and animations for Xenoblade Chronicles X, Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3. Report bugs or request new features in [issues](https://github.com/ScanMountGoat/xenoblade_blender/issues). Download the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Check the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki) for more usage information.
 
 ## Features
 * Faster and more accurate than intermediate formats like FBX or glTF
 * Import characters, objects, enemies, and weapon models from .wimdo and .camdo files
 * Import maps from .wismhd files
 * Import character animations from .mot files
-* Decoded and packed RGBA textures for easier use in Blender
-* Material parameters, textures, and texture channel assignments based on decompiled in game shader code.
+* Decoded and embedded RGBA textures for easier use in Blender
+* Material parameters, textures, and texture channel assignments based on decompiled in game shader code
+* Export .wimdo models using an existing model as a base (very experimental WIP)
 
 ## Getting Started
 * Download the latest version of the addon supported by your Blender version from releases.
