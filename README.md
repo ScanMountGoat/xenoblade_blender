@@ -11,7 +11,7 @@ A Blender addon for importing and exporting models, maps, and animations for Xen
 * Export .wimdo models using an existing model as a base (very experimental WIP)
 
 ## Getting Started
-* Download the latest version of the addon supported by your Blender version from releases.
+* Download the latest version of the addon supported by your Blender version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases).
 * Install the .zip file in Blender using Edit > Preferences > Addons > Install...
 * Enable the addon if it is not already enabled.
 * Import any of the supported file types using the new menu options under File > Import.
