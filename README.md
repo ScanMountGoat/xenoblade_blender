@@ -1,5 +1,5 @@
 # xenoblade_blender [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ScanMountGoat/xenoblade_blender?include_prereleases)](https://github.com/ScanMountGoat/xenoblade_blender/releases/latest)
-A Blender addon for importing and exporting models, maps, and animations for Xenoblade Chronicles X, Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3. 
+A Blender addon for importing models, maps, and animations for Xenoblade Chronicles X, Xenoblade Chronicles 1 DE, Xenoblade Chronicles 2, and Xenoblade Chronicles 3. 
 
 Report bugs or request new features in [issues](https://github.com/ScanMountGoat/xenoblade_blender/issues). Download the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Check the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki) for more usage information.
 
