@@ -66,6 +66,8 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
     loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
     uv_layer.data.foreach_get("uv", loop_uvs)
     texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
+    # Flip vertically to match in game.
+    texcoords[:, 1] = 1.0 - texcoords[:, 1]
 
     # TODO: create influences and then convert to weights
     # TODO: Where to store weights for each mesh?

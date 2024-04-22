@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added an option to save unpacked PNG textures when importing to reduce memory usage and import times.
+
 ### Changed
 * Optimized import times for models and maps with many materials and images.
+* Adjusted images and UVs to have the expected vertical orientation.
 
 ## 0.3.1 - 2024-04-19
 ### Fixed

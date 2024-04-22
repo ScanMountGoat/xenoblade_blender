@@ -5,9 +5,9 @@ import logging
 import math
 
 from . import xc3_model_py
-from .import_root import get_database_path, import_root, import_images
+from .import_root import get_database_path, get_image_folder, import_root, import_images
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, EnumProperty
+from bpy.props import StringProperty, EnumProperty, BoolProperty
 from mathutils import Matrix
 
 
@@ -35,17 +35,30 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         default='XC3',
     )
 
+    pack_images: BoolProperty(
+        name="Pack Images",
+        description="Pack all images into the Blender file. Increases memory usage and import times but makes the Blender file easier to share by not creating additional files",
+        default=False
+    )
+
+    # TODO: Only show this if packed is unchecked
+    image_folder: StringProperty(
+        name="Image Folder", description="The folder for the imported images. Defaults to the file's parent folder if not set")
+
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
         log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
         database_path = get_database_path(self.game_version)
-        import_wismhd(context, self.filepath, database_path)
+        image_folder = get_image_folder(self.image_folder, self.filepath)
+
+        import_wismhd(context, self.filepath, database_path,
+                      self.pack_images, image_folder)
         return {'FINISHED'}
 
 
-def import_wismhd(context: bpy.types.Context, path: str, database_path: str):
+def import_wismhd(context: bpy.types.Context, path: str, database_path: str, pack_images: bool, image_folder: str):
     start = time.time()
 
     roots = xc3_model_py.load_map(path, database_path)
@@ -56,8 +69,10 @@ def import_wismhd(context: bpy.types.Context, path: str, database_path: str):
     start = time.time()
 
     model_name = os.path.basename(path)
-    for root in roots:
-        blender_images = import_images(root)
+
+    for i, root in enumerate(roots):
+        blender_images = import_images(
+            root, f'{model_name}.root{i}', pack_images, image_folder, flip=True)
 
         # Create an empty by setting the data to None.
         # Maps have no skeletons.
@@ -66,7 +81,7 @@ def import_wismhd(context: bpy.types.Context, path: str, database_path: str):
         root_obj.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
         bpy.context.collection.objects.link(root_obj)
 
-        import_root(root, blender_images, root_obj)
+        import_root(root, blender_images, root_obj, flip_uvs=True)
 
     end = time.time()
     print(f'Import Blender Scene: {end - start}')

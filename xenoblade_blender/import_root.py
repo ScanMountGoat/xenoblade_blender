@@ -4,11 +4,20 @@ import os
 
 from . import xc3_model_py
 from mathutils import Matrix
+from bpy_extras import image_utils
+from pathlib import Path
 
 
 def get_database_path(version: str) -> str:
     files = {'XC1': "xc1.json", 'XC2': "xc2.json", 'XC3': "xc3.json"}
     return os.path.join(os.path.dirname(__file__), files[version])
+
+
+def get_image_folder(image_folder: str, filepath: str) -> str:
+    if image_folder == '':
+        return str(Path(filepath).parent)
+    else:
+        return image_folder
 
 
 def import_armature(context, root, name: str):
@@ -40,25 +49,45 @@ def import_armature(context, root, name: str):
     return armature
 
 
-def import_images(root):
+def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bool):
     blender_images = []
 
-    for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
-        name = image.name if image.name is not None else 'image'
-        blender_image = bpy.data.images.new(name, image.width, image.height)
-        decoded_size = image.width * image.height * 4  # TODO: why is this necessary?
-        blender_image.pixels.foreach_set(decoded[:decoded_size])
-        # TODO: This should depend on srgb vs linear in format.
-        # TODO: Why does this cause weird issues on saving?
-        blender_image.colorspace_settings.is_data = True
-        # Pack textures to avoid the prompt to save on exit.
-        blender_image.pack()
-        blender_images.append(blender_image)
+    if pack:
+        for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
+            name = image.name if image.name is not None else 'image'
+            blender_image = bpy.data.images.new(
+                name, image.width, image.height)
+
+            decoded_size = image.width * image.height * 4  # TODO: why is this necessary?
+            if flip:
+                # Flip vertically to match Blender.
+                decoded = decoded[:decoded_size].reshape(
+                    (image.width, image.height, 4))
+                decoded = np.flip(decoded, axis=0)
+
+            blender_image.pixels.foreach_set(decoded.reshape(-1))
+
+            # TODO: This should depend on srgb vs linear in format.
+            blender_image.colorspace_settings.is_data = True
+
+            # Pack textures to avoid the prompt to save on exit.
+            blender_image.pack()
+            blender_images.append(blender_image)
+    else:
+        # Unpacked textures use less memory and are faster to load.
+        for image, file in zip(root.image_textures, root.save_images_rgba8(image_folder, model_name, 'png', not flip)):
+            blender_image = image_utils.load_image(
+                file, place_holder=True, check_existing=False)
+
+            # TODO: This should depend on srgb vs linear in format.
+            blender_image.colorspace_settings.is_data = True
+
+            blender_images.append(blender_image)
 
     return blender_images
 
 
-def import_root(root, blender_images, root_obj):
+def import_root(root, blender_images, root_obj, flip_uvs: bool):
     for group in root.groups:
         for models in group.models:
             materials = import_materials(
@@ -72,10 +101,11 @@ def import_root(root, blender_images, root_obj):
                     material = materials[mesh.material_index]
                     if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
                         continue
-                    import_mesh(root_obj, group, models, model, mesh, material)
+                    import_mesh(root_obj, group, models, model,
+                                mesh, material, flip_uvs)
 
 
-def import_mesh(root_obj, group, models, model, mesh, material):
+def import_mesh(root_obj, group, models, model, mesh, material, flip_uvs: bool):
     blender_mesh = bpy.data.meshes.new(material.name)
 
     buffers = group.buffers[model.model_buffers_index]
@@ -86,12 +116,12 @@ def import_mesh(root_obj, group, models, model, mesh, material):
     min_index = index_buffer.indices.min()
     max_index = index_buffer.indices.max()
 
-    vertex_indices = index_buffer.indices.astype(np.uint32) - min_index
-    loop_start = np.arange(0, vertex_indices.shape[0], 3, dtype=np.uint32)
+    indices = index_buffer.indices.astype(np.uint32) - min_index
+    loop_start = np.arange(0, indices.shape[0], 3, dtype=np.uint32)
     loop_total = np.full(loop_start.shape[0], 3, dtype=np.uint32)
 
-    blender_mesh.loops.add(vertex_indices.shape[0])
-    blender_mesh.loops.foreach_set('vertex_index', vertex_indices)
+    blender_mesh.loops.add(indices.shape[0])
+    blender_mesh.loops.foreach_set('vertex_index', indices)
 
     blender_mesh.polygons.add(loop_start.shape[0])
     blender_mesh.polygons.foreach_set('loop_start', loop_start)
@@ -113,27 +143,27 @@ def import_mesh(root_obj, group, models, model, mesh, material):
             blender_mesh.vertices.add(data.shape[0])
             blender_mesh.vertices.foreach_set('co', data.reshape(-1))
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord0')
+            import_uvs(blender_mesh, indices, data, 'TexCoord0', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord1:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord1')
+            import_uvs(blender_mesh, indices, data, 'TexCoord1', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord2:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord2')
+            import_uvs(blender_mesh, indices, data, 'TexCoord2', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord3:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord3')
+            import_uvs(blender_mesh, indices, data, 'TexCoord3', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord4:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord4')
+            import_uvs(blender_mesh, indices, data, 'TexCoord4', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord5:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord5')
+            import_uvs(blender_mesh, indices, data, 'TexCoord5', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord6:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord6')
+            import_uvs(blender_mesh, indices, data, 'TexCoord6', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord7:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord7')
+            import_uvs(blender_mesh, indices, data, 'TexCoord7', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord8:
-            import_uvs(blender_mesh, vertex_indices, data, 'TexCoord8')
+            import_uvs(blender_mesh, indices, data, 'TexCoord8', flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
-            import_colors(blender_mesh, vertex_indices, data, 'VertexColor')
+            import_colors(blender_mesh, indices, data, 'VertexColor')
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
-            import_colors(blender_mesh, vertex_indices, data, 'Blend')
+            import_colors(blender_mesh, indices, data, 'Blend')
 
     # TODO: Will this mess up indexing for weight groups?
     blender_mesh.update()
@@ -210,11 +240,14 @@ def import_shape_keys(vertex_buffer, names: list[str], position_data, min_index:
             sk.points.foreach_set('co', final_positions.reshape(-1))
 
 
-def import_uvs(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str):
+def import_uvs(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str, flip_uvs: bool):
     uv_layer = blender_mesh.uv_layers.new(name=name)
     # This is set per loop rather than per vertex.
-    loop_uvs = data[vertex_indices].reshape(-1)
-    uv_layer.data.foreach_set('uv', loop_uvs)
+    loop_uvs = data[vertex_indices]
+    if flip_uvs:
+        # Flip vertically to match Blender.
+        loop_uvs[:, 1] = 1.0 - loop_uvs[:, 1]
+    uv_layer.data.foreach_set('uv', loop_uvs.reshape(-1))
 
 
 def import_colors(blender_mesh: bpy.types.Mesh, vertex_indices: np.ndarray, data: np.ndarray, name: str):
