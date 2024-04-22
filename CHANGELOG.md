@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Optimized import times for models and maps with many materials and images.
+
 ## 0.3.1 - 2024-04-19
 ### Fixed
 * Fixed an issue where map files failed to load.
