@@ -90,19 +90,23 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
 def import_root(root, blender_images, root_obj, flip_uvs: bool):
     for group in root.groups:
         for models in group.models:
-            materials = import_materials(
-                blender_images, models, root.image_textures)
-
             # TODO: Cache based on vertex and index buffer indices?
             for model in models.models:
                 for mesh in model.meshes:
+                    # Many materials are for meshes that won't be loaded.
+                    # Lazy load materials to improve import times.
+                    material = models.materials[mesh.material_index]
+                    blender_material = bpy.data.materials.get(material.name)
+                    if blender_material is None:
+                        blender_material = import_material(
+                            material, blender_images, root.image_textures)
+
                     # TODO: check actual base lod
                     # TODO: Include all meshes for proper exporting later?
-                    material = materials[mesh.material_index]
                     if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
                         continue
                     import_mesh(root_obj, group, models, model,
-                                mesh, material, flip_uvs)
+                                mesh, blender_material, flip_uvs)
 
 
 def import_mesh(root_obj, group, models, model, mesh, material, flip_uvs: bool):
@@ -175,6 +179,7 @@ def import_mesh(root_obj, group, models, model, mesh, material, flip_uvs: bool):
             # We can't assume that the attribute data is normalized.
             data = attribute.data[min_index:max_index+1, :3]
             lengths = np.linalg.norm(data, ord=2, axis=1)
+            # TODO: Prevent divide by zero?
             normals = data / lengths.reshape((-1, 1))
             blender_mesh.normals_split_custom_set_from_vertices(normals)
 
@@ -285,16 +290,6 @@ def import_weight_groups(skin_weights, start_index: int, blender_mesh, vertex_bu
                 # TODO: Is there a faster way than setting weights per vertex?
                 for weight in influence.weights:
                     group.add([weight.vertex_index], weight.weight, 'REPLACE')
-
-
-def import_materials(blender_images, models, image_textures):
-    materials = []
-    for material in models.materials:
-        blender_material = import_material(
-            material, blender_images, image_textures)
-        materials.append(blender_material)
-
-    return materials
 
 
 def import_material(material, blender_images, image_textures):
