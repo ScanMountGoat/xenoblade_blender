@@ -87,7 +87,7 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
     return blender_images
 
 
-def import_root(root, blender_images, root_obj, flip_uvs: bool):
+def import_map_root(root, blender_images, root_obj, flip_uvs: bool):
     for group in root.groups:
         for models in group.models:
             # TODO: Cache based on vertex and index buffer indices?
@@ -101,18 +101,39 @@ def import_root(root, blender_images, root_obj, flip_uvs: bool):
                         blender_material = import_material(
                             material, blender_images, root.image_textures)
 
+                    buffers = group.buffers[model.model_buffers_index]
+
                     # TODO: check actual base lod
                     # TODO: Include all meshes for proper exporting later?
                     if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
                         continue
-                    import_mesh(root_obj, group, models, model,
+                    import_mesh(root_obj, buffers, models, model,
                                 mesh, blender_material, flip_uvs)
 
 
-def import_mesh(root_obj, group, models, model, mesh, material, flip_uvs: bool):
+def import_model_root(root, blender_images, root_obj, flip_uvs: bool):
+    # TODO: Cache based on vertex and index buffer indices?
+    for model in root.models.models:
+        for mesh in model.meshes:
+            # Many materials are for meshes that won't be loaded.
+            # Lazy load materials to improve import times.
+            material = root.models.materials[mesh.material_index]
+            blender_material = bpy.data.materials.get(material.name)
+            if blender_material is None:
+                blender_material = import_material(
+                    material, blender_images, root.image_textures)
+
+            # TODO: check actual base lod
+            # TODO: Include all meshes for proper exporting later?
+            if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
+                continue
+            import_mesh(root_obj, root.buffers, root.models,
+                        model, mesh, blender_material, flip_uvs)
+
+
+def import_mesh(root_obj, buffers, models, model, mesh, material, flip_uvs: bool):
     blender_mesh = bpy.data.meshes.new(material.name)
 
-    buffers = group.buffers[model.model_buffers_index]
     # Vertex buffers are shared with multiple index buffers.
     # In practice, only a small range of vertices are used.
     # Reindex the vertices to eliminate most loose vertices.

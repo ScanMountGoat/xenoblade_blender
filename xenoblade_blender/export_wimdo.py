@@ -1,18 +1,14 @@
 import bpy
 import time
-import os
 import logging
-import math
 from pathlib import Path
 
-from .import_root import get_database_path, import_armature, import_root, import_images
 from .export_root import export_mesh
 
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, EnumProperty
-from mathutils import Matrix
+from bpy.props import StringProperty
 
 
 class ExportWimdo(bpy.types.Operator, ExportHelper):

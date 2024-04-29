@@ -4,7 +4,7 @@ import os
 import logging
 import math
 
-from .import_root import get_image_folder, import_armature, import_root, import_images
+from .import_root import get_image_folder, import_armature, import_model_root, import_images
 
 from . import xc3_model_py
 
@@ -61,7 +61,7 @@ def import_camdo(context: bpy.types.Context, path: str, pack_images: bool, image
     blender_images = import_images(
         root, model_name, pack_images, image_folder, flip=False)
     armature = import_armature(context, root, model_name)
-    import_root(root, blender_images, armature, flip_uvs=False)
+    import_model_root(root, blender_images, armature, flip_uvs=False)
 
     # Convert from Y up to Z up.
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')

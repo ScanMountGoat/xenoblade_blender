@@ -5,7 +5,7 @@ import logging
 import math
 
 from . import xc3_model_py
-from .import_root import get_database_path, get_image_folder, import_root, import_images
+from .import_root import get_database_path, get_image_folder, import_map_root, import_images
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty, EnumProperty, BoolProperty
 from mathutils import Matrix
@@ -81,7 +81,7 @@ def import_wismhd(context: bpy.types.Context, path: str, database_path: str, pac
         root_obj.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
         bpy.context.collection.objects.link(root_obj)
 
-        import_root(root, blender_images, root_obj, flip_uvs=True)
+        import_map_root(root, blender_images, root_obj, flip_uvs=True)
 
     end = time.time()
     print(f'Import Blender Scene: {end - start}')

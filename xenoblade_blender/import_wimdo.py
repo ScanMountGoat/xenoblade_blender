@@ -4,7 +4,7 @@ import os
 import logging
 import math
 
-from .import_root import get_database_path, get_image_folder, import_armature, import_root, import_images
+from .import_root import get_database_path, get_image_folder, import_armature, import_model_root, import_images
 
 from . import xc3_model_py
 
@@ -74,7 +74,7 @@ def import_wimdo(context: bpy.types.Context, path: str, database_path: str, pack
     blender_images = import_images(
         root, model_name, pack_images, image_folder, flip=True)
     armature = import_armature(context, root, model_name)
-    import_root(root, blender_images, armature, flip_uvs=True)
+    import_model_root(root, blender_images, armature, flip_uvs=True)
 
     # Convert from Y up to Z up.
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
