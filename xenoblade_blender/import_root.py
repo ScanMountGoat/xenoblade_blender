@@ -58,14 +58,14 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
             blender_image = bpy.data.images.new(
                 name, image.width, image.height)
 
-            decoded_size = image.width * image.height * 4  # TODO: why is this necessary?
             if flip:
                 # Flip vertically to match Blender.
                 decoded = decoded[:decoded_size].reshape(
                     (image.width, image.height, 4))
                 decoded = np.flip(decoded, axis=0)
 
-            blender_image.pixels.foreach_set(decoded.reshape(-1))
+            decoded_size = image.width * image.height * 4  # TODO: why is this necessary?
+            blender_image.pixels.foreach_set(decoded.reshape(-1)[:decoded_size])
 
             # TODO: This should depend on srgb vs linear in format.
             blender_image.colorspace_settings.is_data = True
