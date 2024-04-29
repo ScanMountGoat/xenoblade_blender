@@ -1,3 +1,4 @@
+from pathlib import Path
 import bpy
 import time
 import os
@@ -9,7 +10,7 @@ from .import_root import get_image_folder, import_armature, import_model_root, i
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty
+from bpy.props import StringProperty, BoolProperty, CollectionProperty
 from mathutils import Matrix
 
 
@@ -25,6 +26,9 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         options={'HIDDEN'},
         maxlen=255,
     )
+
+    files: CollectionProperty(type=bpy.types.OperatorFileListElement,
+                              options={'HIDDEN', 'SKIP_SAVE'})
 
     pack_images: BoolProperty(
         name="Pack Images",
@@ -42,7 +46,12 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
-        import_camdo(context, self.filepath, self.pack_images, image_folder)
+
+        # TODO: merge armatures?
+        folder = Path(self.filepath).parent
+        for file in self.files:
+            abs_path = str(folder.joinpath(file.name))
+            import_camdo(context, abs_path, self.pack_images, image_folder)
 
         return {'FINISHED'}
 

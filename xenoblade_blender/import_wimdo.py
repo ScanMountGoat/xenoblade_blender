@@ -1,3 +1,4 @@
+from pathlib import Path
 import bpy
 import time
 import os
@@ -9,7 +10,7 @@ from .import_root import get_database_path, get_image_folder, import_armature, i
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, EnumProperty, BoolProperty
+from bpy.props import StringProperty, EnumProperty, BoolProperty, CollectionProperty
 from mathutils import Matrix
 
 
@@ -25,6 +26,9 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         options={'HIDDEN'},
         maxlen=255,
     )
+
+    files: CollectionProperty(type=bpy.types.OperatorFileListElement,
+                              options={'HIDDEN', 'SKIP_SAVE'})
 
     game_version: EnumProperty(
         name="Game Version",
@@ -55,8 +59,12 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         database_path = get_database_path(self.game_version)
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
-        import_wimdo(context, self.filepath, database_path,
-                     self.pack_images, image_folder)
+        # TODO: merge armatures?
+        folder = Path(self.filepath).parent
+        for file in self.files:
+            abs_path = str(folder.joinpath(file.name))
+            import_wimdo(context, abs_path, database_path,
+                         self.pack_images, image_folder)
         return {'FINISHED'}
 
 
