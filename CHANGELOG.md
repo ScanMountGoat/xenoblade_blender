@@ -6,11 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added an option to save unpacked PNG textures when importing to reduce memory usage and import times.
-* Added the ability to select muliple .wimdo or .camdo files on import.
 
 ### Changed
 * Optimized import times for models and maps with many materials and images.
 * Adjusted images and UVs to have the expected vertical orientation.
+* Adjusted .wimdo and .camdo import dialogs to support selecting multiple files.
 
 ### Fixed
 * Fixed an issue where some animation files failed to load.
