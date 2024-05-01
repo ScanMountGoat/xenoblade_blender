@@ -71,6 +71,8 @@ def import_mot(context: bpy.types.Context, path: str):
 
 def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
     action = bpy.data.actions.new(animation.name)
+    if animation.frame_count > 0:
+        action.frame_end = float(animation.frame_count) - 1.0
 
     # Assume each bone appears in only one track.
     animated_bones = {get_bone_name(
