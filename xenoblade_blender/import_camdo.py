@@ -70,7 +70,7 @@ def import_camdo(context: bpy.types.Context, path: str, pack_images: bool, image
     blender_images = import_images(
         root, model_name, pack_images, image_folder, flip=False)
     armature = import_armature(context, root, model_name)
-    import_model_root(root, blender_images, armature, flip_uvs=False)
+    import_model_root(root, blender_images, armature, import_all_meshes=True, flip_uvs=False)
 
     # Convert from Y up to Z up.
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
