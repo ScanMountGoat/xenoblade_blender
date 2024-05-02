@@ -93,7 +93,7 @@ def import_map_root(root, blender_images, root_obj, flip_uvs: bool):
         for models in group.models:
             # TODO: Cache based on vertex and index buffer indices?
             for model in models.models:
-                for mesh in model.meshes:
+                for i, mesh in enumerate(model.meshes):
                     # Many materials are for meshes that won't be loaded.
                     # Lazy load materials to improve import times.
                     material = models.materials[mesh.material_index]
@@ -106,16 +106,21 @@ def import_map_root(root, blender_images, root_obj, flip_uvs: bool):
 
                     # TODO: check actual base lod
                     # TODO: Include all meshes for proper exporting later?
-                    if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
+                    base_lods = models.base_lod_indices
+                    if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
                         continue
+
+                    if "_outline" in material.name or "_speff_" in material.name:
+                        continue
+
                     import_mesh(root_obj, buffers, models, model,
-                                mesh, blender_material, flip_uvs)
+                                mesh, blender_material, flip_uvs, i)
 
 
 def import_model_root(root, blender_images, root_obj, flip_uvs: bool):
     # TODO: Cache based on vertex and index buffer indices?
     for model in root.models.models:
-        for mesh in model.meshes:
+        for i, mesh in enumerate(model.meshes):
             # Many materials are for meshes that won't be loaded.
             # Lazy load materials to improve import times.
             material = root.models.materials[mesh.material_index]
@@ -126,14 +131,19 @@ def import_model_root(root, blender_images, root_obj, flip_uvs: bool):
 
             # TODO: check actual base lod
             # TODO: Include all meshes for proper exporting later?
-            if mesh.lod > 1 or "_outline" in material.name or "_speff_" in material.name:
+            base_lods = root.models.base_lod_indices
+            if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
                 continue
+
+            if "_outline" in material.name or "_speff_" in material.name:
+                continue
+
             import_mesh(root_obj, root.buffers, root.models,
-                        model, mesh, blender_material, flip_uvs)
+                        model, mesh, blender_material, flip_uvs, i)
 
 
-def import_mesh(root_obj, buffers, models, model, mesh, material, flip_uvs: bool):
-    blender_mesh = bpy.data.meshes.new(material.name)
+def import_mesh(root_obj, buffers, models, model, mesh, material, flip_uvs: bool, i: int):
+    blender_mesh = bpy.data.meshes.new(f'{i}.{material.name}')
 
     # Vertex buffers are shared with multiple index buffers.
     # In practice, only a small range of vertices are used.

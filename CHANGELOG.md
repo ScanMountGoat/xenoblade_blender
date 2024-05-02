@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Adjusted mesh names to include the mesh index to match the in game order in the outliner.
+* Improved accuracy of base level of detail (LOD) detection.
+
 ### Fixed
 * Fixed an issue where animations did not loop properly due to the final keyframe not extrapolating to the final frame.
 
