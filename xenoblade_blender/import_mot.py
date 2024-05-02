@@ -29,11 +29,11 @@ class ImportMot(bpy.types.Operator, ImportHelper):
         log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        import_mot(context, self.filepath)
+        import_mot(self, context, self.filepath)
         return {'FINISHED'}
 
 
-def import_mot(context: bpy.types.Context, path: str):
+def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: str):
     start = time.time()
 
     animations = xc3_model_py.load_animations(path)
@@ -43,7 +43,10 @@ def import_mot(context: bpy.types.Context, path: str):
 
     start = time.time()
 
-    # TODO: Don't assume an armature is selected?
+    if context.object is None or not isinstance(context.object.data, bpy.types.Armature):
+        operator.report({'ERROR'}, 'No armature selected')
+        return
+
     armature = context.object
     if armature.animation_data is None:
         armature.animation_data_create()
