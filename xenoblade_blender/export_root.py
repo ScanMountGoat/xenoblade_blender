@@ -89,12 +89,12 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
     ]
 
     # Give each mesh a unique vertex and index buffer for simplicity.
-    vertex_buffer_index = len(root.groups[0].buffers[0].vertex_buffers)
-    index_buffer_index = len(root.groups[0].buffers[0].index_buffers)
+    vertex_buffer_index = len(root.buffers.vertex_buffers)
+    index_buffer_index = len(root.buffers.index_buffers)
     # Don't support adding new materials for now.
     # xc3_model doesn't actually overwrite materials yet.
     material_index = 0
-    for i, material in enumerate(root.groups[0].models[0].materials):
+    for i, material in enumerate(root.models.materials):
         if material.name == mesh_data.materials[0].name:
             material_index = i
             break
@@ -110,6 +110,6 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(attributes, [], None)
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
 
-    root.groups[0].buffers[0].vertex_buffers.append(vertex_buffer)
-    root.groups[0].buffers[0].index_buffers.append(index_buffer)
-    root.groups[0].models[0].models[0].meshes.append(mesh)
+    root.buffers.vertex_buffers.append(vertex_buffer)
+    root.buffers.index_buffers.append(index_buffer)
+    root.models.models[0].meshes.append(mesh)

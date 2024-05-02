@@ -32,21 +32,24 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
         log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        export_wimdo(context, self.filepath, self.original_wimdo.strip('\"'))
+        export_wimdo(self, context, self.filepath,
+                     self.original_wimdo.strip('\"'))
         return {'FINISHED'}
 
 
-def export_wimdo(context: bpy.types.Context, output_wimdo_path: str, wimdo_path: str):
-    # TODO: Error if no armature is selected?
+def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, output_wimdo_path: str, wimdo_path: str):
     start = time.time()
+
+    if context.object is None or not isinstance(context.object.data, bpy.types.Armature):
+        operator.report({'ERROR'}, 'No armature selected')
+        return
 
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
-    root.groups[0].buffers[0].vertex_buffers = []
-    root.groups[0].buffers[0].index_buffers = []
-    root.groups[0].models[0].models[0].meshes = []
+    root.buffers.vertex_buffers = []
+    root.buffers.index_buffers = []
+    root.models.models[0].meshes = []
 
-    # TODO: Don't assume an armature is selected?
     armature = context.object
     for object in armature.children:
         export_mesh(root, object)
