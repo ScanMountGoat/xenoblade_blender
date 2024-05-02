@@ -50,6 +50,12 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
     # TODO: Only show this if packed is unchecked
     image_folder: StringProperty(
         name="Image Folder", description="The folder for the imported images. Defaults to the file's parent folder if not set")
+    
+    import_all_meshes: BoolProperty(
+        name="Import All Meshes",
+        description="Import all meshes regardless of LOD or material name",
+        default=False
+    )
 
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
@@ -64,11 +70,11 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
             import_wimdo(context, abs_path, database_path,
-                         self.pack_images, image_folder)
+                         self.pack_images, image_folder, self.import_all_meshes)
         return {'FINISHED'}
 
 
-def import_wimdo(context: bpy.types.Context, path: str, database_path: str, pack_images: bool, image_folder: str):
+def import_wimdo(context: bpy.types.Context, path: str, database_path: str, pack_images: bool, image_folder: str, import_all_meshes: bool):
     start = time.time()
 
     root = xc3_model_py.load_model(path, database_path)
@@ -82,7 +88,7 @@ def import_wimdo(context: bpy.types.Context, path: str, database_path: str, pack
     blender_images = import_images(
         root, model_name, pack_images, image_folder, flip=True)
     armature = import_armature(context, root, model_name)
-    import_model_root(root, blender_images, armature, flip_uvs=True)
+    import_model_root(root, blender_images, armature, import_all_meshes, flip_uvs=True)
 
     # Convert from Y up to Z up.
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')

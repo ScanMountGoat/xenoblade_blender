@@ -45,6 +45,12 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
     image_folder: StringProperty(
         name="Image Folder", description="The folder for the imported images. Defaults to the file's parent folder if not set")
 
+    import_all_meshes: BoolProperty(
+        name="Import All Meshes",
+        description="Import all meshes regardless of LOD or material name",
+        default=False
+    )
+
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
         log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
@@ -54,11 +60,11 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
         import_wismhd(context, self.filepath, database_path,
-                      self.pack_images, image_folder)
+                      self.pack_images, image_folder, self.import_all_meshes)
         return {'FINISHED'}
 
 
-def import_wismhd(context: bpy.types.Context, path: str, database_path: str, pack_images: bool, image_folder: str):
+def import_wismhd(context: bpy.types.Context, path: str, database_path: str, pack_images: bool, image_folder: str, import_all_meshes: bool):
     start = time.time()
 
     roots = xc3_model_py.load_map(path, database_path)
@@ -81,7 +87,8 @@ def import_wismhd(context: bpy.types.Context, path: str, database_path: str, pac
         root_obj.matrix_world = Matrix.Rotation(math.radians(90), 4, 'X')
         bpy.context.collection.objects.link(root_obj)
 
-        import_map_root(root, blender_images, root_obj, flip_uvs=True)
+        import_map_root(root, blender_images, root_obj,
+                        import_all_meshes, flip_uvs=True)
 
     end = time.time()
     print(f'Import Blender Scene: {end - start}')

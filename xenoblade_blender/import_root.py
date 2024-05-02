@@ -88,7 +88,7 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
     return blender_images
 
 
-def import_map_root(root, blender_images, root_obj, flip_uvs: bool):
+def import_map_root(root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool):
     for group in root.groups:
         for models in group.models:
             # TODO: Cache based on vertex and index buffer indices?
@@ -104,20 +104,19 @@ def import_map_root(root, blender_images, root_obj, flip_uvs: bool):
 
                     buffers = group.buffers[model.model_buffers_index]
 
-                    # TODO: check actual base lod
-                    # TODO: Include all meshes for proper exporting later?
-                    base_lods = models.base_lod_indices
-                    if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
-                        continue
+                    if not import_all_meshes:
+                        base_lods = models.base_lod_indices
+                        if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
+                            continue
 
-                    if "_outline" in material.name or "_speff_" in material.name:
-                        continue
+                        if "_outline" in material.name or "_speff_" in material.name:
+                            continue
 
                     import_mesh(root_obj, buffers, models, model,
                                 mesh, blender_material, flip_uvs, i)
 
 
-def import_model_root(root, blender_images, root_obj, flip_uvs: bool):
+def import_model_root(root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool):
     # TODO: Cache based on vertex and index buffer indices?
     for model in root.models.models:
         for i, mesh in enumerate(model.meshes):
@@ -129,14 +128,13 @@ def import_model_root(root, blender_images, root_obj, flip_uvs: bool):
                 blender_material = import_material(
                     material, blender_images, root.image_textures)
 
-            # TODO: check actual base lod
-            # TODO: Include all meshes for proper exporting later?
-            base_lods = root.models.base_lod_indices
-            if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
-                continue
+            if not import_all_meshes:
+                base_lods = root.models.base_lod_indices
+                if base_lods is not None and (mesh.lod & 0xff - 1) not in base_lods:
+                    continue
 
-            if "_outline" in material.name or "_speff_" in material.name:
-                continue
+                if "_outline" in material.name or "_speff_" in material.name:
+                    continue
 
             import_mesh(root_obj, root.buffers, root.models,
                         model, mesh, blender_material, flip_uvs, i)
