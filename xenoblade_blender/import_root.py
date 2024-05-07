@@ -334,7 +334,9 @@ def import_material(material, blender_images, image_textures):
     # Get information on how the decompiled shader code assigns outputs.
     # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
     # Textures provide less accurate fallback assignments based on usage hints.
-    assignments = material.output_assignments(image_textures).assignments
+    assignments = material.output_assignments(image_textures)
+    mat_id = assignments.mat_id()
+    assignments = assignments.assignments
 
     textures = []
     textures_rgb = []
@@ -365,6 +367,18 @@ def import_material(material, blender_images, image_textures):
 
     assign_channel(assignments[1].x, links, textures,
                    textures_rgb, bsdf, 'Metallic')
+
+    # TODO: toon and hair shaders always use specular color?
+    if not mat_id in [2, 5]:
+        # TODO: This doesn't always work?
+        emi_color = nodes.new('ShaderNodeCombineColor')
+        assign_channel(assignments[5].x, links, textures,
+                       textures_rgb, emi_color, 'Red', is_data=False)
+        assign_channel(assignments[5].y, links, textures,
+                       textures_rgb, emi_color, 'Green', is_data=False)
+        assign_channel(assignments[5].z, links, textures,
+                       textures_rgb, emi_color, 'Blue', is_data=False)
+        links.new(emi_color.outputs['Color'], bsdf.inputs['Emission Color'])
 
     # Invert glossiness to get roughness.
     invert = nodes.new('ShaderNodeMath')

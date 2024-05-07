@@ -99,13 +99,17 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
             material_index = i
             break
 
-    # TODO: What to use for mesh flags?
+    # TODO: morph targets.
+
+    # TODO: What to use for mesh flags and lod?
     lod = 1
     flags1 = 24576
     flags2 = 16400
-    ext_mesh_index = 0
-    mesh = xc3_model_py.Mesh(
-        vertex_buffer_index, index_buffer_index, material_index, ext_mesh_index, lod, flags1, flags2)
+    ext_mesh_index = None
+    unk_mesh_index1 = 0
+    base_mesh_index = None
+    mesh = xc3_model_py.Mesh(vertex_buffer_index, index_buffer_index, unk_mesh_index1,
+                             material_index, lod, flags1, flags2, ext_mesh_index, base_mesh_index)
 
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(attributes, [], None)
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)

@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for emissive maps to generated materials.
+
 ## 0.5.0 - 2024-05-02
 ### Added
 * Added an option to import all meshes for .wismhd or .wimdo files.
