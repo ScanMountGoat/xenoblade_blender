@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added support for emissive maps to generated materials.
+* Added support for skin weights to exported .wimdo files.
 
 ## 0.5.0 - 2024-05-02
 ### Added

@@ -26,15 +26,12 @@ def export_skeleton(armature: bpy.types.Object):
     return xc3_model_py.Skeleton(bones)
 
 
-def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
+def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, combined_weights: xc3_model_py.skinning.SkinWeights):
     mesh_data = blender_mesh.data
-
-    # TODO: Is there a better way to account for the change of coordinates?
-    axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, 'X'))
 
     positions = np.zeros(len(mesh_data.vertices) * 3)
     mesh_data.vertices.foreach_get('co', positions)
-    positions = positions.reshape((-1, 3)) @ axis_correction
+    positions = positions.reshape((-1, 3))
 
     vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
     mesh_data.loops.foreach_get('vertex_index', vertex_indices)
@@ -42,37 +39,60 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
     # Normals are stored per loop instead of per vertex.
     loop_normals = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
     mesh_data.loops.foreach_get('normal', loop_normals)
-    loop_normals = loop_normals.reshape((-1, 3)) @ axis_correction
+    loop_normals = loop_normals.reshape((-1, 3))
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
     normals[:, :3][vertex_indices] = loop_normals
 
     # Tangents are stored per loop instead of per vertex.
-    mesh_data.calc_tangents()
     loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
-    mesh_data.loops.foreach_get('tangent', loop_tangents)
+    try:
+        # TODO: Why do some meshes not have UVs for Pyra?
+        mesh_data.calc_tangents()
+        mesh_data.loops.foreach_get('tangent', loop_tangents)
+    except:
+        pass
 
     loop_bitangent_signs = np.zeros(len(mesh_data.loops), dtype=np.float32)
     mesh_data.loops.foreach_get('bitangent_sign', loop_bitangent_signs)
 
     tangents = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
-    tangents[:, :3][vertex_indices] = loop_tangents.reshape(
-        (-1, 3)) @ axis_correction
+    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3))
     tangents[:, 3][vertex_indices] = loop_bitangent_signs
 
     # TODO: multiple UV and color attributes
     texcoords = np.zeros((positions.shape[0], 2), dtype=np.float32)
-    uv_layer = mesh_data.uv_layers[0]
-    loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
-    uv_layer.data.foreach_get("uv", loop_uvs)
-    texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
-    # Flip vertically to match in game.
-    texcoords[:, 1] = 1.0 - texcoords[:, 1]
+    if len(mesh_data.uv_layers) > 0:
+        uv_layer = mesh_data.uv_layers[0]
+        loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
+        uv_layer.data.foreach_get("uv", loop_uvs)
+        texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
+        # Flip vertically to match in game.
+        texcoords[:, 1] = 1.0 - texcoords[:, 1]
 
-    # TODO: create influences and then convert to weights
-    # TODO: Where to store weights for each mesh?
-    # TODO: Don't assume only one bone.
-    weight_indices = np.zeros((positions.shape[0], 2), dtype=np.uint16)
+    # Export Weights
+    # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
+    # TODO: Does Blender not expose this directly?
+    group_to_weights = {vg.index: (vg.name, [])
+                        for vg in blender_mesh.vertex_groups}
+
+    for vertex in blender_mesh.data.vertices:
+        # Blender doesn't enforce normalization, since it normalizes while animating.
+        # Normalize on export to ensure the weights work correctly in game.
+        weight_sum = sum([g.weight for g in vertex.groups])
+        for group in vertex.groups:
+            weight = xc3_model_py.skinning.VertexWeight(
+                vertex.index, group.weight / weight_sum)
+            group_to_weights[group.group][1].append(weight)
+
+    influences = []
+    for name, weights in group_to_weights.values():
+        if len(weights) > 0:
+            influence = xc3_model_py.skinning.Influence(name, weights)
+            influences.append(influence)
+
+    weight_indices = combined_weights.add_influences(
+        influences, positions.shape[0])
 
     # TODO: Does this order need to match in game to work properly?
     attributes = [
@@ -103,7 +123,7 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object):
 
     # TODO: What to use for mesh flags and lod?
     lod = 1
-    flags1 = 24576
+    flags1 = 16385
     flags2 = 16400
     ext_mesh_index = None
     unk_mesh_index1 = 0

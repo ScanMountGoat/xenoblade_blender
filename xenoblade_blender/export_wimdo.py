@@ -1,6 +1,7 @@
 import bpy
 import time
 import logging
+import numpy as np
 from pathlib import Path
 
 from .export_root import export_mesh
@@ -44,15 +45,22 @@ def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, outpu
         operator.report({'ERROR'}, 'No armature selected')
         return
 
+    armature = context.object
+
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
     root.buffers.vertex_buffers = []
     root.buffers.index_buffers = []
     root.models.models[0].meshes = []
 
-    armature = context.object
+    # Initialize weight buffer to share with all meshes.
+    bone_names = root.buffers.weights.weight_buffer(16385).bone_names
+    combined_weights = xc3_model_py.skinning.SkinWeights(np.array([]), np.array([]), bone_names)
+
     for object in armature.children:
-        export_mesh(root, object)
+        export_mesh(root, object, combined_weights)
+
+    root.buffers.weights.update_weights(combined_weights)
 
     end = time.time()
     print(f"Create ModelRoot: {end - start}")
