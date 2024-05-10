@@ -60,16 +60,6 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
     tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3))
     tangents[:, 3][vertex_indices] = loop_bitangent_signs
 
-    # TODO: multiple UV and color attributes
-    texcoords = np.zeros((positions.shape[0], 2), dtype=np.float32)
-    if len(mesh_data.uv_layers) > 0:
-        uv_layer = mesh_data.uv_layers[0]
-        loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
-        uv_layer.data.foreach_get("uv", loop_uvs)
-        texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
-        # Flip vertically to match in game.
-        texcoords[:, 1] = 1.0 - texcoords[:, 1]
-
     # Export Weights
     # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
     # TODO: Does Blender not expose this directly?
@@ -94,19 +84,72 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
     weight_indices = combined_weights.add_influences(
         influences, positions.shape[0])
 
-    # TODO: Does this order need to match in game to work properly?
+    # Export all available vertex attributes.
+    # xc3_model will handle ordering and selecting attributes required by the shader.
     attributes = [
         xc3_model_py.vertex.AttributeData(
             xc3_model_py.vertex.AttributeType.Position, positions),
         xc3_model_py.vertex.AttributeData(
             xc3_model_py.vertex.AttributeType.WeightIndex, weight_indices),
         xc3_model_py.vertex.AttributeData(
-            xc3_model_py.vertex.AttributeType.TexCoord0, texcoords),
-        xc3_model_py.vertex.AttributeData(
             xc3_model_py.vertex.AttributeType.Normal, normals),
         xc3_model_py.vertex.AttributeData(
             xc3_model_py.vertex.AttributeType.Tangent, tangents),
     ]
+
+    for uv_layer in mesh_data.uv_layers:
+        texcoords = np.zeros((positions.shape[0], 2), dtype=np.float32)
+        loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
+        uv_layer.data.foreach_get("uv", loop_uvs)
+        texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
+        # Flip vertically to match in game.
+        texcoords[:, 1] = 1.0 - texcoords[:, 1]
+
+        ty = xc3_model_py.vertex.AttributeType.TexCoord0
+        if uv_layer.name == 'TexCoord0':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord0
+        elif uv_layer.name == 'TexCoord1':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord1
+        elif uv_layer.name == 'TexCoord2':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord2
+        elif uv_layer.name == 'TexCoord3':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord3
+        elif uv_layer.name == 'TexCoord4':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord4
+        elif uv_layer.name == 'TexCoord5':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord5
+        elif uv_layer.name == 'TexCoord6':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord6
+        elif uv_layer.name == 'TexCoord7':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord7
+        elif uv_layer.name == 'TexCoord8':
+            ty = xc3_model_py.vertex.AttributeType.TexCoord8
+
+        attributes.append(xc3_model_py.vertex.AttributeData(ty, texcoords))
+
+    for color_attribute in mesh_data.color_attributes:
+        ty = xc3_model_py.vertex.AttributeType.VertexColor
+        if color_attribute.name == 'VertexColor':
+            ty = xc3_model_py.vertex.AttributeType.VertexColor
+        elif color_attribute.name == 'Blend':
+            ty = xc3_model_py.vertex.AttributeType.Blend
+
+        # TODO: error for unsupported data_type or domain.
+        if color_attribute.domain == 'POINT':
+            colors = np.zeros(len(mesh_data.vertices) * 4)
+            color_attribute.data.foreach_get('color', colors)
+        elif color_attribute.domain == 'CORNER':
+            loop_colors = np.zeros(len(mesh_data.loops) * 4)
+            color_attribute.data.foreach_get('color', loop_colors)
+            # Convert per loop data to per vertex data.
+            colors = np.zeros((len(mesh_data.vertices), 4))
+            colors[vertex_indices] = loop_colors.reshape((-1, 4))
+
+        colors = colors.reshape((-1, 4))
+        attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
+
+    # TODO: morph targets.
+    morph_targets = []
 
     # Give each mesh a unique vertex and index buffer for simplicity.
     vertex_buffer_index = len(root.buffers.vertex_buffers)
@@ -119,19 +162,18 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
             material_index = i
             break
 
-    # TODO: morph targets.
-
     # TODO: What to use for mesh flags and lod?
     lod = 1
-    flags1 = 16385
-    flags2 = 16400
+    flags1 = 16640
+    flags2 = 16385
     ext_mesh_index = None
     unk_mesh_index1 = 0
     base_mesh_index = None
     mesh = xc3_model_py.Mesh(vertex_buffer_index, index_buffer_index, unk_mesh_index1,
                              material_index, lod, flags1, flags2, ext_mesh_index, base_mesh_index)
 
-    vertex_buffer = xc3_model_py.vertex.VertexBuffer(attributes, [], None)
+    vertex_buffer = xc3_model_py.vertex.VertexBuffer(
+        attributes, morph_targets, None)
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
 
     root.buffers.vertex_buffers.append(vertex_buffer)
