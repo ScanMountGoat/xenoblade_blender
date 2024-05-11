@@ -26,7 +26,8 @@ def export_skeleton(armature: bpy.types.Object):
     return xc3_model_py.Skeleton(bones)
 
 
-def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, combined_weights: xc3_model_py.skinning.SkinWeights):
+def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
+                combined_weights: xc3_model_py.skinning.SkinWeights, original_meshes, morph_names: list[str]):
     mesh_data = blender_mesh.data
 
     positions = np.zeros(len(mesh_data.vertices) * 3)
@@ -148,12 +149,13 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
         colors = colors.reshape((-1, 4))
         attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
 
-    # TODO: morph targets.
-    morph_targets = []
+    morph_targets = export_shape_keys(
+        morph_names, mesh_data, positions, vertex_indices)
 
     # Give each mesh a unique vertex and index buffer for simplicity.
     vertex_buffer_index = len(root.buffers.vertex_buffers)
     index_buffer_index = len(root.buffers.index_buffers)
+
     # Don't support adding new materials for now.
     # xc3_model doesn't actually overwrite materials yet.
     material_index = 0
@@ -169,6 +171,22 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
     ext_mesh_index = None
     unk_mesh_index1 = 0
     base_mesh_index = None
+
+    # Preserve original fields for meshes like "0.material"
+    mesh_name = blender_mesh.name
+    name_parts = mesh_name.split('.')
+    if len(name_parts) == 2:
+        mesh_index = int(name_parts[0])
+        original_mesh = original_meshes[mesh_index]
+
+        lod = original_mesh.lod
+        # TODO: Why does these cause instant crashes?
+        flags1 = original_mesh.flags1
+        flags2 = original_mesh.flags2  # TODO: preserve skin flags?
+        ext_mesh_index = original_mesh.ext_mesh_index
+        unk_mesh_index1 = original_mesh.unk_mesh_index1
+        base_mesh_index = original_mesh.base_mesh_index
+
     mesh = xc3_model_py.Mesh(vertex_buffer_index, index_buffer_index, unk_mesh_index1,
                              material_index, lod, flags1, flags2, ext_mesh_index, base_mesh_index)
 
@@ -179,3 +197,35 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object, co
     root.buffers.vertex_buffers.append(vertex_buffer)
     root.buffers.index_buffers.append(index_buffer)
     root.models.models[0].meshes.append(mesh)
+
+
+def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
+    morph_targets = []
+    for shape_key in mesh_data.shape_keys.key_blocks:
+        if shape_key.name == 'Basis':
+            continue
+
+        # Only add existing morph targets for now.
+        morph_controller_index = None
+        for i, name in enumerate(morph_names):
+            if shape_key.name == name:
+                morph_controller_index = i
+                break
+
+        if morph_controller_index is None:
+            continue
+
+        # TODO: make these sparse if vertices are unchanged?
+        morph_positions = np.zeros(len(mesh_data.vertices) * 3)
+        shape_key.points.foreach_get('co', morph_positions)
+
+        position_deltas = morph_positions.reshape((-1, 3)) - positions
+        # TODO: Can these be calculated from Blender?
+        normal_deltas = np.zeros((len(mesh_data.vertices), 4))
+        tangent_deltas = np.zeros((len(mesh_data.vertices), 4))
+
+        target = xc3_model_py.vertex.MorphTarget(
+            morph_controller_index, position_deltas, normal_deltas, tangent_deltas, vertex_indices)
+        morph_targets.append(target)
+
+    return morph_targets

@@ -49,6 +49,8 @@ def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, outpu
 
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
+    original_meshes = [m for m in root.models.models[0].meshes]
+    morph_names = root.models.morph_controller_names
     root.buffers.vertex_buffers = []
     root.buffers.index_buffers = []
     root.models.models[0].meshes = []
@@ -58,7 +60,7 @@ def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, outpu
     combined_weights = xc3_model_py.skinning.SkinWeights(np.array([]), np.array([]), bone_names)
 
     for object in armature.children:
-        export_mesh(root, object, combined_weights)
+        export_mesh(root, object, combined_weights, original_meshes, morph_names)
 
     root.buffers.weights.update_weights(combined_weights)
 
