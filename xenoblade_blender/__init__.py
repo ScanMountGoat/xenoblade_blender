@@ -16,7 +16,7 @@ bl_info = {
     "warning": "",
     "doc_url": "https://github.com/ScanMountGoat/xenoblade_blender/wiki",
     "tracker_url": "https://github.com/ScanMountGoat/xenoblade_blender/issues",
-    "category": "Import-Export"
+    "category": "Import-Export",
 }
 
 
@@ -45,8 +45,13 @@ def menu_import_camdo(self, context):
     self.layout.operator(import_camdo.ImportCamdo.bl_idname, text=text)
 
 
-classes = [import_mot.ImportMot,
-           import_wimdo.ImportWimdo, import_wismhd.ImportWismhd, import_camdo.ImportCamdo, export_wimdo.ExportWimdo]
+classes = [
+    import_mot.ImportMot,
+    import_wimdo.ImportWimdo,
+    import_wismhd.ImportWismhd,
+    import_camdo.ImportCamdo,
+    export_wimdo.ExportWimdo,
+]
 
 
 def register():

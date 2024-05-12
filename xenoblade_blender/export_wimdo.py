@@ -14,6 +14,7 @@ from bpy.props import StringProperty
 
 class ExportWimdo(bpy.types.Operator, ExportHelper):
     """Export a Xenoblade Switch model"""
+
     bl_idname = "export_scene.wimdo"
     bl_label = "Export Wimdo"
 
@@ -21,28 +22,36 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
 
     filter_glob: StringProperty(
         default="*.wimdo",
-        options={'HIDDEN'},
+        options={"HIDDEN"},
         maxlen=255,
     )
 
     original_wimdo: StringProperty(
-        name="Original Wimdo", description="The original .wimdo file to use to generate the new model")
+        name="Original Wimdo",
+        description="The original .wimdo file to use to generate the new model",
+    )
 
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
-        log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
+        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        export_wimdo(self, context, self.filepath,
-                     self.original_wimdo.strip('\"'))
-        return {'FINISHED'}
+        export_wimdo(self, context, self.filepath, self.original_wimdo.strip('"'))
+        return {"FINISHED"}
 
 
-def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, output_wimdo_path: str, wimdo_path: str):
+def export_wimdo(
+    operator: bpy.types.Operator,
+    context: bpy.types.Context,
+    output_wimdo_path: str,
+    wimdo_path: str,
+):
     start = time.time()
 
-    if context.object is None or not isinstance(context.object.data, bpy.types.Armature):
-        operator.report({'ERROR'}, 'No armature selected')
+    if context.object is None or not isinstance(
+        context.object.data, bpy.types.Armature
+    ):
+        operator.report({"ERROR"}, "No armature selected")
         return
 
     armature = context.object
@@ -57,7 +66,9 @@ def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, outpu
 
     # Initialize weight buffer to share with all meshes.
     bone_names = root.buffers.weights.weight_buffer(16385).bone_names
-    combined_weights = xc3_model_py.skinning.SkinWeights(np.array([]), np.array([]), bone_names)
+    combined_weights = xc3_model_py.skinning.SkinWeights(
+        np.array([]), np.array([]), bone_names
+    )
 
     for object in armature.children:
         export_mesh(root, object, combined_weights, original_meshes, morph_names)
@@ -71,13 +82,12 @@ def export_wimdo(operator: bpy.types.Operator, context: bpy.types.Context, outpu
 
     # TODO: Error if no wimdo path or path cannot be found
     mxmd = xc3_model_py.Mxmd.from_file(wimdo_path)
-    msrd = xc3_model_py.Msrd.from_file(
-        str(Path(wimdo_path).with_suffix('.wismt')))
+    msrd = xc3_model_py.Msrd.from_file(str(Path(wimdo_path).with_suffix(".wismt")))
 
     new_mxmd, new_msrd = root.to_mxmd_model(mxmd, msrd)
 
     new_mxmd.save(output_wimdo_path)
-    new_msrd.save(str(Path(output_wimdo_path).with_suffix('.wismt')))
+    new_msrd.save(str(Path(output_wimdo_path).with_suffix(".wismt")))
 
     end = time.time()
     print(f"Export Files: {end - start}")

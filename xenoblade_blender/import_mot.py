@@ -13,6 +13,7 @@ from mathutils import Matrix
 
 class ImportMot(bpy.types.Operator, ImportHelper):
     """Import a Xenoblade animation"""
+
     bl_idname = "import_scene.mot"
     bl_label = "Import Mot"
 
@@ -20,17 +21,17 @@ class ImportMot(bpy.types.Operator, ImportHelper):
 
     filter_glob: StringProperty(
         default="*.mot",
-        options={'HIDDEN'},
+        options={"HIDDEN"},
         maxlen=255,
     )
 
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
-        log_fmt = '%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s'
+        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
         import_mot(self, context, self.filepath)
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: str):
@@ -43,8 +44,10 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
 
     start = time.time()
 
-    if context.object is None or not isinstance(context.object.data, bpy.types.Armature):
-        operator.report({'ERROR'}, 'No armature selected')
+    if context.object is None or not isinstance(
+        context.object.data, bpy.types.Armature
+    ):
+        operator.report({"ERROR"}, "No armature selected")
         return
 
     armature = context.object
@@ -58,14 +61,15 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
     bone_names = [bone.name for bone in skeleton.bones]
     for i, bone in enumerate(skeleton.bones):
         if bone.parent_index is not None and bone.parent_index > i:
-            print(f'invalid index {bone.parent_index} > {i}')
+            print(f"invalid index {bone.parent_index} > {i}")
     hash_to_name = {xc3_model_py.animation.murmur3(name): name for name in bone_names}
 
     # TODO: Is this the best way to load all animations?
     # TODO: Optimize this.
     for animation in animations:
         action = import_animation(
-            armature, skeleton, bone_names, hash_to_name, animation)
+            armature, skeleton, bone_names, hash_to_name, animation
+        )
         armature.animation_data.action = action
 
     end = time.time()
@@ -78,8 +82,9 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
         action.frame_end = float(animation.frame_count) - 1.0
 
     # Assume each bone appears in only one track.
-    animated_bones = {get_bone_name(
-        t, bone_names, hash_to_name) for t in animation.tracks}
+    animated_bones = {
+        get_bone_name(t, bone_names, hash_to_name) for t in animation.tracks
+    }
 
     # Collect keyframes for the appropriate bones.
     positions = {name: [] for name in animated_bones}
@@ -113,8 +118,7 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
 
         # TODO: Use actual cubic keyframes instead of baking at each frame?
         set_fcurves(action, name, "location", positions[name], 3)
-        set_fcurves(action, name, "rotation_quaternion",
-                    rotations_wxyz[name], 4)
+        set_fcurves(action, name, "rotation_quaternion", rotations_wxyz[name], 4)
         set_fcurves(action, name, "scale", scales[name], 3)
     return action
 
@@ -139,11 +143,12 @@ def set_fcurves(action, bone_name: str, value_name: str, values, component_count
     for i in range(component_count):
         # Values can be quickly set in the form [frame, value, frame, value, ...]
         # Assume one value at each frame index for now.
-        keyframe_points = [val for pair in enumerate(
-            v[i] for v in values) for val in pair]
+        keyframe_points = [
+            val for pair in enumerate(v[i] for v in values) for val in pair
+        ]
 
         # Each coordinate of each value has its own fcurve.
-        data_path = f"pose.bones[\"{bone_name}\"].{value_name}"
+        data_path = f'pose.bones["{bone_name}"].{value_name}'
         fcurve = action.fcurves.new(data_path, index=i, action_group=bone_name)
         fcurve.keyframe_points.add(count=len(values))
-        fcurve.keyframe_points.foreach_set('co', keyframe_points)
+        fcurve.keyframe_points.foreach_set("co", keyframe_points)

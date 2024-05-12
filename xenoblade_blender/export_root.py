@@ -26,20 +26,25 @@ def export_skeleton(armature: bpy.types.Object):
     return xc3_model_py.Skeleton(bones)
 
 
-def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
-                combined_weights: xc3_model_py.skinning.SkinWeights, original_meshes, morph_names: list[str]):
+def export_mesh(
+    root: xc3_model_py.ModelRoot,
+    blender_mesh: bpy.types.Object,
+    combined_weights: xc3_model_py.skinning.SkinWeights,
+    original_meshes,
+    morph_names: list[str],
+):
     mesh_data = blender_mesh.data
 
     positions = np.zeros(len(mesh_data.vertices) * 3)
-    mesh_data.vertices.foreach_get('co', positions)
+    mesh_data.vertices.foreach_get("co", positions)
     positions = positions.reshape((-1, 3))
 
     vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
-    mesh_data.loops.foreach_get('vertex_index', vertex_indices)
+    mesh_data.loops.foreach_get("vertex_index", vertex_indices)
 
     # Normals are stored per loop instead of per vertex.
     loop_normals = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
-    mesh_data.loops.foreach_get('normal', loop_normals)
+    mesh_data.loops.foreach_get("normal", loop_normals)
     loop_normals = loop_normals.reshape((-1, 3))
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
@@ -50,12 +55,12 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
     try:
         # TODO: Why do some meshes not have UVs for Pyra?
         mesh_data.calc_tangents()
-        mesh_data.loops.foreach_get('tangent', loop_tangents)
+        mesh_data.loops.foreach_get("tangent", loop_tangents)
     except:
         pass
 
     loop_bitangent_signs = np.zeros(len(mesh_data.loops), dtype=np.float32)
-    mesh_data.loops.foreach_get('bitangent_sign', loop_bitangent_signs)
+    mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
 
     tangents = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
     tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3))
@@ -64,8 +69,7 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
     # Export Weights
     # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
     # TODO: Does Blender not expose this directly?
-    group_to_weights = {vg.index: (vg.name, [])
-                        for vg in blender_mesh.vertex_groups}
+    group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
 
     for vertex in blender_mesh.data.vertices:
         # Blender doesn't enforce normalization, since it normalizes while animating.
@@ -73,7 +77,8 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
         weight_sum = sum([g.weight for g in vertex.groups])
         for group in vertex.groups:
             weight = xc3_model_py.skinning.VertexWeight(
-                vertex.index, group.weight / weight_sum)
+                vertex.index, group.weight / weight_sum
+            )
             group_to_weights[group.group][1].append(weight)
 
     influences = []
@@ -82,20 +87,23 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
             influence = xc3_model_py.skinning.Influence(name, weights)
             influences.append(influence)
 
-    weight_indices = combined_weights.add_influences(
-        influences, positions.shape[0])
+    weight_indices = combined_weights.add_influences(influences, positions.shape[0])
 
     # Export all available vertex attributes.
     # xc3_model will handle ordering and selecting attributes required by the shader.
     attributes = [
         xc3_model_py.vertex.AttributeData(
-            xc3_model_py.vertex.AttributeType.Position, positions),
+            xc3_model_py.vertex.AttributeType.Position, positions
+        ),
         xc3_model_py.vertex.AttributeData(
-            xc3_model_py.vertex.AttributeType.WeightIndex, weight_indices),
+            xc3_model_py.vertex.AttributeType.WeightIndex, weight_indices
+        ),
         xc3_model_py.vertex.AttributeData(
-            xc3_model_py.vertex.AttributeType.Normal, normals),
+            xc3_model_py.vertex.AttributeType.Normal, normals
+        ),
         xc3_model_py.vertex.AttributeData(
-            xc3_model_py.vertex.AttributeType.Tangent, tangents),
+            xc3_model_py.vertex.AttributeType.Tangent, tangents
+        ),
     ]
 
     for uv_layer in mesh_data.uv_layers:
@@ -107,41 +115,41 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
         texcoords[:, 1] = 1.0 - texcoords[:, 1]
 
         ty = xc3_model_py.vertex.AttributeType.TexCoord0
-        if uv_layer.name == 'TexCoord0':
+        if uv_layer.name == "TexCoord0":
             ty = xc3_model_py.vertex.AttributeType.TexCoord0
-        elif uv_layer.name == 'TexCoord1':
+        elif uv_layer.name == "TexCoord1":
             ty = xc3_model_py.vertex.AttributeType.TexCoord1
-        elif uv_layer.name == 'TexCoord2':
+        elif uv_layer.name == "TexCoord2":
             ty = xc3_model_py.vertex.AttributeType.TexCoord2
-        elif uv_layer.name == 'TexCoord3':
+        elif uv_layer.name == "TexCoord3":
             ty = xc3_model_py.vertex.AttributeType.TexCoord3
-        elif uv_layer.name == 'TexCoord4':
+        elif uv_layer.name == "TexCoord4":
             ty = xc3_model_py.vertex.AttributeType.TexCoord4
-        elif uv_layer.name == 'TexCoord5':
+        elif uv_layer.name == "TexCoord5":
             ty = xc3_model_py.vertex.AttributeType.TexCoord5
-        elif uv_layer.name == 'TexCoord6':
+        elif uv_layer.name == "TexCoord6":
             ty = xc3_model_py.vertex.AttributeType.TexCoord6
-        elif uv_layer.name == 'TexCoord7':
+        elif uv_layer.name == "TexCoord7":
             ty = xc3_model_py.vertex.AttributeType.TexCoord7
-        elif uv_layer.name == 'TexCoord8':
+        elif uv_layer.name == "TexCoord8":
             ty = xc3_model_py.vertex.AttributeType.TexCoord8
 
         attributes.append(xc3_model_py.vertex.AttributeData(ty, texcoords))
 
     for color_attribute in mesh_data.color_attributes:
         ty = xc3_model_py.vertex.AttributeType.VertexColor
-        if color_attribute.name == 'VertexColor':
+        if color_attribute.name == "VertexColor":
             ty = xc3_model_py.vertex.AttributeType.VertexColor
-        elif color_attribute.name == 'Blend':
+        elif color_attribute.name == "Blend":
             ty = xc3_model_py.vertex.AttributeType.Blend
 
         # TODO: error for unsupported data_type or domain.
-        if color_attribute.domain == 'POINT':
+        if color_attribute.domain == "POINT":
             colors = np.zeros(len(mesh_data.vertices) * 4)
-            color_attribute.data.foreach_get('color', colors)
-        elif color_attribute.domain == 'CORNER':
+            color_attribute.data.foreach_get("color", colors)
+        elif color_attribute.domain == "CORNER":
             loop_colors = np.zeros(len(mesh_data.loops) * 4)
-            color_attribute.data.foreach_get('color', loop_colors)
+            color_attribute.data.foreach_get("color", loop_colors)
             # Convert per loop data to per vertex data.
             colors = np.zeros((len(mesh_data.vertices), 4))
             colors[vertex_indices] = loop_colors.reshape((-1, 4))
@@ -149,8 +157,7 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
         colors = colors.reshape((-1, 4))
         attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
 
-    morph_targets = export_shape_keys(
-        morph_names, mesh_data, positions, vertex_indices)
+    morph_targets = export_shape_keys(morph_names, mesh_data, positions, vertex_indices)
 
     # Give each mesh a unique vertex and index buffer for simplicity.
     vertex_buffer_index = len(root.buffers.vertex_buffers)
@@ -174,7 +181,7 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
 
     # Preserve original fields for meshes like "0.material"
     mesh_name = blender_mesh.name
-    name_parts = mesh_name.split('.')
+    name_parts = mesh_name.split(".")
     if len(name_parts) == 2:
         mesh_index = int(name_parts[0])
         original_mesh = original_meshes[mesh_index]
@@ -187,11 +194,19 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
         unk_mesh_index1 = original_mesh.unk_mesh_index1
         base_mesh_index = original_mesh.base_mesh_index
 
-    mesh = xc3_model_py.Mesh(vertex_buffer_index, index_buffer_index, unk_mesh_index1,
-                             material_index, lod, flags1, flags2, ext_mesh_index, base_mesh_index)
+    mesh = xc3_model_py.Mesh(
+        vertex_buffer_index,
+        index_buffer_index,
+        unk_mesh_index1,
+        material_index,
+        lod,
+        flags1,
+        flags2,
+        ext_mesh_index,
+        base_mesh_index,
+    )
 
-    vertex_buffer = xc3_model_py.vertex.VertexBuffer(
-        attributes, morph_targets, None)
+    vertex_buffer = xc3_model_py.vertex.VertexBuffer(attributes, morph_targets, None)
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
 
     root.buffers.vertex_buffers.append(vertex_buffer)
@@ -202,7 +217,7 @@ def export_mesh(root: xc3_model_py.ModelRoot, blender_mesh: bpy.types.Object,
 def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
     morph_targets = []
     for shape_key in mesh_data.shape_keys.key_blocks:
-        if shape_key.name == 'Basis':
+        if shape_key.name == "Basis":
             continue
 
         # Only add existing morph targets for now.
@@ -217,7 +232,7 @@ def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
 
         # TODO: make these sparse if vertices are unchanged?
         morph_positions = np.zeros(len(mesh_data.vertices) * 3)
-        shape_key.points.foreach_get('co', morph_positions)
+        shape_key.points.foreach_get("co", morph_positions)
 
         position_deltas = morph_positions.reshape((-1, 3)) - positions
         # TODO: Can these be calculated from Blender?
@@ -225,7 +240,12 @@ def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
         tangent_deltas = np.zeros((len(mesh_data.vertices), 4))
 
         target = xc3_model_py.vertex.MorphTarget(
-            morph_controller_index, position_deltas, normal_deltas, tangent_deltas, vertex_indices)
+            morph_controller_index,
+            position_deltas,
+            normal_deltas,
+            tangent_deltas,
+            vertex_indices,
+        )
         morph_targets.append(target)
 
     return morph_targets
