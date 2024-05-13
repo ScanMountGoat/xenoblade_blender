@@ -159,6 +159,24 @@ def export_mesh(
 
     morph_targets = export_shape_keys(morph_names, mesh_data, positions, vertex_indices)
 
+    morph_blend_target = []
+    if len(morph_targets) > 0:
+        # TODO: Handle creating attributes and ordering in xc3_model?
+        morph_blend_target = [
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Position2, positions
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Normal4, normals * 0.5 + 0.5
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.OldPosition, positions
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Tangent2, tangents * 0.5 + 0.5
+            ),
+        ]
+
     # Give each mesh a unique vertex and index buffer for simplicity.
     vertex_buffer_index = len(root.buffers.vertex_buffers)
     index_buffer_index = len(root.buffers.index_buffers)
@@ -206,7 +224,9 @@ def export_mesh(
         base_mesh_index,
     )
 
-    vertex_buffer = xc3_model_py.vertex.VertexBuffer(attributes, morph_targets, None)
+    vertex_buffer = xc3_model_py.vertex.VertexBuffer(
+        attributes, morph_blend_target, morph_targets, None
+    )
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
 
     root.buffers.vertex_buffers.append(vertex_buffer)
