@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for emissive maps to generated materials.
 * Added support for skin weights to exported .wimdo files.
+* Added support for additional UV and color attributes to exported .wimdo files.
+* Added support for shape keys to exported .wimdo files.
+
+### Fixed
+* Fixed an issue where some model exports would be invisible in game. This mostly affected Xenoblade 3 models.
 
 ## 0.5.0 - 2024-05-02
 ### Added
