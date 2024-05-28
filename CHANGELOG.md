@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where wimdo export would not correctly detect mesh index prefixes.
+* Fixed an issue where wimdo export would fail if a mesh did not have any shape keys.
+
 ## 0.6.0 - 2024-05-27
 ### Added
 * Added support for emissive maps to generated materials.
