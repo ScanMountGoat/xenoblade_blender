@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 * Fixed an issue where wimdo export would not correctly detect mesh index prefixes.
 * Fixed an issue where wimdo export would fail if a mesh did not have any shape keys.
+* Fixed an issue where materials would not use the correct UV wrap modes for image textures.
 
 ## 0.6.0 - 2024-05-27
 ### Added

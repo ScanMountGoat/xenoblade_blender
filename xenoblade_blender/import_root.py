@@ -107,7 +107,10 @@ def import_map_root(
                     blender_material = bpy.data.materials.get(material.name)
                     if blender_material is None:
                         blender_material = import_material(
-                            material, blender_images, root.image_textures
+                            material,
+                            blender_images,
+                            root.image_textures,
+                            models.samplers,
                         )
 
                     buffers = group.buffers[model.model_buffers_index]
@@ -147,7 +150,7 @@ def import_model_root(
             blender_material = bpy.data.materials.get(material.name)
             if blender_material is None:
                 blender_material = import_material(
-                    material, blender_images, root.image_textures
+                    material, blender_images, root.image_textures, root.models.samplers
                 )
 
             if not import_all_meshes:
@@ -400,7 +403,7 @@ def import_weight_groups(
                     group.add([weight.vertex_index], weight.weight, "REPLACE")
 
 
-def import_material(material, blender_images, image_textures):
+def import_material(material, blender_images, image_textures, samplers):
     blender_material = bpy.data.materials.new(material.name)
     blender_material.use_nodes = True
 
@@ -421,6 +424,16 @@ def import_material(material, blender_images, image_textures):
     for texture in material.textures:
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.image = blender_images[texture.image_texture_index]
+
+        # TODO: Check if U and V have the same address mode.
+        sampler = samplers[texture.sampler_index]
+        if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
+            texture_node.extension = "CLIP"
+        elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
+            texture_node.extension = "REPEAT"
+        elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
+            texture_node.extension = "MIRROR"
+
         textures.append(texture_node)
 
         texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
