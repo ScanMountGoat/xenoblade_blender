@@ -117,10 +117,7 @@ def import_map_root(
 
                     if not import_all_meshes:
                         base_lods = models.base_lod_indices
-                        if (
-                            base_lods is not None
-                            and (mesh.lod & 0xFF - 1) not in base_lods
-                        ):
+                        if base_lods is not None and (mesh.lod - 1) not in base_lods:
                             continue
 
                         if "_outline" in material.name or "_speff_" in material.name:
@@ -155,7 +152,7 @@ def import_model_root(
 
             if not import_all_meshes:
                 base_lods = root.models.base_lod_indices
-                if base_lods is not None and (mesh.lod & 0xFF - 1) not in base_lods:
+                if base_lods is not None and (mesh.lod - 1) not in base_lods:
                     continue
 
                 if "_outline" in material.name or "_speff_" in material.name:
