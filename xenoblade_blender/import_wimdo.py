@@ -114,6 +114,9 @@ def import_wimdo(
     armature = import_armature(context, root, model_name)
     import_model_root(root, blender_images, armature, import_all_meshes, flip_uvs=True)
 
+    # Store the path to make exporting easier later.
+    armature["original_wimdo"] = path
+
     # Convert from Y up to Z up.
     armature.matrix_world = Matrix.Rotation(math.radians(90), 4, "X")
 

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added the `original_wimdo` custom property to .wimdo armatures on import. This value will be saved with the Blender scene and avoids needing to set the original file path for exporting in most cases.
+
 ### Fixed
 * Fixed an issue where wimdo export would not correctly detect mesh index prefixes.
 * Fixed an issue where wimdo export would fail if a mesh did not have any shape keys.

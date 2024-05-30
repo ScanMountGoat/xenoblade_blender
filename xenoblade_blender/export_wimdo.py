@@ -28,7 +28,7 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
 
     original_wimdo: StringProperty(
         name="Original Wimdo",
-        description="The original .wimdo file to use to generate the new model",
+        description="The original .wimdo file to use to generate the new model. Defaults to the armature's original_wimdo custom property if not set",
     )
 
     def execute(self, context: bpy.types.Context):
@@ -48,13 +48,14 @@ def export_wimdo(
 ):
     start = time.time()
 
-    if context.object is None or not isinstance(
-        context.object.data, bpy.types.Armature
-    ):
+    armature = context.object
+    if armature is None or not isinstance(armature.data, bpy.types.Armature):
         operator.report({"ERROR"}, "No armature selected")
         return
 
-    armature = context.object
+    # The path specified in export settings should have priority.
+    if wimdo_path == "":
+        wimdo_path = armature.get("original_wimdo", "")
 
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
@@ -65,6 +66,7 @@ def export_wimdo(
     root.models.models[0].meshes = []
 
     # Initialize weight buffer to share with all meshes.
+    # TODO: Missing bone names?
     bone_names = root.buffers.weights.weight_buffer(16385).bone_names
     combined_weights = xc3_model_py.skinning.SkinWeights(
         np.array([]), np.array([]), bone_names
