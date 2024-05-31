@@ -77,6 +77,17 @@ def export_wimdo(
 
     root.buffers.weights.update_weights(combined_weights)
 
+    # Detect the default import behavior of a single lod level in each group.
+    # Setting the lod count avoids needing to export LOD or speff meshes.
+    lod_data = root.models.lod_data
+    if lod_data is not None:
+        base_lod_indices = [g.base_lod_index for g in lod_data.groups]
+        if all(
+            m.lod_item_index in base_lod_indices for m in root.models.models[0].meshes
+        ):
+            for g in lod_data.groups:
+                g.lod_count = 1
+
     end = time.time()
     print(f"Create ModelRoot: {end - start}")
 

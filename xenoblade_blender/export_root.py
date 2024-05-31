@@ -189,8 +189,9 @@ def export_mesh(
             material_index = i
             break
 
-    # TODO: What to use for mesh flags and lod?
-    lod = 1
+    # TODO: why does None not work well in game?
+    lod_item_index = 0
+    # TODO: What to use for mesh flags?
     flags1 = 16384
     flags2 = 16385
     ext_mesh_index = None
@@ -205,10 +206,9 @@ def export_mesh(
             mesh_index = int(name_parts[0])
             original_mesh = original_meshes[mesh_index]
 
-            lod = original_mesh.lod
-            # TODO: Why does these cause instant crashes?
+            lod_item_index = original_mesh.lod_item_index
             flags1 = original_mesh.flags1
-            flags2 = original_mesh.flags2  # TODO: preserve skin flags?
+            flags2 = original_mesh.flags2
             ext_mesh_index = original_mesh.ext_mesh_index
             unk_mesh_index1 = original_mesh.unk_mesh_index1
             base_mesh_index = original_mesh.base_mesh_index
@@ -220,9 +220,9 @@ def export_mesh(
         index_buffer_index,
         unk_mesh_index1,
         material_index,
-        lod,
         flags1,
         flags2,
+        lod_item_index,
         ext_mesh_index,
         base_mesh_index,
     )

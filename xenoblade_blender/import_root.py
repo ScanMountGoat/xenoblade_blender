@@ -98,6 +98,10 @@ def import_map_root(
 ):
     for group in root.groups:
         for models in group.models:
+            base_lods = None
+            if models.lod_data is not None:
+                base_lods = [g.base_lod_index for g in models.lod_data.groups]
+
             # TODO: Cache based on vertex and index buffer indices?
             for model in models.models:
                 for i, mesh in enumerate(model.meshes):
@@ -116,8 +120,10 @@ def import_map_root(
                     buffers = group.buffers[model.model_buffers_index]
 
                     if not import_all_meshes:
-                        base_lods = models.base_lod_indices
-                        if base_lods is not None and (mesh.lod - 1) not in base_lods:
+                        if (
+                            base_lods is not None
+                            and mesh.lod_item_index not in base_lods
+                        ):
                             continue
 
                         if "_outline" in material.name or "_speff_" in material.name:
@@ -138,6 +144,10 @@ def import_map_root(
 def import_model_root(
     root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool
 ):
+    base_lods = None
+    if root.models.lod_data is not None:
+        base_lods = [g.base_lod_index for g in root.models.lod_data.groups]
+
     # TODO: Cache based on vertex and index buffer indices?
     for model in root.models.models:
         for i, mesh in enumerate(model.meshes):
@@ -151,8 +161,7 @@ def import_model_root(
                 )
 
             if not import_all_meshes:
-                base_lods = root.models.base_lod_indices
-                if base_lods is not None and (mesh.lod - 1) not in base_lods:
+                if base_lods is not None and mesh.lod_item_index not in base_lods:
                     continue
 
                 if "_outline" in material.name or "_speff_" in material.name:
@@ -278,8 +287,9 @@ def import_mesh(
         if buffers.weights is not None:
             # Calculate the index offset based on the weight group for this mesh.
             pass_type = models.materials[mesh.material_index].pass_type
+            lod_item_index = 0 if mesh.lod_item_index is None else mesh.lod_item_index
             start_index = buffers.weights.weights_start_index(
-                mesh.flags2, mesh.lod, pass_type
+                mesh.flags2, lod_item_index, pass_type
             )
 
             # An extra step is required since some Xenoblade X models have multiple weight buffers.
