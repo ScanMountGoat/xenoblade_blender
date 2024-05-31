@@ -3,6 +3,7 @@ import time
 import logging
 import numpy as np
 from pathlib import Path
+import re
 
 from .export_root import export_mesh
 
@@ -40,6 +41,12 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
         return {"FINISHED"}
 
 
+def name_sort_index(name: str):
+    # Use integer sorting for any chunks of chars that are integers.
+    # This avoids unwanted behavior of alphabetical sorting like "10" coming before "2".
+    return [int(c) if c.isdigit() else c for c in re.split("([0-9]+)", name)]
+
+
 def export_wimdo(
     operator: bpy.types.Operator,
     context: bpy.types.Context,
@@ -72,7 +79,11 @@ def export_wimdo(
         np.array([]), np.array([]), bone_names
     )
 
-    for object in armature.children:
+    # Use a consistent ordering since Blender collections don't have one.
+    sorted_objects = [o for o in armature.children]
+    sorted_objects.sort(key=lambda o: name_sort_index(o.name))
+    for object in sorted_objects:
+        print(object.name)
         export_mesh(root, object, combined_weights, original_meshes, morph_names)
 
     root.buffers.weights.update_weights(combined_weights)
