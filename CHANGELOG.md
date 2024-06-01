@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Fixed an issue where wimdo export would fail if a mesh did not have any shape keys.
 * Fixed an issue where materials would not use the correct UV wrap modes for image textures.
 * Fixed an issue where some .wimdo files did not load the correct meshes for the base level of detail on import.
+* Fixed an issue where non square textures would not import with the correct layout.
 
 ## 0.6.0 - 2024-05-27
 ### Added

@@ -64,7 +64,7 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
 
             if flip:
                 # Flip vertically to match Blender.
-                decoded = decoded.reshape((image.width, image.height, 4))
+                decoded = decoded.reshape((image.height, image.width, 4))
                 decoded = np.flip(decoded, axis=0)
 
             blender_image.pixels.foreach_set(decoded.reshape(-1))
