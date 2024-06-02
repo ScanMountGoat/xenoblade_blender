@@ -309,15 +309,15 @@ def import_mesh(
 
         # TODO: Is there a way to not do this for every instance?
         # Only non instanced character meshes have shape keys in practice.
-        # TODO: Skip this if no morphs are present?
-        import_shape_keys(
-            vertex_buffer,
-            models.morph_controller_names,
-            position_data,
-            min_index,
-            max_index,
-            obj,
-        )
+        if len(vertex_buffer.morph_targets) > 0:
+            import_shape_keys(
+                vertex_buffer,
+                models.morph_controller_names,
+                position_data,
+                min_index,
+                max_index,
+                obj,
+            )
 
         bpy.context.collection.objects.link(obj)
 
