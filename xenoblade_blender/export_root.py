@@ -195,8 +195,10 @@ def export_mesh(
     flags1 = 16384
     flags2 = 16385
     ext_mesh_index = None
-    unk_mesh_index1 = 0
     base_mesh_index = None
+    # Use the index buffer as the shadow map index buffer.
+    # We don't use the original index since the new buffers are different.
+    unk_mesh_index1 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
     mesh_name = blender_mesh.name
@@ -210,7 +212,6 @@ def export_mesh(
             flags1 = original_mesh.flags1
             flags2 = original_mesh.flags2
             ext_mesh_index = original_mesh.ext_mesh_index
-            unk_mesh_index1 = original_mesh.unk_mesh_index1
             base_mesh_index = original_mesh.base_mesh_index
         except:
             pass
