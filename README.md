@@ -21,10 +21,8 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 Select the game version before importing for correct material texture assignments.
 
 ## Planned Features
-* Improved wimdo export
-* Exporting animations
-* Better support for Xenoblade X models and maps
-* Improvements to import times and memory usage
+* Export animations
+* Import Xenoblade X maps
 
 The goal of this addon is to provide import and export operations with good performance and minimal configuration. Quality of life features requiring more complex UI are better handled using traditional pure Python addons.
 
