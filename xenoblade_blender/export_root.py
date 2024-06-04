@@ -4,6 +4,7 @@ import math
 import numpy as np
 from . import xc3_model_py
 from mathutils import Matrix
+import bmesh
 
 
 def export_skeleton(armature: bpy.types.Object):
@@ -35,13 +36,157 @@ def extract_index(name: str) -> Optional[int]:
         return None
 
 
+# Updated from the processing code written for Smash Ultimate:
+# https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/export_model.py#L956
+def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
+    # Apply any transforms before exporting to preserve vertex positions.
+    # Assume the meshes have no children that would inherit their transforms.
+    mesh.data.transform(mesh.matrix_basis)
+    mesh.matrix_basis.identity()
+
+    # Apply Modifiers
+    override = context.copy()
+    override["object"] = mesh
+    override["active_object"] = mesh
+    override["selected_objects"] = [mesh]
+    with context.temp_override(**override):
+        for modifier in mesh.modifiers:
+            if modifier.type != "ARMATURE":
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+    # Get the custom normals from the original mesh.
+    # We use the copy here since applying transforms alters the normals.
+    loop_normals = np.zeros(len(mesh.data.loops) * 3, dtype=np.float32)
+    mesh.data.loops.foreach_get("normal", loop_normals)
+
+    # Transfer the original normals to a custom attribute.
+    # This allows us to edit the mesh without affecting custom normals.
+    normals_color = mesh.data.attributes.new(
+        name="_custom_normals", type="FLOAT_VECTOR", domain="CORNER"
+    )
+    normals_color.data.foreach_set("vector", loop_normals)
+
+    # Check if any faces are not triangles, and convert them into triangles.
+    # TODO: Investigate why this causes issues in game.
+    if any(len(f.vertices) != 3 for f in mesh.data.polygons):
+        bm = bmesh.new()
+        bm.from_mesh(mesh.data)
+
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+
+        bm.to_mesh(mesh.data)
+        bm.free()
+
+    # Blender stores normals and UVs per loop rather than per vertex.
+    # Edges with more than one value per vertex need to be split.
+    split_duplicate_loop_attributes(mesh)
+    # Rarely this will create some loose verts
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+
+    unlinked_verts = [v for v in bm.verts if len(v.link_faces) == 0]
+    bmesh.ops.delete(bm, geom=unlinked_verts, context="VERTS")
+
+    bm.to_mesh(mesh.data)
+    mesh.data.update()
+    bm.clear()
+
+    # Extract the custom normals preserved in the custom attribute.
+    # Attributes should not be affected by splitting or triangulating.
+    # This avoids the datatransfer modifier not handling vertices at the same position.
+    loop_normals = np.zeros(len(mesh.data.loops) * 3, dtype=np.float32)
+    normals = mesh.data.attributes["_custom_normals"]
+    normals.data.foreach_get("vector", loop_normals)
+
+    # Assign the preserved custom normals to the temp mesh.
+    mesh.data.normals_split_custom_set(loop_normals.reshape((-1, 3)))
+    mesh.data.update()
+
+
+def split_duplicate_loop_attributes(mesh: bpy.types.Object):
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+
+    edges_to_split: list[bmesh.types.BMEdge] = []
+
+    add_duplicate_normal_edges(edges_to_split, bm)
+
+    for layer_name in bm.loops.layers.uv.keys():
+        uv_layer = bm.loops.layers.uv.get(layer_name)
+        add_duplicate_uv_edges(edges_to_split, bm, uv_layer)
+
+    # Duplicate edges cause problems with split_edges.
+    edges_to_split = list(set(edges_to_split))
+
+    # Don't modify the mesh if no edges need to be split.
+    # This check also seems to prevent a potential crash.
+    if len(edges_to_split) > 0:
+        bmesh.ops.split_edges(bm, edges=edges_to_split)
+        bm.to_mesh(mesh.data)
+        mesh.data.update()
+
+    bm.clear()
+
+    # Check if any edges were split.
+    return len(edges_to_split) > 0
+
+
+def add_duplicate_normal_edges(edges_to_split, bm):
+    # The original normals are preserved in a custom attribute.
+    normal_layer = bm.loops.layers.float_vector.get("_custom_normals")
+
+    # Find edges connected to vertices with more than one normal.
+    # This allows converting to per vertex later by splitting edges.
+    index_to_normal = {}
+    for face in bm.faces:
+        for loop in face.loops:
+            vertex_index = loop.vert.index
+            normal = loop[normal_layer]
+            # Small fluctuations in normal vectors are expected during processing.
+            # Check if the angle between normals is sufficiently large.
+            # Assume normal vectors are normalized to have length 1.0.
+            if vertex_index not in index_to_normal:
+                index_to_normal[vertex_index] = normal
+            elif not math.isclose(
+                normal.dot(index_to_normal[vertex_index]),
+                1.0,
+                abs_tol=0.001,
+                rel_tol=0.001,
+            ):
+                # Get any edges containing this vertex.
+                edges_to_split.extend(loop.vert.link_edges)
+
+
+def add_duplicate_uv_edges(edges_to_split, bm, uv_layer):
+    # Blender stores uvs per loop rather than per vertex.
+    # Find edges connected to vertices with more than one uv coord.
+    # This allows converting to per vertex later by splitting edges.
+    index_to_uv = {}
+    for face in bm.faces:
+        for loop in face.loops:
+            vertex_index = loop.vert.index
+            uv = loop[uv_layer].uv
+            # Use strict equality since UVs are unlikely to change unintentionally.
+            if vertex_index not in index_to_uv:
+                index_to_uv[vertex_index] = uv
+            elif uv != index_to_uv[vertex_index]:
+                edges_to_split.extend(loop.vert.link_edges)
+
+
 def export_mesh(
+    context: bpy.types.Context,
     root: xc3_model_py.ModelRoot,
     blender_mesh: bpy.types.Object,
     combined_weights: xc3_model_py.skinning.SkinWeights,
     original_meshes,
     morph_names: list[str],
 ):
+    # Work on a copy in case we need to make any changes.
+    mesh_copy = blender_mesh.copy()
+    mesh_copy.data = blender_mesh.data.copy()
+
+    process_export_mesh(context, mesh_copy)
+
     mesh_data = blender_mesh.data
 
     positions = np.zeros(len(mesh_data.vertices) * 3)
