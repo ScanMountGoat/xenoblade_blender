@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Changed the name of materials to include an index prefix to handle materials with duplicate names.
 * Changed the label for image texture nodes to include the material texture index.
 
+### Fixed
+* Fixed an issue where .camdo models would not import due to unsupported sampler data.
+
 ## 0.7.0 - 2024-06-02
 ### Added
 * Added the `original_wimdo` custom property to .wimdo armatures on import. This value will be saved with the Blender scene and avoids needing to set the original file path for exporting in most cases.

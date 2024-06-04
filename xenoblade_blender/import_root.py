@@ -457,13 +457,17 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         texture_node.image = blender_images[texture.image_texture_index]
 
         # TODO: Check if U and V have the same address mode.
-        sampler = samplers[texture.sampler_index]
-        if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
-            texture_node.extension = "CLIP"
-        elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
-            texture_node.extension = "REPEAT"
-        elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
-            texture_node.extension = "MIRROR"
+        try:
+            sampler = samplers[texture.sampler_index]
+            if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
+                texture_node.extension = "CLIP"
+            elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
+                texture_node.extension = "REPEAT"
+            elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
+                texture_node.extension = "MIRROR"
+        except:
+            # TODO: Fix samplers for xcx models.
+            pass
 
         textures.append(texture_node)
 
