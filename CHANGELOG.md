@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Improved the layout of nodes in generated materials.
 * Changed the name of materials to include an index prefix to handle materials with duplicate names.
 * Changed the label for image texture nodes to include the material texture index.
+* Changed exporting behavior to automatically apply transforms and any non armature modifiers.
 
 ### Fixed
 * Fixed an issue where .camdo models would not import due to unsupported sampler data.
