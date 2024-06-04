@@ -83,7 +83,6 @@ def export_wimdo(
     sorted_objects = [o for o in armature.children]
     sorted_objects.sort(key=lambda o: name_sort_index(o.name))
     for object in sorted_objects:
-        print(object.name)
         export_mesh(root, object, combined_weights, original_meshes, morph_names)
 
     root.buffers.weights.update_weights(combined_weights)

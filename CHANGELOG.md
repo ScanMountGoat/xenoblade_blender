@@ -3,6 +3,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Improved the layout of nodes in generated materials.
+* Changed the name of materials to include an index prefix to handle materials with duplicate names.
+* Changed the label for image texture nodes to include the material texture index.
+
 ## 0.7.0 - 2024-06-02
 ### Added
 * Added the `original_wimdo` custom property to .wimdo armatures on import. This value will be saved with the Blender scene and avoids needing to set the original file path for exporting in most cases.

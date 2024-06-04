@@ -1,3 +1,4 @@
+from typing import Optional
 import bpy
 import math
 import numpy as np
@@ -24,6 +25,14 @@ def export_skeleton(armature: bpy.types.Object):
         bones.append(xc3_model_py.Bone(name, transform, parent_index))
 
     return xc3_model_py.Skeleton(bones)
+
+
+def extract_index(name: str) -> Optional[int]:
+    name_parts = name.split(".")
+    try:
+        return int(name_parts[0])
+    except:
+        return None
 
 
 def export_mesh(
@@ -183,11 +192,12 @@ def export_mesh(
 
     # Don't support adding new materials for now.
     # xc3_model doesn't actually overwrite materials yet.
-    material_index = 0
-    for i, material in enumerate(root.models.materials):
-        if material.name == mesh_data.materials[0].name:
-            material_index = i
-            break
+    material_index = extract_index(mesh_data.materials[0].name)
+    if material_index is None:
+        for i, material in enumerate(root.models.materials):
+            if material.name == mesh_data.materials[0].name:
+                material_index = i
+                break
 
     # TODO: why does None not work well in game?
     lod_item_index = 0
@@ -201,20 +211,15 @@ def export_mesh(
     unk_mesh_index1 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
-    mesh_name = blender_mesh.name
-    name_parts = mesh_name.split(".")
-    if len(name_parts) > 0:
-        try:
-            mesh_index = int(name_parts[0])
-            original_mesh = original_meshes[mesh_index]
+    mesh_index = extract_index(blender_mesh.name)
+    if mesh_index is not None:
+        original_mesh = original_meshes[mesh_index]
 
-            lod_item_index = original_mesh.lod_item_index
-            flags1 = original_mesh.flags1
-            flags2 = original_mesh.flags2
-            ext_mesh_index = original_mesh.ext_mesh_index
-            base_mesh_index = original_mesh.base_mesh_index
-        except:
-            pass
+        lod_item_index = original_mesh.lod_item_index
+        flags1 = original_mesh.flags1
+        flags2 = original_mesh.flags2
+        ext_mesh_index = original_mesh.ext_mesh_index
+        base_mesh_index = original_mesh.base_mesh_index
 
     mesh = xc3_model_py.Mesh(
         vertex_buffer_index,

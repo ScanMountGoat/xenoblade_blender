@@ -108,9 +108,12 @@ def import_map_root(
                     # Many materials are for meshes that won't be loaded.
                     # Lazy load materials to improve import times.
                     material = models.materials[mesh.material_index]
-                    blender_material = bpy.data.materials.get(material.name)
+                    material_name = f"{mesh.material_index}.{material.name}"
+
+                    blender_material = bpy.data.materials.get(material_name)
                     if blender_material is None:
                         blender_material = import_material(
+                            material_name,
                             material,
                             blender_images,
                             root.image_textures,
@@ -136,6 +139,7 @@ def import_map_root(
                         model,
                         mesh,
                         blender_material,
+                        material.name,
                         flip_uvs,
                         i,
                     )
@@ -154,10 +158,16 @@ def import_model_root(
             # Many materials are for meshes that won't be loaded.
             # Lazy load materials to improve import times.
             material = root.models.materials[mesh.material_index]
-            blender_material = bpy.data.materials.get(material.name)
+            material_name = f"{mesh.material_index}.{material.name}"
+
+            blender_material = bpy.data.materials.get(material_name)
             if blender_material is None:
                 blender_material = import_material(
-                    material, blender_images, root.image_textures, root.models.samplers
+                    material_name,
+                    material,
+                    blender_images,
+                    root.image_textures,
+                    root.models.samplers,
                 )
 
             if not import_all_meshes:
@@ -174,15 +184,24 @@ def import_model_root(
                 model,
                 mesh,
                 blender_material,
+                material.name,
                 flip_uvs,
                 i,
             )
 
 
 def import_mesh(
-    root_obj, buffers, models, model, mesh, material, flip_uvs: bool, i: int
+    root_obj,
+    buffers,
+    models,
+    model,
+    mesh,
+    material: bpy.types.Material,
+    material_name: str,
+    flip_uvs: bool,
+    i: int,
 ):
-    blender_mesh = bpy.data.meshes.new(f"{i}.{material.name}")
+    blender_mesh = bpy.data.meshes.new(f"{i}.{material_name}")
 
     # Vertex buffers are shared with multiple index buffers.
     # In practice, only a small range of vertices are used.
@@ -410,14 +429,17 @@ def import_weight_groups(
                     group.add([weight.vertex_index], weight.weight, "REPLACE")
 
 
-def import_material(material, blender_images, image_textures, samplers):
-    blender_material = bpy.data.materials.new(material.name)
+def import_material(name: str, material, blender_images, image_textures, samplers):
+    blender_material = bpy.data.materials.new(name)
     blender_material.use_nodes = True
 
     nodes = blender_material.node_tree.nodes
     links = blender_material.node_tree.links
 
-    bsdf = blender_material.node_tree.nodes["Principled BSDF"]
+    bsdf = nodes["Principled BSDF"]
+    bsdf.location = (0, 0)
+
+    nodes["Material Output"].location = (300, 0)
 
     # Get information on how the decompiled shader code assigns outputs.
     # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
@@ -428,8 +450,10 @@ def import_material(material, blender_images, image_textures, samplers):
 
     textures = []
     textures_rgb = []
-    for texture in material.textures:
+    for i, texture in enumerate(material.textures):
         texture_node = nodes.new("ShaderNodeTexImage")
+        texture_node.label = str(i)
+        texture_node.location = (-800, 300 - i * 300)
         texture_node.image = blender_images[texture.image_texture_index]
 
         # TODO: Check if U and V have the same address mode.
@@ -444,6 +468,7 @@ def import_material(material, blender_images, image_textures, samplers):
         textures.append(texture_node)
 
         texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
+        texture_rgb_node.location = (-500, 300 - i * 300)
         textures_rgb.append(texture_rgb_node)
         links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
 
@@ -452,6 +477,7 @@ def import_material(material, blender_images, image_textures, samplers):
     # TODO: Set color space for images?
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
+    base_color.location = (-200, 200)
     assign_channel(
         assignments[0].x,
         links,
@@ -483,12 +509,14 @@ def import_material(material, blender_images, image_textures, samplers):
 
     assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
 
+    # TODO: Just assign the 1 - value directly if not using a texture.
     assign_channel(assignments[1].x, links, textures, textures_rgb, bsdf, "Metallic")
 
     # TODO: toon and hair shaders always use specular color?
     if not mat_id in [2, 5]:
         # TODO: This doesn't always work?
         emi_color = nodes.new("ShaderNodeCombineColor")
+        emi_color.location = (-200, -400)
         assign_channel(
             assignments[5].x,
             links,
@@ -520,6 +548,7 @@ def import_material(material, blender_images, image_textures, samplers):
 
     # Invert glossiness to get roughness.
     invert = nodes.new("ShaderNodeMath")
+    invert.location = (-200, 0)
     invert.operation = "SUBTRACT"
     invert.inputs[0].default_value = 1.0
     assign_channel(assignments[1].y, links, textures, textures_rgb, invert, 1)
@@ -545,31 +574,38 @@ def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
     if assignments[2].x is None and assignments[2].y is None:
         return
 
+    # TODO: Group these nodes in a node group?
     normal_xy = nodes.new("ShaderNodeCombineXYZ")
+    normal_xy.location = (-1200, -700)
     assign_channel(assignments[2].x, links, textures, textures_rgb, normal_xy, "X")
     assign_channel(assignments[2].y, links, textures, textures_rgb, normal_xy, "Y")
     normal_xy.inputs["Z"].default_value = 0.0
 
     length2 = nodes.new("ShaderNodeVectorMath")
+    length2.location = (-1000, -700)
     length2.operation = "DOT_PRODUCT"
     links.new(normal_xy.outputs["Vector"], length2.inputs[0])
     links.new(normal_xy.outputs["Vector"], length2.inputs[1])
 
     one_minus_length = nodes.new("ShaderNodeMath")
+    one_minus_length.location = (-800, -700)
     one_minus_length.operation = "SUBTRACT"
     one_minus_length.inputs[0].default_value = 1.0
     links.new(length2.outputs["Value"], one_minus_length.inputs[1])
 
     length = nodes.new("ShaderNodeMath")
+    length.location = (-600, -700)
     length.operation = "SQRT"
     links.new(one_minus_length.outputs["Value"], length.inputs[0])
 
     normal_xyz = nodes.new("ShaderNodeCombineXYZ")
+    normal_xyz.location = (-400, -700)
     assign_channel(assignments[2].x, links, textures, textures_rgb, normal_xyz, "X")
     assign_channel(assignments[2].y, links, textures, textures_rgb, normal_xyz, "Y")
     links.new(length.outputs["Value"], normal_xyz.inputs["Z"])
 
     normal_map = nodes.new("ShaderNodeNormalMap")
+    normal_map.location = (-200, -200)
     links.new(normal_xyz.outputs["Vector"], normal_map.inputs["Color"])
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
 
