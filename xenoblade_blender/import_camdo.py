@@ -79,7 +79,7 @@ def import_camdo(
 
     model_name = os.path.basename(path)
     blender_images = import_images(
-        root, model_name, pack_images, image_folder, flip=False
+        root, model_name.replace(".camdo", ""), pack_images, image_folder, flip=False
     )
     armature = import_armature(context, root, model_name)
     import_model_root(

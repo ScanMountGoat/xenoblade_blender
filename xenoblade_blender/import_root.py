@@ -53,13 +53,19 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
     blender_images = []
 
     if pack:
-        for image, decoded in zip(root.image_textures, root.decode_images_rgbaf32()):
-            name = image.name if image.name is not None else "image"
+        for i, (image, decoded) in enumerate(
+            zip(root.image_textures, root.decode_images_rgbaf32())
+        ):
+            # Use the same naming conventions as the saved PNG images and xc3_tex.
+            if image.name is not None:
+                name = f"{model_name}.{i}.{image.name}"
+            else:
+                name = f"{model_name}.{i}"
+
             blender_image = bpy.data.images.new(name, image.width, image.height)
 
-            decoded_size = (
-                image.width * image.height * 4
-            )  # TODO: why is this necessary?
+            # TODO: why is this necessary?
+            decoded_size = image.width * image.height * 4
             decoded = decoded[:decoded_size]
 
             if flip:
@@ -77,6 +83,7 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
             blender_images.append(blender_image)
     else:
         # Unpacked textures use less memory and are faster to load.
+        # This already includes the index in the file name.
         for image, file in zip(
             root.image_textures,
             root.save_images_rgba8(image_folder, model_name, "png", not flip),

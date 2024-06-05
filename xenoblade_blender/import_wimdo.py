@@ -109,7 +109,7 @@ def import_wimdo(
 
     model_name = os.path.basename(path)
     blender_images = import_images(
-        root, model_name, pack_images, image_folder, flip=True
+        root, model_name.replace(".wimdo", ""), pack_images, image_folder, flip=True
     )
     armature = import_armature(context, root, model_name)
     import_model_root(root, blender_images, armature, import_all_meshes, flip_uvs=True)

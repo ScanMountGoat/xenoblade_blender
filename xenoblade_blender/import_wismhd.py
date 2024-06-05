@@ -98,8 +98,9 @@ def import_wismhd(
     model_name = os.path.basename(path)
 
     for i, root in enumerate(roots):
+        name = model_name.replace(".wismhd", "")
         blender_images = import_images(
-            root, f"{model_name}.root{i}", pack_images, image_folder, flip=True
+            root, f"{name}.root{i}", pack_images, image_folder, flip=True
         )
 
         # Create an empty by setting the data to None.
