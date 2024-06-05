@@ -10,7 +10,7 @@ from .export_root import export_mesh
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty
+from bpy.props import StringProperty, BoolProperty
 
 
 class ExportWimdo(bpy.types.Operator, ExportHelper):
@@ -32,12 +32,24 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
         description="The original .wimdo file to use to generate the new model. Defaults to the armature's original_wimdo custom property if not set",
     )
 
+    create_speff_meshes: BoolProperty(
+        name="Create _speff meshes",
+        description="Create additional copies of meshes with _speff materials. This only affects Xenoblade 3",
+        default=True,
+    )
+
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
         log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        export_wimdo(self, context, self.filepath, self.original_wimdo.strip('"'))
+        export_wimdo(
+            self,
+            context,
+            self.filepath,
+            self.original_wimdo.strip('"'),
+            self.create_speff_meshes,
+        )
         return {"FINISHED"}
 
 
@@ -52,6 +64,7 @@ def export_wimdo(
     context: bpy.types.Context,
     output_wimdo_path: str,
     wimdo_path: str,
+    create_speff_meshes: bool,
 ):
     start = time.time()
 
@@ -84,7 +97,13 @@ def export_wimdo(
     sorted_objects.sort(key=lambda o: name_sort_index(o.name))
     for object in sorted_objects:
         export_mesh(
-            context, root, object, combined_weights, original_meshes, morph_names
+            context,
+            root,
+            object,
+            combined_weights,
+            original_meshes,
+            morph_names,
+            create_speff_meshes,
         )
 
     root.buffers.weights.update_weights(combined_weights)

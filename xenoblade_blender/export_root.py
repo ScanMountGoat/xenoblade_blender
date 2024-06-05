@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 import bpy
 import math
 import numpy as np
@@ -51,12 +51,18 @@ def get_bone_transform(m: Matrix) -> Matrix:
     return (p @ m @ p.inverted()).transposed()
 
 
-def extract_index(name: str) -> Optional[int]:
-    name_parts = name.split(".")
+def extract_index(name: str) -> Tuple[Optional[int], str]:
+    name_parts = name.split(".", 1)
+
+    prefix = None
+    name = name_parts[1] if len(name_parts) == 2 else ""
+
     try:
-        return int(name_parts[0])
+        prefix = int(name_parts[0])
     except:
-        return None
+        prefix = None
+
+    return prefix, name
 
 
 # Updated from the processing code written for Smash Ultimate:
@@ -203,6 +209,7 @@ def export_mesh(
     combined_weights: xc3_model_py.skinning.SkinWeights,
     original_meshes,
     morph_names: list[str],
+    create_speff_meshes: bool,
 ):
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
@@ -363,10 +370,10 @@ def export_mesh(
 
     # Don't support adding new materials for now.
     # xc3_model doesn't actually overwrite materials yet.
-    material_index = extract_index(mesh_data.materials[0].name)
+    material_index, material_name = extract_index(mesh_data.materials[0].name)
     if material_index is None:
         for i, material in enumerate(root.models.materials):
-            if material.name == mesh_data.materials[0].name:
+            if material.name == material_name:
                 material_index = i
                 break
 
@@ -382,9 +389,15 @@ def export_mesh(
     unk_mesh_index1 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
-    mesh_index = extract_index(blender_mesh.name)
-    if mesh_index is not None:
-        original_mesh = original_meshes[mesh_index]
+    original_mesh_index, _ = extract_index(blender_mesh.name)
+    if original_mesh_index is None:
+        for i, mesh in original_meshes:
+            if mesh.material_index == material_index:
+                original_mesh_index = i
+                break
+
+    if original_mesh_index is not None:
+        original_mesh = original_meshes[original_mesh_index]
 
         lod_item_index = original_mesh.lod_item_index
         flags1 = original_mesh.flags1
@@ -404,14 +417,36 @@ def export_mesh(
         base_mesh_index,
     )
 
+    mesh_index = len(root.models.models[0].meshes)
+    root.models.models[0].meshes.append(mesh)
+
+    # TODO: report a warning if this fails.
+    # Materials can share names, so check the base mesh index instead.
+    if create_speff_meshes and original_mesh_index is not None:
+        # Create speff meshes based on the base mesh index.
+        # Existing speff meshes aren't referenced by base_mesh_index and will be ignored.
+        for mesh in original_meshes:
+            if mesh.base_mesh_index == original_mesh_index:
+                speff_mesh = xc3_model_py.Mesh(
+                    vertex_buffer_index,
+                    index_buffer_index,
+                    unk_mesh_index1,
+                    mesh.material_index,
+                    mesh.flags1,
+                    mesh.flags2,
+                    lod_item_index,
+                    ext_mesh_index,
+                    base_mesh_index=mesh_index,
+                )
+                root.models.models[0].meshes.append(speff_mesh)
+
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
         attributes, morph_blend_target, morph_targets, None
     )
-    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
-
     root.buffers.vertex_buffers.append(vertex_buffer)
+
+    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
     root.buffers.index_buffers.append(index_buffer)
-    root.models.models[0].meshes.append(mesh)
 
 
 def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
