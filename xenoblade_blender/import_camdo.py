@@ -86,8 +86,5 @@ def import_camdo(
         root, blender_images, armature, import_all_meshes=True, flip_uvs=False
     )
 
-    # Convert from Y up to Z up.
-    armature.matrix_world = Matrix.Rotation(math.radians(90), 4, "X")
-
     end = time.time()
     print(f"Import Blender Scene: {end - start}")

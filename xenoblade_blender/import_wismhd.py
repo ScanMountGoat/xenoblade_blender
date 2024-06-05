@@ -106,8 +106,6 @@ def import_wismhd(
         # Create an empty by setting the data to None.
         # Maps have no skeletons.
         root_obj = bpy.data.objects.new(model_name, None)
-        # Convert from Y up to Z up.
-        root_obj.matrix_world = Matrix.Rotation(math.radians(90), 4, "X")
         bpy.context.collection.objects.link(root_obj)
 
         import_map_root(

@@ -2,6 +2,7 @@ import bpy
 import time
 import logging
 import numpy as np
+import math
 
 from . import xc3_model_py
 from .export_root import export_skeleton
@@ -103,9 +104,13 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
             pose_bone = armature.pose.bones.get(name)
             matrix = Matrix(transform).transposed()
             if pose_bone.parent is not None:
-                pose_bone.matrix = pose_bone.parent.matrix @ matrix
+                pose_bone.matrix = pose_bone.parent.matrix @ get_blender_transform(
+                    matrix
+                )
             else:
-                pose_bone.matrix = matrix
+                y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
+                x_major_to_y_major = Matrix.Rotation(math.radians(-90), 4, "Z")
+                pose_bone.matrix = y_up_to_z_up @ matrix @ x_major_to_y_major
 
             t, r, s = pose_bone.matrix_basis.decompose()
             positions[name].append(t)
@@ -121,6 +126,15 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
         set_fcurves(action, name, "rotation_quaternion", rotations_wxyz[name], 4)
         set_fcurves(action, name, "scale", scales[name], 3)
     return action
+
+
+def get_blender_transform(m):
+    # In game, the bone's x-axis points from parent to child.
+    # In Blender, the bone's y-axis points from parent to child.
+    # https://en.wikipedia.org/wiki/Matrix_similarity
+    p = Matrix([[0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    # Perform the transformation m in Ultimate's basis and convert back to Blender.
+    return p @ m @ p.inverted()
 
 
 def get_bone_name(track, bone_names: list[str], hash_to_name):

@@ -117,8 +117,5 @@ def import_wimdo(
     # Store the path to make exporting easier later.
     armature["original_wimdo"] = path
 
-    # Convert from Y up to Z up.
-    armature.matrix_world = Matrix.Rotation(math.radians(90), 4, "X")
-
     end = time.time()
     print(f"Import Blender Scene: {end - start}")

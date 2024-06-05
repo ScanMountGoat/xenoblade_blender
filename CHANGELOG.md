@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Changed the label for image texture nodes to include the material texture index.
 * Changed exporting behavior to automatically apply transforms and any non armature modifiers.
 * Changed image names to always include the image index similar to xc3_tex.
+* Changed armatures, models, and animations to use Blender's coordinate system on import.
 
 ### Fixed
 * Fixed an issue where .camdo models would not import due to unsupported sampler data.

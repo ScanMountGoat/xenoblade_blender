@@ -8,24 +8,47 @@ import bmesh
 
 
 def export_skeleton(armature: bpy.types.Object):
+    bpy.ops.object.mode_set(mode="EDIT")
+
     bones = []
-    for bone in armature.data.bones.values():
+    for bone in armature.data.edit_bones:
         name = bone.name
-        transform = np.array(bone.matrix_local.transposed())
         if bone.parent:
-            matrix = bone.parent.matrix_local.inverted() @ bone.matrix_local
+            matrix = get_bone_transform(bone.parent.matrix.inverted() @ bone.matrix)
+            transform = np.array(matrix.transposed())
+        else:
+            matrix = get_root_bone_transform(bone)
             transform = np.array(matrix.transposed())
 
         # TODO: Find a way to make this not O(N^2)?
         parent_index = None
         if bone.parent:
-            for i, other in enumerate(armature.data.bones.values()):
+            for i, other in enumerate(armature.data.edit_bones):
                 if other == bone.parent:
                     parent_index = i
                     break
         bones.append(xc3_model_py.Bone(name, transform, parent_index))
 
+    bpy.ops.object.mode_set(mode="OBJECT")
+
     return xc3_model_py.Skeleton(bones)
+
+
+def get_root_bone_transform(bone: bpy.types.EditBone) -> Matrix:
+    bone.transform(Matrix.Rotation(math.radians(-90), 4, "X"))
+    bone.transform(Matrix.Rotation(math.radians(90), 4, "Z"))
+    unreoriented_matrix = get_bone_transform(bone.matrix)
+    bone.transform(Matrix.Rotation(math.radians(-90), 4, "Z"))
+    bone.transform(Matrix.Rotation(math.radians(90), 4, "X"))
+    return unreoriented_matrix
+
+
+def get_bone_transform(m: Matrix) -> Matrix:
+    # This is the inverse of the get_blender_transform permutation matrix.
+    # https://en.wikipedia.org/wiki/Matrix_similarity
+    p = Matrix([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    # Perform the transformation m in Blender's basis and convert back to Ultimate.
+    return (p @ m @ p.inverted()).transposed()
 
 
 def extract_index(name: str) -> Optional[int]:
@@ -189,9 +212,12 @@ def export_mesh(
 
     mesh_data = blender_mesh.data
 
+    # TODO: Is there a better way to account for the change of coordinates?
+    axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+
     positions = np.zeros(len(mesh_data.vertices) * 3)
     mesh_data.vertices.foreach_get("co", positions)
-    positions = positions.reshape((-1, 3))
+    positions = positions.reshape((-1, 3)) @ axis_correction
 
     vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
     mesh_data.loops.foreach_get("vertex_index", vertex_indices)
@@ -202,7 +228,7 @@ def export_mesh(
     loop_normals = loop_normals.reshape((-1, 3))
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
-    normals[:, :3][vertex_indices] = loop_normals
+    normals[:, :3][vertex_indices] = loop_normals @ axis_correction
 
     # Tangents are stored per loop instead of per vertex.
     loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
@@ -217,7 +243,7 @@ def export_mesh(
     mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
 
     tangents = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
-    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3))
+    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ axis_correction
     tangents[:, 3][vertex_indices] = loop_bitangent_signs
 
     # Export Weights
@@ -389,6 +415,9 @@ def export_mesh(
 
 
 def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
+    # TODO: Is there a better way to account for the change of coordinates?
+    axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+
     morph_targets = []
     if mesh_data.shape_keys is not None:
         for shape_key in mesh_data.shape_keys.key_blocks:
@@ -408,8 +437,9 @@ def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
             # TODO: make these sparse if vertices are unchanged?
             morph_positions = np.zeros(len(mesh_data.vertices) * 3)
             shape_key.points.foreach_get("co", morph_positions)
+            morph_positions = morph_positions.reshape((-1, 3)) @ axis_correction
 
-            position_deltas = morph_positions.reshape((-1, 3)) - positions
+            position_deltas = morph_positions - positions
             # TODO: Can these be calculated from Blender?
             normal_deltas = np.zeros((len(mesh_data.vertices), 4))
             tangent_deltas = np.zeros((len(mesh_data.vertices), 4))

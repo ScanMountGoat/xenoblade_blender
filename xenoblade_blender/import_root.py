@@ -1,6 +1,7 @@
 import bpy
 import numpy as np
 import os
+import math
 
 from . import xc3_model_py
 from mathutils import Matrix
@@ -20,10 +21,14 @@ def get_image_folder(image_folder: str, filepath: str) -> str:
         return image_folder
 
 
+# https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/import_model.py#L371
 def import_armature(context, root, name: str):
     armature = bpy.data.objects.new(name, bpy.data.armatures.new(name))
-    armature.data.display_type = "STICK"
     bpy.context.collection.objects.link(armature)
+
+    armature.data.display_type = "STICK"
+    armature.rotation_mode = "QUATERNION"
+    armature.show_in_front = True
 
     context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode="EDIT", toggle=False)
@@ -33,16 +38,30 @@ def import_armature(context, root, name: str):
 
         for bone, transform in zip(root.skeleton.bones, transforms):
             new_bone = armature.data.edit_bones.new(name=bone.name)
-            # TODO: Point bones towards their child?
             new_bone.head = [0, 0, 0]
             new_bone.tail = [0, 1, 0]
-            new_bone.matrix = Matrix(transform).transposed()
+            matrix = Matrix(transform).transposed()
+            y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
+            x_major_to_y_major = Matrix.Rotation(math.radians(-90), 4, "Z")
+            new_bone.matrix = y_up_to_z_up @ matrix @ x_major_to_y_major
 
         for bone in root.skeleton.bones:
             if bone.parent_index is not None:
                 parent_bone_name = root.skeleton.bones[bone.parent_index].name
                 parent_bone = armature.data.edit_bones.get(parent_bone_name)
                 armature.data.edit_bones.get(bone.name).parent = parent_bone
+
+        # TODO: Adjust length without causing twisting in animations like bl000101.
+        for bone in armature.data.edit_bones:
+            # if len(bone.children) > 0:
+            #     bone.length = (bone.head - bone.children[0].head).length
+            # elif bone.parent:
+            #     bone.length = bone.parent.length
+            bone.length = 0.1
+
+            # Prevent Blender from removing any bones.
+            if bone.length < 0.01:
+                bone.length = 0.01
 
     bpy.ops.object.mode_set(mode="OBJECT")
 
@@ -302,11 +321,18 @@ def import_mesh(
     # Assign materials from the current group.
     blender_mesh.materials.append(material)
 
+    # Convert from Y up to Z up.
+    y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
+    blender_mesh.transform(y_up_to_z_up)
+
     # Instances technically apply to the entire model.
     # Just instance each mesh for now for simplicity.
     for transform in model.instances:
         obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
-        obj.matrix_local = Matrix(transform).transposed()
+        # Transform the instance using the in game coordinate system and convert back.
+        obj.matrix_local = (
+            y_up_to_z_up @ Matrix(transform).transposed() @ y_up_to_z_up.inverted()
+        )
 
         # TODO: Is there a way to not do this for every instance?
         # Only non instanced character meshes are skinned in practice.
@@ -325,14 +351,6 @@ def import_mesh(
                     weight_buffer, start_index, obj, vertex_buffer, min_index, max_index
                 )
 
-        # Attach the mesh to the armature or empty.
-        # Assume the root_obj is an armature if there are weights.
-        # TODO: Find a more reliable way of checking this.
-        obj.parent = root_obj
-        if buffers.weights is not None:
-            modifier = obj.modifiers.new(root_obj.data.name, type="ARMATURE")
-            modifier.object = root_obj
-
         # TODO: Is there a way to not do this for every instance?
         # Only non instanced character meshes have shape keys in practice.
         if len(vertex_buffer.morph_targets) > 0:
@@ -344,6 +362,14 @@ def import_mesh(
                 max_index,
                 obj,
             )
+
+        # Attach the mesh to the armature or empty.
+        # Assume the root_obj is an armature if there are weights.
+        # TODO: Find a more reliable way of checking this.
+        obj.parent = root_obj
+        if buffers.weights is not None:
+            modifier = obj.modifiers.new(root_obj.data.name, type="ARMATURE")
+            modifier.object = root_obj
 
         bpy.context.collection.objects.link(obj)
 
@@ -357,6 +383,8 @@ def import_shape_keys(
     if position_data is None:
         return
 
+    y_up_to_z_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+
     for target in vertex_buffer.morph_targets:
         sk = obj.shape_key_add(name=names[target.morph_controller_index])
         if target.vertex_indices.size > 0:
@@ -366,7 +394,7 @@ def import_shape_keys(
             positions[target.vertex_indices] += target.position_deltas
 
             # Account for the unused vertex removal performed for other attributes.
-            final_positions = positions[min_index : max_index + 1]
+            final_positions = positions[min_index : max_index + 1] @ y_up_to_z_up
             sk.points.foreach_set("co", final_positions.reshape(-1))
 
 
