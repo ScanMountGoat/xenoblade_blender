@@ -548,7 +548,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
 
-    # TODO: Just assign the 1 - value directly if not using a texture.
     assign_channel(assignments[1].x, links, textures, textures_rgb, bsdf, "Metallic")
 
     # TODO: toon and hair shaders always use specular color?
@@ -586,12 +585,17 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         links.new(emi_color.outputs["Color"], bsdf.inputs["Emission Color"])
 
     # Invert glossiness to get roughness.
-    invert = nodes.new("ShaderNodeMath")
-    invert.location = (-200, 0)
-    invert.operation = "SUBTRACT"
-    invert.inputs[0].default_value = 1.0
-    assign_channel(assignments[1].y, links, textures, textures_rgb, invert, 1)
-    links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
+    if assignments[1].y is not None:
+        value = assignments[1].y.value()
+        if value is not None:
+            bsdf.inputs["Roughness"].default_value = 1.0 - value
+        else:
+            invert = nodes.new("ShaderNodeMath")
+            invert.location = (-200, 0)
+            invert.operation = "SUBTRACT"
+            invert.inputs[0].default_value = 1.0
+            assign_channel(assignments[1].y, links, textures, textures_rgb, invert, 1)
+            links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
     if material.alpha_test is not None:
         texture = material.alpha_test
