@@ -39,7 +39,7 @@ bpy.ops.import_scene.wimdo(filepath="bl/bl000101.wimdo")
 ## Reloading Changes
 The process of uninstalling and reinstalling the addon when making a new change can be time consuming. Thankfully, this can be almost entirely automated using a script. Simply close Blender, run a script to overwrite the files in the installed addon directory, and reopen Blender. 
 
-Sample scripts for different operating systems are provided below. Note that these scripts will also install the addon if it hasn't been installed already. Addon "installation" in Blender is just the process of moving the folder into the addons directory. Make sure to set the appropriate username and version of Blender!
+Sample scripts for different operating systems are provided below. Note that these scripts will also install the addon if it hasn't been installed already. Addon "installation" in Blender is just the process of moving the folder into the addons directory. Make sure to set the appropriate version of Blender.
 
 ### Windows
 ```bat
