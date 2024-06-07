@@ -1,3 +1,4 @@
+from typing import Optional
 import bpy
 import time
 import logging
@@ -82,6 +83,10 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
     if animation.frame_count > 0:
         action.frame_end = float(animation.frame_count) - 1.0
 
+    # Reset between each animation.
+    for bone in armature.pose.bones:
+        bone.matrix_basis.identity()
+
     # Assume each bone appears in only one track.
     animated_bones = {
         get_bone_name(t, bone_names, hash_to_name) for t in animation.tracks
@@ -104,9 +109,7 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
             pose_bone = armature.pose.bones.get(name)
             matrix = Matrix(transform).transposed()
             if pose_bone.parent is not None:
-                pose_bone.matrix = pose_bone.parent.matrix @ get_blender_transform(
-                    matrix
-                )
+                pose_bone.matrix = pose_bone.parent.matrix @ blender_transform(matrix)
             else:
                 y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
                 x_major_to_y_major = Matrix.Rotation(math.radians(-90), 4, "Z")
@@ -128,7 +131,7 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
     return action
 
 
-def get_blender_transform(m):
+def blender_transform(m):
     # In game, the bone's x-axis points from parent to child.
     # In Blender, the bone's y-axis points from parent to child.
     # https://en.wikipedia.org/wiki/Matrix_similarity
@@ -137,10 +140,11 @@ def get_blender_transform(m):
     return p @ m @ p.inverted()
 
 
-def get_bone_name(track, bone_names: list[str], hash_to_name):
+def get_bone_name(track, bone_names: list[str], hash_to_name) -> Optional[str]:
     bone_index = track.bone_index()
     bone_hash = track.bone_hash()
     bone_name = track.bone_name()
+    # TODO: Handle indexing errors.
     if bone_index is not None:
         # TODO: Does the armature preserve insertion order?
         return bone_names[bone_index]

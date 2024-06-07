@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 * Fixed an issue where .camdo models would not import due to unsupported sampler data.
 * Fixed an issue where models with more than one normal or UV per vertex would not export properly.
+* Fixed an issue where animation import would sometimes use transforms from a previous animation.
 
 ## 0.7.0 - 2024-06-02
 ### Added
