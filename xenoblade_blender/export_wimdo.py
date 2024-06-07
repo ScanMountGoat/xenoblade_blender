@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 import re
 
-from .export_root import export_mesh
+from .export_root import ExportException, export_mesh
 
 from . import xc3_model_py
 
@@ -43,13 +43,18 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
         log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        export_wimdo(
-            self,
-            context,
-            self.filepath,
-            self.original_wimdo.strip('"'),
-            self.create_speff_meshes,
-        )
+        try:
+            export_wimdo(
+                self,
+                context,
+                self.filepath,
+                self.original_wimdo.strip('"'),
+                self.create_speff_meshes,
+            )
+        except ExportException as e:
+            self.report({"ERROR"}, str(e))
+            return {"FINISHED"}
+
         return {"FINISHED"}
 
 

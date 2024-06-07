@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added an option to generate meshes with "_speff" materials on export for Xenoblade 3.
+* Added error reporting for errors preventing import or export operations from succeeding.
 
 ### Changed
 * Improved the layout of nodes in generated materials.

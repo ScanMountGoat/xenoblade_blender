@@ -7,6 +7,10 @@ from mathutils import Matrix
 import bmesh
 
 
+class ExportException(Exception):
+    pass
+
+
 def export_skeleton(armature: bpy.types.Object):
     bpy.ops.object.mode_set(mode="EDIT")
 
@@ -96,15 +100,11 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     normals_color.data.foreach_set("vector", loop_normals)
 
     # Check if any faces are not triangles, and convert them into triangles.
-    # TODO: Investigate why this causes issues in game.
+    # TODO: Investigate why triangulation causes weight issues in game.
     if any(len(f.vertices) != 3 for f in mesh.data.polygons):
-        bm = bmesh.new()
-        bm.from_mesh(mesh.data)
-
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-
-        bm.to_mesh(mesh.data)
-        bm.free()
+        raise ExportException(
+            f"Mesh {mesh.name} contains non triangular faces. Triangulate the mesh before exporting."
+        )
 
     # Blender stores normals and UVs per loop rather than per vertex.
     # Edges with more than one value per vertex need to be split.
@@ -219,10 +219,18 @@ def export_mesh(
 
     mesh_data = blender_mesh.data
 
+    # This needs to be checked after processing in case there are more vertices.
+    # TODO: Support 32 bit indices eventually and make this a warning.
+    vertex_count = len(mesh_data.vertices)
+    if vertex_count > 65535:
+        raise ExportException(
+            f"Mesh {blender_mesh.name} will have {vertex_count} vertices after exporting, which exceeds the per mesh limit of 65535."
+        )
+
     # TODO: Is there a better way to account for the change of coordinates?
     axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
-    positions = np.zeros(len(mesh_data.vertices) * 3)
+    positions = np.zeros(vertex_count * 3)
     mesh_data.vertices.foreach_get("co", positions)
     positions = positions.reshape((-1, 3)) @ axis_correction
 
@@ -234,7 +242,7 @@ def export_mesh(
     mesh_data.loops.foreach_get("normal", loop_normals)
     loop_normals = loop_normals.reshape((-1, 3))
 
-    normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
+    normals = np.zeros((vertex_count, 4), dtype=np.float32)
     normals[:, :3][vertex_indices] = loop_normals @ axis_correction
 
     # Tangents are stored per loop instead of per vertex.
@@ -249,7 +257,7 @@ def export_mesh(
     loop_bitangent_signs = np.zeros(len(mesh_data.loops), dtype=np.float32)
     mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
 
-    tangents = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
+    tangents = np.zeros((vertex_count, 4), dtype=np.float32)
     tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ axis_correction
     tangents[:, 3][vertex_indices] = loop_bitangent_signs
 
@@ -320,6 +328,10 @@ def export_mesh(
             ty = xc3_model_py.vertex.AttributeType.TexCoord7
         elif uv_layer.name == "TexCoord8":
             ty = xc3_model_py.vertex.AttributeType.TexCoord8
+        else:
+            message = f'"{uv_layer.name}" for mesh {blender_mesh.name} is not one of the supported UV map names.'
+            message += ' Valid names are "TexCoord0" to "TexCoord8".'
+            raise ExportException(message)
 
         attributes.append(xc3_model_py.vertex.AttributeData(ty, texcoords))
 
@@ -329,10 +341,14 @@ def export_mesh(
             ty = xc3_model_py.vertex.AttributeType.VertexColor
         elif color_attribute.name == "Blend":
             ty = xc3_model_py.vertex.AttributeType.Blend
+        else:
+            message = f'"{color_attribute.name}" for mesh {blender_mesh.name} is not one of the supported color attribute names.'
+            message += ' Valid names are "VertexColor" and "Blend".'
+            raise ExportException(message)
 
         # TODO: error for unsupported data_type or domain.
         if color_attribute.domain == "POINT":
-            colors = np.zeros(len(mesh_data.vertices) * 4)
+            colors = np.zeros(vertex_count * 4)
             color_attribute.data.foreach_get("color", colors)
         elif color_attribute.domain == "CORNER":
             loop_colors = np.zeros(len(mesh_data.loops) * 4)
