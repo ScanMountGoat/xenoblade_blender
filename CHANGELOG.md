@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 0.8.1 - 2024-06-07
+### Fixed
+* Fixed an issue where temporary mesh processing did not work properly for wimdo export.
+
 ## 0.8.0 - 2024-06-07
 ### Added
 * Added an option to generate meshes with "_speff" materials on export for Xenoblade 3.
