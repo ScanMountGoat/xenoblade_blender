@@ -391,7 +391,7 @@ def export_mesh(
     # Preserve original fields for meshes like "0.material"
     original_mesh_index, _ = extract_index(blender_mesh.name)
     if original_mesh_index is None:
-        for i, mesh in original_meshes:
+        for i, mesh in enumerate(original_meshes):
             if mesh.material_index == material_index:
                 original_mesh_index = i
                 break
