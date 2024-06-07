@@ -102,9 +102,13 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     # Check if any faces are not triangles, and convert them into triangles.
     # TODO: Investigate why triangulation causes weight issues in game.
     if any(len(f.vertices) != 3 for f in mesh.data.polygons):
-        raise ExportException(
-            f"Mesh {mesh.name} contains non triangular faces. Triangulate the mesh before exporting."
-        )
+        bm = bmesh.new()
+        bm.from_mesh(mesh.data)
+
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+
+        bm.to_mesh(mesh.data)
+        bm.free()
 
     # Blender stores normals and UVs per loop rather than per vertex.
     # Edges with more than one value per vertex need to be split.
@@ -215,7 +219,31 @@ def export_mesh(
     mesh_copy = blender_mesh.copy()
     mesh_copy.data = blender_mesh.data.copy()
 
-    process_export_mesh(context, mesh_copy)
+    try:
+        process_export_mesh(context, mesh_copy)
+
+        export_mesh_inner(
+            context,
+            root,
+            mesh_copy,
+            combined_weights,
+            original_meshes,
+            morph_names,
+            create_speff_meshes,
+        )
+    finally:
+        bpy.data.meshes.remove(mesh_copy.data)
+
+
+def export_mesh_inner(
+    context: bpy.types.Context,
+    root: xc3_model_py.ModelRoot,
+    blender_mesh: bpy.types.Object,
+    combined_weights: xc3_model_py.skinning.SkinWeights,
+    original_meshes,
+    morph_names: list[str],
+    create_speff_meshes: bool,
+):
 
     mesh_data = blender_mesh.data
 
