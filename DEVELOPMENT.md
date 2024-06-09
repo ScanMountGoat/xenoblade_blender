@@ -33,7 +33,7 @@ Blender can be run scripts in headless mode without ever loading the UI. This ca
 ```python
 # script.py
 import bpy
-bpy.ops.import_scene.wimdo(filepath="bl/bl000101.wimdo")
+bpy.ops.import_scene.wimdo(files=[{"name": "model/bl/bl000101.wimdo"}])
 ```
 
 ## Reloading Changes
