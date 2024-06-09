@@ -28,7 +28,7 @@ The Blender addon uses the Rust code to simplify the addon code and take advanta
 Blender loads addons with multiple files from zip files, so place the contents of the `xenoblade_blender` folder and the native Python module from earlier in a zip file. This zip file can than be installed from the addons menu in Blender and enabled as the `xenoblade_blender` addon. This addon will only work on the current operating system and target like 64-bit Windows with an x86 processor. The Rust code can easily be compiled for other targets and operating systems like Apple Silicon Macs as needed.
 
 ## Running Blender from Terminal
-Blender can be run scripts in headless mode without ever loading the UI. This can be a quick way to test that importing works without any errors. See the [Blender tips and tricks](https://docs.blender.org/api/current/info_tips_and_tricks.html#use-blender-without-it-s-user-interface) for information. For example, running `blender --background --python script.py` with the following simple script will call the main import function.
+Blender can be run scripts in headless mode without ever loading the UI. This can be a quick way to test that importing works without any errors. See the [Blender tips and tricks](https://docs.blender.org/api/current/info_tips_and_tricks.html#use-blender-without-it-s-user-interface) for information. For example, running `blender --background --python script.py` with the following simple script will call the main import function. The operators `bpy.ops.import_scene.camdo` or `bpy.ops.import_scene.wismhd` have similar arguments.  
 
 ```python
 # script.py
