@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where shape keys would import with the wrong orientation.
+* Fixed an issue where wimdo export error messages would use the wrong mesh name.
 
 ## 0.8.1 - 2024-06-07
 ### Fixed

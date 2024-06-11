@@ -226,6 +226,7 @@ def export_mesh(
             context,
             root,
             mesh_copy,
+            blender_mesh.name,
             combined_weights,
             original_meshes,
             morph_names,
@@ -239,6 +240,7 @@ def export_mesh_inner(
     context: bpy.types.Context,
     root: xc3_model_py.ModelRoot,
     blender_mesh: bpy.types.Object,
+    mesh_name: str,
     combined_weights: xc3_model_py.skinning.SkinWeights,
     original_meshes,
     morph_names: list[str],
@@ -252,7 +254,7 @@ def export_mesh_inner(
     vertex_count = len(mesh_data.vertices)
     if vertex_count > 65535:
         raise ExportException(
-            f"Mesh {blender_mesh.name} will have {vertex_count} vertices after exporting, which exceeds the per mesh limit of 65535."
+            f"Mesh {mesh_name} will have {vertex_count} vertices after exporting, which exceeds the per mesh limit of 65535."
         )
 
     # TODO: Is there a better way to account for the change of coordinates?
@@ -357,7 +359,7 @@ def export_mesh_inner(
         elif uv_layer.name == "TexCoord8":
             ty = xc3_model_py.vertex.AttributeType.TexCoord8
         else:
-            message = f'"{uv_layer.name}" for mesh {blender_mesh.name} is not one of the supported UV map names.'
+            message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
             message += ' Valid names are "TexCoord0" to "TexCoord8".'
             raise ExportException(message)
 
@@ -370,7 +372,7 @@ def export_mesh_inner(
         elif color_attribute.name == "Blend":
             ty = xc3_model_py.vertex.AttributeType.Blend
         else:
-            message = f'"{color_attribute.name}" for mesh {blender_mesh.name} is not one of the supported color attribute names.'
+            message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
             message += ' Valid names are "VertexColor" and "Blend".'
             raise ExportException(message)
 
@@ -423,12 +425,12 @@ def export_mesh_inner(
                 break
 
     if material_index is not None and material_index >= len(root.models.materials):
-        message = f"Material index {material_index} for mesh {blender_mesh.name}"
-        message += f" exceeds original material count of {len(root.models.materials)}"
+        message = f"Material index {material_index} for mesh {mesh_name}"
+        message += f" exceeds original material count of {len(root.models.materials)}."
         raise ExportException(message)
 
     if material_index is None:
-        message = f"Failed to find original material for mesh {blender_mesh.name} with material {blender_material_name}."
+        message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
         raise ExportException(message)
 
     # TODO: why does None not work well in game?
@@ -443,7 +445,7 @@ def export_mesh_inner(
     unk_mesh_index1 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
-    original_mesh_index, _ = extract_index(blender_mesh.name)
+    original_mesh_index, _ = extract_index(mesh_name)
     if original_mesh_index is None:
         for i, mesh in enumerate(original_meshes):
             if mesh.material_index == material_index:
