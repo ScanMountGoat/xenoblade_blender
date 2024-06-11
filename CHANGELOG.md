@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where shape keys would import with the wrong orientation.
+
 ## 0.8.1 - 2024-06-07
 ### Fixed
 * Fixed an issue where temporary mesh processing did not work properly for wimdo export.

@@ -383,7 +383,7 @@ def import_shape_keys(
     if position_data is None:
         return
 
-    y_up_to_z_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(-90), 3, "X"))
 
     for target in vertex_buffer.morph_targets:
         sk = obj.shape_key_add(name=names[target.morph_controller_index])
@@ -394,7 +394,7 @@ def import_shape_keys(
             positions[target.vertex_indices] += target.position_deltas
 
             # Account for the unused vertex removal performed for other attributes.
-            final_positions = positions[min_index : max_index + 1] @ y_up_to_z_up
+            final_positions = positions[min_index : max_index + 1]  @ z_up_to_y_up
             sk.points.foreach_set("co", final_positions.reshape(-1))
 
 
