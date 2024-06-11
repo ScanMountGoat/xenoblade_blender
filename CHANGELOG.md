@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added validation for material names and index prefixes to wimdo export.
+
 ### Fixed
 * Fixed an issue where shape keys would import with the wrong orientation.
 

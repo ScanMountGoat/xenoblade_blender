@@ -394,7 +394,7 @@ def import_shape_keys(
             positions[target.vertex_indices] += target.position_deltas
 
             # Account for the unused vertex removal performed for other attributes.
-            final_positions = positions[min_index : max_index + 1]  @ z_up_to_y_up
+            final_positions = positions[min_index : max_index + 1] @ z_up_to_y_up
             sk.points.foreach_set("co", final_positions.reshape(-1))
 
 

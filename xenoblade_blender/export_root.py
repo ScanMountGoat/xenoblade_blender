@@ -59,7 +59,7 @@ def extract_index(name: str) -> Tuple[Optional[int], str]:
     name_parts = name.split(".", 1)
 
     prefix = None
-    name = name_parts[1] if len(name_parts) == 2 else ""
+    name = name_parts[1] if len(name_parts) == 2 else name
 
     try:
         prefix = int(name_parts[0])
@@ -414,12 +414,22 @@ def export_mesh_inner(
 
     # Don't support adding new materials for now.
     # xc3_model doesn't actually overwrite materials yet.
-    material_index, material_name = extract_index(mesh_data.materials[0].name)
+    blender_material_name = mesh_data.materials[0].name
+    material_index, material_name = extract_index(blender_material_name)
     if material_index is None:
         for i, material in enumerate(root.models.materials):
             if material.name == material_name:
                 material_index = i
                 break
+
+    if material_index is not None and material_index >= len(root.models.materials):
+        message = f"Material index {material_index} for mesh {blender_mesh.name}"
+        message += f" exceeds original material count of {len(root.models.materials)}"
+        raise ExportException(message)
+
+    if material_index is None:
+        message = f"Failed to find original material for mesh {blender_mesh.name} with material {blender_material_name}."
+        raise ExportException(message)
 
     # TODO: why does None not work well in game?
     lod_item_index = 0
