@@ -247,7 +247,7 @@ def export_mesh_inner(
     create_speff_meshes: bool,
 ):
 
-    mesh_data = blender_mesh.data
+    mesh_data: bpy.types.Mesh = blender_mesh.data
 
     # This needs to be checked after processing in case there are more vertices.
     # TODO: Support 32 bit indices eventually and make this a warning.
@@ -296,7 +296,7 @@ def export_mesh_inner(
     # TODO: Does Blender not expose this directly?
     group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
 
-    for vertex in blender_mesh.data.vertices:
+    for vertex in mesh_data.vertices:
         # Blender doesn't enforce normalization, since it normalizes while animating.
         # Normalize on export to ensure the weights work correctly in game.
         weight_sum = sum([g.weight for g in vertex.groups])
@@ -539,16 +539,20 @@ def export_shape_keys(
 
             position_deltas = morph_positions - positions
 
-            # TODO: Calculate better values normals and tangents?
+            # TODO: Calculate better values for normals and tangents?
 
-            # TODO: make these sparse if vertices are unchanged?
-            vertex_indices = np.arange(0, len(mesh_data.vertices), dtype=np.uint16)
+            # Calculate sparse indices to avoid including zero elements.
+            # TODO: Is there a better threshold value?
+            vertex_indices = np.where(
+                ~np.all(np.isclose(position_deltas, 0, atol=1e-6), axis=1)
+            )[0]
+            print(vertex_indices.shape)
 
             target = xc3_model_py.vertex.MorphTarget(
                 morph_controller_index,
-                position_deltas,
-                normals,
-                tangents,
+                position_deltas[vertex_indices],
+                normals[vertex_indices],
+                tangents[vertex_indices],
                 vertex_indices,
             )
             morph_targets.append(target)
