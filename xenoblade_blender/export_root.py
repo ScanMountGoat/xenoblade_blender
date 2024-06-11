@@ -390,7 +390,9 @@ def export_mesh_inner(
         colors = colors.reshape((-1, 4))
         attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
 
-    morph_targets = export_shape_keys(morph_names, mesh_data, positions, vertex_indices)
+    morph_targets = export_shape_keys(
+        morph_names, mesh_data, positions, normals, tangents
+    )
 
     morph_blend_target = []
     if len(morph_targets) > 0:
@@ -442,7 +444,7 @@ def export_mesh_inner(
     base_mesh_index = None
     # Use the index buffer as the shadow map index buffer.
     # We don't use the original index since the new buffers are different.
-    unk_mesh_index1 = index_buffer_index
+    index_buffer_index2 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
     original_mesh_index, _ = extract_index(mesh_name)
@@ -464,7 +466,7 @@ def export_mesh_inner(
     mesh = xc3_model_py.Mesh(
         vertex_buffer_index,
         index_buffer_index,
-        unk_mesh_index1,
+        index_buffer_index2,
         material_index,
         flags1,
         flags2,
@@ -486,7 +488,7 @@ def export_mesh_inner(
                 speff_mesh = xc3_model_py.Mesh(
                     vertex_buffer_index,
                     index_buffer_index,
-                    unk_mesh_index1,
+                    index_buffer_index2,
                     mesh.material_index,
                     mesh.flags1,
                     mesh.flags2,
@@ -505,7 +507,13 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
-def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
+def export_shape_keys(
+    morph_names: list[str],
+    mesh_data,
+    positions: np.ndarray,
+    normals: np.ndarray,
+    tangents: np.ndarray,
+):
     # TODO: Is there a better way to account for the change of coordinates?
     axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
@@ -525,21 +533,22 @@ def export_shape_keys(morph_names, mesh_data, positions, vertex_indices):
             if morph_controller_index is None:
                 continue
 
-            # TODO: make these sparse if vertices are unchanged?
             morph_positions = np.zeros(len(mesh_data.vertices) * 3)
             shape_key.points.foreach_get("co", morph_positions)
             morph_positions = morph_positions.reshape((-1, 3)) @ axis_correction
 
             position_deltas = morph_positions - positions
-            # TODO: Can these be calculated from Blender?
-            normal_deltas = np.zeros((len(mesh_data.vertices), 4))
-            tangent_deltas = np.zeros((len(mesh_data.vertices), 4))
+
+            # TODO: Calculate better values normals and tangents?
+
+            # TODO: make these sparse if vertices are unchanged?
+            vertex_indices = np.arange(0, len(mesh_data.vertices), dtype=np.uint16)
 
             target = xc3_model_py.vertex.MorphTarget(
                 morph_controller_index,
                 position_deltas,
-                normal_deltas,
-                tangent_deltas,
+                normals,
+                tangents,
                 vertex_indices,
             )
             morph_targets.append(target)
