@@ -478,11 +478,14 @@ def export_mesh_inner(
     mesh_index = len(root.models.models[0].meshes)
     root.models.models[0].meshes.append(mesh)
 
+    # XC1 and XC2 don't use speff meshes.
+    only_base_meshes = all(m.base_mesh_index == 0 for m in original_meshes)
+
     # TODO: report a warning if this fails.
-    # Materials can share names, so check the base mesh index instead.
-    if create_speff_meshes and original_mesh_index is not None:
-        # Create speff meshes based on the base mesh index.
+    if create_speff_meshes and not only_base_meshes and original_mesh_index is not None:
+        # Materials can share names, so check the base mesh index instead.
         # Existing speff meshes aren't referenced by base_mesh_index and will be ignored.
+        # TODO: This can be generated more reliably based on the base material once flags are figured out.
         for mesh in original_meshes:
             if mesh.base_mesh_index == original_mesh_index:
                 speff_mesh = xc3_model_py.Mesh(
