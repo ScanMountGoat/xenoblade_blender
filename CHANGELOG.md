@@ -3,17 +3,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.8.2 - 2024-06-12
 ### Added
 * Added validation for material names and index prefixes to wimdo export.
 
 ### Fixed
 * Fixed an issue where shape keys would import with the wrong orientation.
 * Fixed an issue where wimdo export error messages would use the wrong mesh name.
-* Fixed shape key indexing for wimdo exports.
+* Fixed an issue where shape keys would export with the wrong indices.
 * Fixed an issue where camdo models would not correctly import all bones.
 * Fixed an issue where some camdo models would not import due to texture loading errors.
-* Fixed an issue where enabling speff mesh export would incorrectly genrate additional meshes for Xenoblade 1 DE and Xenoblade 2.
+* Fixed an issue where enabling speff mesh export would incorrectly generate additional meshes for Xenoblade 1 DE and Xenoblade 2.
 
 ## 0.8.1 - 2024-06-07
 ### Fixed
