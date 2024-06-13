@@ -20,12 +20,6 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Import any of the supported file types using the new menu options under File > Import.  
 Select the game version before importing for correct material texture assignments.
 
-## Planned Features
-* Export animations
-* Import Xenoblade X maps
-
-The goal of this addon is to provide import and export operations with good performance and minimal configuration. Quality of life features requiring more complex UI are better handled using traditional pure Python addons.
-
 ## Building
 Clone the repository with `git clone https://github.com/ScanMountGoat/xenoblade_blender --recursive`. 
 
