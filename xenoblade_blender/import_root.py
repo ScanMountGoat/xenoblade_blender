@@ -1,3 +1,4 @@
+from typing import Optional
 import bpy
 import numpy as np
 import os
@@ -120,8 +121,16 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
 
 
 def import_map_root(
-    root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool
+    root,
+    root_collection: bpy.types.Collection,
+    blender_images,
+    import_all_meshes: bool,
+    flip_uvs: bool,
 ):
+    # Convert from Y up to Z up.
+    y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
+
+    # TODO: Create a group collection?
     for group in root.groups:
         for models in group.models:
             base_lods = None
@@ -130,6 +139,15 @@ def import_map_root(
 
             # TODO: Cache based on vertex and index buffer indices?
             for model in models.models:
+                model_collection = bpy.data.collections.new("Model")
+                root_collection.children.link(model_collection)
+
+                # Hide the base collection that isn't transformed.
+                # This has to be done through the view layer instead of globally.
+                bpy.context.view_layer.layer_collection.children[
+                    root_collection.name
+                ].children[model_collection.name].hide_viewport = True
+
                 for i, mesh in enumerate(model.meshes):
                     # Many materials are for meshes that won't be loaded.
                     # Lazy load materials to improve import times.
@@ -159,16 +177,34 @@ def import_map_root(
                             continue
 
                     import_mesh(
-                        root_obj,
+                        None,
+                        model_collection,
                         buffers,
                         models,
-                        model,
                         mesh,
                         blender_material,
                         material.name,
                         flip_uvs,
                         i,
                     )
+
+                # Instances technically apply to the entire model.
+                # Just instance each mesh for now for simplicity.
+                for i, transform in enumerate(model.instances):
+                    # Transform the instance using the in game coordinate system and convert back.
+                    matrix_world = (
+                        y_up_to_z_up
+                        @ Matrix(transform).transposed()
+                        @ y_up_to_z_up.inverted()
+                    )
+
+                    collection_instance = bpy.data.objects.new(
+                        f"ModelInstance{i}", None
+                    )
+                    collection_instance.instance_type = "COLLECTION"
+                    collection_instance.instance_collection = model_collection
+                    collection_instance.matrix_world = matrix_world
+                    root_collection.objects.link(collection_instance)
 
 
 def import_model_root(
@@ -205,9 +241,9 @@ def import_model_root(
 
             import_mesh(
                 root_obj,
+                bpy.context.collection,
                 root.buffers,
                 root.models,
-                model,
                 mesh,
                 blender_material,
                 material.name,
@@ -217,10 +253,10 @@ def import_model_root(
 
 
 def import_mesh(
-    root_obj,
+    root_obj: Optional[bpy.types.Object],
+    collection: bpy.types.Collection,
     buffers,
     models,
-    model,
     mesh,
     material: bpy.types.Material,
     material_name: str,
@@ -325,53 +361,46 @@ def import_mesh(
     y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
     blender_mesh.transform(y_up_to_z_up)
 
-    # Instances technically apply to the entire model.
-    # Just instance each mesh for now for simplicity.
-    for transform in model.instances:
-        obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
-        # Transform the instance using the in game coordinate system and convert back.
-        obj.matrix_local = (
-            y_up_to_z_up @ Matrix(transform).transposed() @ y_up_to_z_up.inverted()
+    obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
+
+    # TODO: Is there a way to not do this for every instance?
+    # Only non instanced character meshes are skinned in practice.
+    if buffers.weights is not None:
+        # Calculate the index offset based on the weight group for this mesh.
+        pass_type = models.materials[mesh.material_index].pass_type
+        lod_item_index = 0 if mesh.lod_item_index is None else mesh.lod_item_index
+        start_index = buffers.weights.weights_start_index(
+            mesh.flags2, lod_item_index, pass_type
         )
 
-        # TODO: Is there a way to not do this for every instance?
-        # Only non instanced character meshes are skinned in practice.
-        if buffers.weights is not None:
-            # Calculate the index offset based on the weight group for this mesh.
-            pass_type = models.materials[mesh.material_index].pass_type
-            lod_item_index = 0 if mesh.lod_item_index is None else mesh.lod_item_index
-            start_index = buffers.weights.weights_start_index(
-                mesh.flags2, lod_item_index, pass_type
+        # An extra step is required since some Xenoblade X models have multiple weight buffers.
+        weight_buffer = buffers.weights.weight_buffer(mesh.flags2)
+        if weight_buffer is not None:
+            import_weight_groups(
+                weight_buffer, start_index, obj, vertex_buffer, min_index, max_index
             )
 
-            # An extra step is required since some Xenoblade X models have multiple weight buffers.
-            weight_buffer = buffers.weights.weight_buffer(mesh.flags2)
-            if weight_buffer is not None:
-                import_weight_groups(
-                    weight_buffer, start_index, obj, vertex_buffer, min_index, max_index
-                )
+    # TODO: Is there a way to not do this for every instance?
+    # Only non instanced character meshes have shape keys in practice.
+    if len(vertex_buffer.morph_targets) > 0:
+        import_shape_keys(
+            vertex_buffer,
+            models.morph_controller_names,
+            position_data,
+            min_index,
+            max_index,
+            obj,
+        )
 
-        # TODO: Is there a way to not do this for every instance?
-        # Only non instanced character meshes have shape keys in practice.
-        if len(vertex_buffer.morph_targets) > 0:
-            import_shape_keys(
-                vertex_buffer,
-                models.morph_controller_names,
-                position_data,
-                min_index,
-                max_index,
-                obj,
-            )
+    # Attach the mesh to the armature or empty.
+    # Assume the root_obj is an armature if there are weights.
+    # TODO: Find a more reliable way of checking this.
+    obj.parent = root_obj
+    if buffers.weights is not None:
+        modifier = obj.modifiers.new(root_obj.data.name, type="ARMATURE")
+        modifier.object = root_obj
 
-        # Attach the mesh to the armature or empty.
-        # Assume the root_obj is an armature if there are weights.
-        # TODO: Find a more reliable way of checking this.
-        obj.parent = root_obj
-        if buffers.weights is not None:
-            modifier = obj.modifiers.new(root_obj.data.name, type="ARMATURE")
-            modifier.object = root_obj
-
-        bpy.context.collection.objects.link(obj)
+    collection.objects.link(obj)
 
 
 def import_shape_keys(

@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Changed the import behavior for wismhd maps to use collection instances instead of linked duplicate meshes.
+
 ## 0.8.2 - 2024-06-12
 ### Added
 * Added validation for material names and index prefixes to wimdo export.

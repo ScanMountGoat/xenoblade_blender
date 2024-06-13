@@ -103,13 +103,12 @@ def import_wismhd(
             root, f"{name}.root{i}", pack_images, image_folder, flip=True
         )
 
-        # Create an empty by setting the data to None.
         # Maps have no skeletons.
-        root_obj = bpy.data.objects.new(model_name, None)
-        bpy.context.collection.objects.link(root_obj)
+        root_collection = bpy.data.collections.new(f"{name}.{i}")
+        bpy.context.scene.collection.children.link(root_collection)
 
         import_map_root(
-            root, blender_images, root_obj, import_all_meshes, flip_uvs=True
+            root, root_collection, blender_images, import_all_meshes, flip_uvs=True
         )
 
     end = time.time()
