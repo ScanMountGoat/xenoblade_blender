@@ -142,11 +142,12 @@ def import_map_root(
                 model_collection = bpy.data.collections.new("Model")
                 root_collection.children.link(model_collection)
 
-                # Hide the base collection that isn't transformed.
+                # Exclude the base collection that isn't transformed.
+                # This prevents viewing and rendering in all modes.
                 # This has to be done through the view layer instead of globally.
                 bpy.context.view_layer.layer_collection.children[
                     root_collection.name
-                ].children[model_collection.name].hide_viewport = True
+                ].children[model_collection.name].exclude = True
 
                 for i, mesh in enumerate(model.meshes):
                     # Many materials are for meshes that won't be loaded.
