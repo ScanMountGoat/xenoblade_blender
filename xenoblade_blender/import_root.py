@@ -574,7 +574,18 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         "Blue",
         is_data=False,
     )
-    links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
+    if (
+        assignments[0].x is None
+        and assignments[0].y is None
+        and assignments[0].z is None
+    ):
+        # TODO: multiply by gMatCol instead?
+        # TODO: more accurate gamma handling
+        bsdf.inputs["Base Color"].default_value = [
+            c**2.2 for c in material.parameters.mat_color
+        ]
+    else:
+        links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
 
     assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
 
