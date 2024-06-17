@@ -518,7 +518,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     for i, texture in enumerate(material.textures):
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.label = str(i)
-        texture_node.location = (-800, 300 - i * 300)
+        texture_node.width = 330
+        texture_node.location = (-900, 300 - i * 300)
         texture_node.image = blender_images[texture.image_texture_index]
 
         # TODO: Check if U and V have the same address mode.
