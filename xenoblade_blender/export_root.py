@@ -55,18 +55,29 @@ def get_bone_transform(m: Matrix) -> Matrix:
     return (p @ m @ p.inverted()).transposed()
 
 
+def parse_int(name: str) -> Optional[int]:
+    value = None
+    try:
+        value = int(name)
+    except:
+        value = None
+
+    return value
+
+
 def extract_index(name: str) -> Tuple[Optional[int], str]:
     name_parts = name.split(".", 1)
 
-    prefix = None
+    prefix = parse_int(name_parts[0])
     name = name_parts[1] if len(name_parts) == 2 else name
 
-    try:
-        prefix = int(name_parts[0])
-    except:
-        prefix = None
-
     return prefix, name
+
+
+def extract_image_index(name: str) -> Optional[int]:
+    # model_name.index.image_name
+    name_parts = name.split(".")
+    return parse_int(name_parts[1])
 
 
 # Updated from the processing code written for Smash Ultimate:
@@ -434,6 +445,25 @@ def export_mesh_inner(
     if material_index is None:
         message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
         raise ExportException(message)
+
+    if material_index >= 0 and material_index < len(root.models.materials):
+        # TODO: edit materials
+        # TODO: How to get the image texture nodes from material?
+        # TODO: error if there are no nodes or not enough textures?
+        for node in mesh_data.materials[0].node_tree.nodes:
+            if node.bl_idname == "ShaderNodeTexImage":
+                # Update material texture assignments.
+                # TODO: samplers?
+                texture_index = parse_int(node.label)
+                image_index = extract_image_index(node.image.name)
+                if texture_index is not None and image_index is not None:
+                    root.models.materials[material_index].textures[
+                        texture_index
+                    ].image_texture_index = image_index
+    else:
+        # TODO: add new materials?
+        # TODO: create an original material list to avoid indexing into newly created materials?
+        pass
 
     # TODO: why does None not work well in game?
     lod_item_index = 0
