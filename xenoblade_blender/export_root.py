@@ -223,6 +223,7 @@ def export_mesh(
     blender_mesh: bpy.types.Object,
     combined_weights: xc3_model_py.skinning.SkinWeights,
     original_meshes,
+    original_materials,
     morph_names: list[str],
     create_speff_meshes: bool,
 ):
@@ -240,6 +241,7 @@ def export_mesh(
             blender_mesh.name,
             combined_weights,
             original_meshes,
+            original_materials,
             morph_names,
             create_speff_meshes,
         )
@@ -247,6 +249,7 @@ def export_mesh(
         bpy.data.meshes.remove(mesh_copy.data)
 
 
+# TODO: Split this into more functions.
 def export_mesh_inner(
     context: bpy.types.Context,
     root: xc3_model_py.ModelRoot,
@@ -254,6 +257,7 @@ def export_mesh_inner(
     mesh_name: str,
     combined_weights: xc3_model_py.skinning.SkinWeights,
     original_meshes,
+    original_materials,
     morph_names: list[str],
     create_speff_meshes: bool,
 ):
@@ -427,43 +431,25 @@ def export_mesh_inner(
     vertex_buffer_index = len(root.buffers.vertex_buffers)
     index_buffer_index = len(root.buffers.index_buffers)
 
-    # Don't support adding new materials for now.
-    # xc3_model doesn't actually overwrite materials yet.
+    # Use names as a less accurate fallback for the original material.
     blender_material_name = mesh_data.materials[0].name
     material_index, material_name = extract_index(blender_material_name)
-    if material_index is None:
-        for i, material in enumerate(root.models.materials):
-            if material.name == material_name:
+    is_new_material = True
+    for i, material in enumerate(root.models.materials):
+        if material.name == material_name:
+            is_new_material = False
+            if material_index is None:
                 material_index = i
-                break
-
-    if material_index is not None and material_index >= len(root.models.materials):
-        message = f"Material index {material_index} for mesh {mesh_name}"
-        message += f" exceeds original material count of {len(root.models.materials)}."
-        raise ExportException(message)
+            break
 
     if material_index is None:
         message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
         raise ExportException(message)
 
-    if material_index >= 0 and material_index < len(root.models.materials):
-        # TODO: edit materials
-        # TODO: How to get the image texture nodes from material?
-        # TODO: error if there are no nodes or not enough textures?
-        for node in mesh_data.materials[0].node_tree.nodes:
-            if node.bl_idname == "ShaderNodeTexImage":
-                # Update material texture assignments.
-                # TODO: samplers?
-                texture_index = parse_int(node.label)
-                image_index = extract_image_index(node.image.name)
-                if texture_index is not None and image_index is not None:
-                    root.models.materials[material_index].textures[
-                        texture_index
-                    ].image_texture_index = image_index
-    else:
-        # TODO: add new materials?
-        # TODO: create an original material list to avoid indexing into newly created materials?
-        pass
+    if material_index < 0 or material_index >= len(root.models.materials):
+        message = f"Material index {material_index} for mesh {mesh_name}"
+        message += f" is out of range for material count {len(root.models.materials)}."
+        raise ExportException(message)
 
     # TODO: why does None not work well in game?
     lod_item_index = 0
@@ -477,6 +463,7 @@ def export_mesh_inner(
     index_buffer_index2 = index_buffer_index
 
     # Preserve original fields for meshes like "0.material"
+    # Perform this before potentially adding materials.
     original_mesh_index, _ = extract_index(mesh_name)
     if original_mesh_index is None:
         for i, mesh in enumerate(original_meshes):
@@ -492,6 +479,20 @@ def export_mesh_inner(
         flags2 = original_mesh.flags2
         ext_mesh_index = original_mesh.ext_mesh_index
         base_mesh_index = original_mesh.base_mesh_index
+
+    if is_new_material:
+        # Add a new material with the given name.
+        # Avoid potentially referencing an added material here.
+        original = original_materials[material_index]
+        new_material = copy_material(original)
+        new_material.name = material_name
+        update_texture_assignments(mesh_data, new_material)
+
+        material_index = len(root.models.materials)
+        root.models.materials.append(new_material)
+    else:
+        # Update an existing material.
+        update_texture_assignments(mesh_data, root.models.materials[material_index])
 
     mesh = xc3_model_py.Mesh(
         vertex_buffer_index,
@@ -534,10 +535,24 @@ def export_mesh_inner(
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
         attributes, morph_blend_target, morph_targets, None
     )
+    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
     root.buffers.vertex_buffers.append(vertex_buffer)
 
-    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
     root.buffers.index_buffers.append(index_buffer)
+
+
+def update_texture_assignments(mesh_data, material):
+    # TODO: error if there are no nodes or not enough textures?
+    for node in mesh_data.materials[0].node_tree.nodes:
+        if node.bl_idname != "ShaderNodeTexImage":
+            continue
+
+        # Update material texture assignments.
+        # TODO: samplers?
+        texture_index = parse_int(node.label)
+        image_index = extract_image_index(node.image.name)
+        if texture_index is not None and image_index is not None:
+            material.textures[texture_index].image_texture_index = image_index
 
 
 def export_shape_keys(
@@ -591,3 +606,33 @@ def export_shape_keys(
             morph_targets.append(target)
 
     return morph_targets
+
+
+def copy_material(material):
+    # TODO: does pyo3 support deep copy?
+    textures = [
+        xc3_model_py.Texture(t.image_texture_index, t.sampler_index)
+        for t in material.textures
+    ]
+    return xc3_model_py.Material(
+        material.name,
+        material.flags,
+        material.render_flags,
+        material.state_flags,
+        textures,
+        material.work_values,
+        material.shader_vars,
+        material.work_callbacks,
+        material.alpha_test_ref,
+        material.m_unks1_1,
+        material.m_unks1_2,
+        material.m_unks1_3,
+        material.m_unks1_4,
+        material.technique_index,
+        material.pass_type,
+        material.parameters,
+        material.m_unks2_2,
+        material.m_unks3_1,
+        material.alpha_test,
+        material.shader,
+    )

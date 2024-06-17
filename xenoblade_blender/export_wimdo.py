@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 import re
 
-from .export_root import ExportException, export_mesh
+from .export_root import ExportException, copy_material, export_mesh
 
 from . import xc3_model_py
 
@@ -85,6 +85,7 @@ def export_wimdo(
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
     original_meshes = [m for m in root.models.models[0].meshes]
+    original_materials = [copy_material(m) for m in root.models.materials]
     morph_names = root.models.morph_controller_names
     root.buffers.vertex_buffers = []
     root.buffers.index_buffers = []
@@ -107,6 +108,7 @@ def export_wimdo(
             object,
             combined_weights,
             original_meshes,
+            original_materials,
             morph_names,
             create_speff_meshes,
         )

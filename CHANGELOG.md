@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
 ### Added
+* Added support for adding new materials for wimdo exports.
 * Added support for material texture assignments for wimdo exports.
 
 ### Changed
