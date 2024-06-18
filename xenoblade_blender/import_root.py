@@ -270,8 +270,11 @@ def import_mesh(
     # In practice, only a small range of vertices are used.
     # Reindex the vertices to eliminate most loose vertices.
     index_buffer = buffers.index_buffers[mesh.index_buffer_index]
-    min_index = index_buffer.indices.min()
-    max_index = index_buffer.indices.max()
+    min_index = 0
+    max_index = 0
+    if index_buffer.indices.size > 0:
+        min_index = index_buffer.indices.min()
+        max_index = index_buffer.indices.max()
 
     indices = index_buffer.indices.astype(np.uint32) - min_index
     loop_start = np.arange(0, indices.shape[0], 3, dtype=np.uint32)
