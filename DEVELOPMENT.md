@@ -11,7 +11,7 @@ Python code should be formatted using the Black formatter. This can be done easi
 Rust code should be formatted by running the `cargo fmt` command. This can also be done in VS Code using the Rust Analyzer extension and using the format document command (Alt+Shift+F). Running code lints with `cargo clippy` is also recommended.
 
 ## [Blender Python API Docs](https://docs.blender.org/api/current/index.html)
-Blender's docs describe the Python API for the current version with all the types and functions available to use. Sadly, the docs don't do a great job at explaining how the code works or why you should use one method compared to another. If you have any questions, please reach out via posting a comment on an issue or Pull request you plan on working on.
+Blender's docs describe the Python API for the current version with all the types and functions available to use. Sadly, the docs don't do a great job at explaining how the code works or why you should use one method compared to another. If you have any questions, please reach out via posting a comment on an issue or pull request you plan on working on.
 
 ## Building
 ### Prerequisites
