@@ -3,10 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.9.0 - 2024-06-20
 ### Added
 * Added support for adding new materials for wimdo exports.
-* Added support for material texture assignments for wimdo exports.
+* Added support for changing material texture assignments for wimdo exports.
 
 ### Changed
 * Changed the import behavior for wismhd maps to use collection instances instead of linked duplicate meshes.
