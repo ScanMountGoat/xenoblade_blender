@@ -96,9 +96,9 @@ jobs:
         target: ${{matrix.target}}
     - name: Build
       run: |
-        cd xc3_model_py 
+        cd xc3_model_py/xc3_model_py 
         maturin build --release --target=${{matrix.target}}
-        cd ..
+        cd ../..
     - name: Create Release Zip
       run: |
         cp xc3_model_py/target/${{matrix.target}}/release/libxc3_model_py.dylib xenoblade_blender/xc3_model_py.so
