@@ -547,7 +547,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     # TODO: Alpha testing.
     # TODO: Select UV map and scale for each texture.
-    # TODO: Set color space for images?
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
     base_color.location = (-200, 200)
@@ -662,40 +661,79 @@ def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
     if assignments[2].x is None and assignments[2].y is None:
         return
 
+    # Cache the node group creation.
+    node_tree = bpy.data.node_groups.get("NormalsXY")
+    if node_tree is None:
+        node_tree = normals_xy_node_group()
+
+    group = nodes.new("ShaderNodeGroup")
+    group.node_tree = node_tree
+    group.location = (-200, -200)
+
+    assign_channel(assignments[2].x, links, textures, textures_rgb, group, "X")
+    assign_channel(assignments[2].y, links, textures, textures_rgb, group, "Y")
+
+    links.new(group.outputs["Normal"], bsdf.inputs["Normal"])
+
+
+def normals_xy_node_group():
+    node_tree = bpy.data.node_groups.new("NormalsXY", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Normal"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    input_node.location = (-1400, 0)
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+
     # TODO: Group these nodes in a node group?
     normal_xy = nodes.new("ShaderNodeCombineXYZ")
-    normal_xy.location = (-1200, -700)
-    assign_channel(assignments[2].x, links, textures, textures_rgb, normal_xy, "X")
-    assign_channel(assignments[2].y, links, textures, textures_rgb, normal_xy, "Y")
+    normal_xy.location = (-1200, 0)
+    links.new(input_node.outputs["X"], normal_xy.inputs["X"])
+    links.new(input_node.outputs["Y"], normal_xy.inputs["Y"])
     normal_xy.inputs["Z"].default_value = 0.0
 
     length2 = nodes.new("ShaderNodeVectorMath")
-    length2.location = (-1000, -700)
+    length2.location = (-1000, 0)
     length2.operation = "DOT_PRODUCT"
     links.new(normal_xy.outputs["Vector"], length2.inputs[0])
     links.new(normal_xy.outputs["Vector"], length2.inputs[1])
 
     one_minus_length = nodes.new("ShaderNodeMath")
-    one_minus_length.location = (-800, -700)
+    one_minus_length.location = (-800, 0)
     one_minus_length.operation = "SUBTRACT"
     one_minus_length.inputs[0].default_value = 1.0
     links.new(length2.outputs["Value"], one_minus_length.inputs[1])
 
     length = nodes.new("ShaderNodeMath")
-    length.location = (-600, -700)
+    length.location = (-600, 0)
     length.operation = "SQRT"
     links.new(one_minus_length.outputs["Value"], length.inputs[0])
 
     normal_xyz = nodes.new("ShaderNodeCombineXYZ")
-    normal_xyz.location = (-400, -700)
-    assign_channel(assignments[2].x, links, textures, textures_rgb, normal_xyz, "X")
-    assign_channel(assignments[2].y, links, textures, textures_rgb, normal_xyz, "Y")
+    normal_xyz.location = (-400, 0)
+    links.new(input_node.outputs["X"], normal_xyz.inputs["X"])
+    links.new(input_node.outputs["Y"], normal_xyz.inputs["Y"])
     links.new(length.outputs["Value"], normal_xyz.inputs["Z"])
 
     normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.location = (-200, -200)
+    normal_map.location = (-200, 0)
     links.new(normal_xyz.outputs["Vector"], normal_map.inputs["Color"])
-    links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    output_node.location = (0, 0)
+    links.new(normal_map.outputs["Normal"], output_node.inputs["Normal"])
+
+    return node_tree
 
 
 def assign_channel(
