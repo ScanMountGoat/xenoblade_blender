@@ -504,10 +504,17 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     nodes = blender_material.node_tree.nodes
     links = blender_material.node_tree.links
 
-    bsdf = nodes["Principled BSDF"]
+    # Create the nodes from scratch to ensure the required nodes are present.
+    # This avoids hard coding names like "Material Output" that depend on the UI language.
+    nodes.clear()
+
+    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
     bsdf.location = (0, 0)
 
-    nodes["Material Output"].location = (300, 0)
+    output_node = nodes.new("ShaderNodeOutputMaterial")
+    output_node.location = (300, 0)
+
+    links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
     # Get information on how the decompiled shader code assigns outputs.
     # The G-Buffer output textures can be mapped to inputs on the principled BSDF.
