@@ -532,6 +532,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         texture_node.location = (-900, 300 - i * 300)
         texture_node.image = blender_images[texture.image_texture_index]
 
+        # TODO: Create mapping at -1100 and uv at -1300
+
         # TODO: Check if U and V have the same address mode.
         try:
             sampler = samplers[texture.sampler_index]
@@ -559,29 +561,29 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     base_color.location = (-200, 200)
     assign_channel(
         assignments[0].x,
+        "x",
         links,
         textures,
         textures_rgb,
-        base_color,
-        "Red",
+        base_color.inputs["Red"],
         is_data=False,
     )
     assign_channel(
         assignments[0].y,
+        "y",
         links,
         textures,
         textures_rgb,
-        base_color,
-        "Green",
+        base_color.inputs["Green"],
         is_data=False,
     )
     assign_channel(
         assignments[0].z,
+        "z",
         links,
         textures,
         textures_rgb,
-        base_color,
-        "Blue",
+        base_color.inputs["Blue"],
         is_data=False,
     )
     if (
@@ -599,41 +601,52 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
 
-    assign_channel(assignments[1].x, links, textures, textures_rgb, bsdf, "Metallic")
+    assign_channel(
+        assignments[1].x, "x", links, textures, textures_rgb, bsdf.inputs["Metallic"]
+    )
 
-    # TODO: toon and hair shaders always use specular color?
-    if not mat_id in [2, 5]:
-        # TODO: This doesn't always work?
-        emi_color = nodes.new("ShaderNodeCombineColor")
-        emi_color.location = (-200, -400)
+    if (
+        assignments[5].x is not None
+        or assignments[5].y is not None
+        or assignments[5].z is not None
+    ):
+        color = nodes.new("ShaderNodeCombineColor")
+        color.location = (-200, -400)
         assign_channel(
             assignments[5].x,
+            "x",
             links,
             textures,
             textures_rgb,
-            emi_color,
-            "Red",
+            color.inputs["Red"],
             is_data=False,
         )
         assign_channel(
             assignments[5].y,
+            "y",
             links,
             textures,
             textures_rgb,
-            emi_color,
-            "Green",
+            color.inputs["Green"],
             is_data=False,
         )
         assign_channel(
             assignments[5].z,
+            "z",
             links,
             textures,
             textures_rgb,
-            emi_color,
-            "Blue",
+            color.inputs["Blue"],
             is_data=False,
         )
-        links.new(emi_color.outputs["Color"], bsdf.inputs["Emission Color"])
+
+        # TODO: Toon and hair shaders always use specular color?
+        # Xenoblade X models typically use specular but don't have a mat id value yet.
+        if mat_id in [2, 5] or mat_id is None:
+            links.new(color.outputs["Color"], bsdf.inputs["Specular Tint"])
+        else:
+            links.new(color.outputs["Color"], bsdf.inputs["Emission Color"])
+            bsdf.inputs["Emission Strength"].default_value = 1.0
 
     # Invert glossiness to get roughness.
     if assignments[1].y is not None:
@@ -645,7 +658,9 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             invert.location = (-200, 0)
             invert.operation = "SUBTRACT"
             invert.inputs[0].default_value = 1.0
-            assign_channel(assignments[1].y, links, textures, textures_rgb, invert, 1)
+            assign_channel(
+                assignments[1].y, "y", links, textures, textures_rgb, invert.inputs[1]
+            )
             links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
     if material.alpha_test is not None:
@@ -677,8 +692,15 @@ def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
     group.node_tree = node_tree
     group.location = (-200, -200)
 
-    assign_channel(assignments[2].x, links, textures, textures_rgb, group, "X")
-    assign_channel(assignments[2].y, links, textures, textures_rgb, group, "Y")
+    group.inputs["X"].default_value = 0.5
+    group.inputs["Y"].default_value = 0.5
+
+    assign_channel(
+        assignments[2].x, "x", links, textures, textures_rgb, group.inputs["X"]
+    )
+    assign_channel(
+        assignments[2].y, "y", links, textures, textures_rgb, group.inputs["Y"]
+    )
 
     links.new(group.outputs["Normal"], bsdf.inputs["Normal"])
 
@@ -745,21 +767,36 @@ def normals_xy_node_group():
 
 def assign_channel(
     channel_assignment,
+    output_channel,
     links,
     textures,
     textures_rgb,
-    output_node,
-    output_channel,
+    output,
     is_data=True,
 ):
-    # Assign one output channel from a texture channel or constant.
+    # Assign one output channel.
     if channel_assignment is not None:
-        texture_assignment = channel_assignment.texture()
+        texture_assignments = channel_assignment.textures()
         value = channel_assignment.value()
+        attribute = channel_assignment.attribute()
 
-        if texture_assignment is not None:
-            input_channels = ["Red", "Green", "Blue", "Alpha"]
-            input_channel = input_channels[texture_assignment.channel_index]
+        # Values or attributes are assigned directly in shaders and should take priority.
+        if value is not None:
+            output.default_value = value
+        elif attribute is not None:
+            # TODO: vColor
+            pass
+        elif texture_assignments is not None and len(texture_assignments) > 0:
+            # Try and assign the current channel in case multiple channels are used.
+            # TODO: Find a better way to fix assignments for color and normal maps.
+            texture_assignment = texture_assignments[0]
+            for assignment in texture_assignments:
+                if assignment.channels == output_channel:
+                    texture_assignment = assignment
+                    break
+
+            channel_index = "xyzw".index(texture_assignment.channels)
+            input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
 
             # Only handle sampler uniforms for material textures for now.
             sampler_to_index = {f"s{i}": i for i in range(10)}
@@ -781,7 +818,7 @@ def assign_channel(
                         input = textures[texture_index].outputs["Alpha"]
                     else:
                         input = textures_rgb[texture_index].outputs[input_channel]
-                    output = output_node.inputs[output_channel]
+
                     links.new(input, output)
 
                     if texture_assignment.texcoord_scale is not None:
@@ -789,5 +826,3 @@ def assign_channel(
                 except IndexError:
                     # TODO: Better error checking.
                     print(f"Texture index {texture_index} out of range")
-        elif value is not None:
-            output_node.inputs[output_channel].default_value = value
