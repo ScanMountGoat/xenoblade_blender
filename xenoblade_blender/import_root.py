@@ -565,6 +565,17 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         textures_rgb.append(texture_rgb_node)
         links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
 
+    vertex_color = nodes.new("ShaderNodeVertexColor")
+    vertex_color.location = (-710, 500)
+    vertex_color.layer_name = "VertexColor"
+
+    vertex_color_rgb = nodes.new("ShaderNodeSeparateColor")
+    vertex_color_rgb.location = (-500, 500)
+    links.new(vertex_color.outputs["Color"], vertex_color_rgb.inputs["Color"])
+
+    vertex_color_nodes = (vertex_color_rgb, vertex_color)
+    texture_nodes = (textures, textures_rgb, textures_scale)
+
     # TODO: Alpha testing.
     # TODO: Select UV map for each texture.
     # Assume the color texture isn't used as non color data.
@@ -574,9 +585,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         assignments[0].x,
         "x",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         base_color.inputs["Red"],
         is_data=False,
     )
@@ -584,9 +594,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         assignments[0].y,
         "y",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         base_color.inputs["Green"],
         is_data=False,
     )
@@ -594,9 +603,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         assignments[0].z,
         "z",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         base_color.inputs["Blue"],
         is_data=False,
     )
@@ -611,9 +619,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         assignments[2].z,
         "z",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         mix_ao.inputs[7],
     )
 
@@ -631,16 +638,15 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
 
     assign_normal_map(
-        nodes, links, bsdf, assignments, textures, textures_rgb, textures_scale
+        nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
     )
 
     assign_channel(
         assignments[1].x,
         "x",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         bsdf.inputs["Metallic"],
     )
 
@@ -655,9 +661,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             assignments[5].x,
             "x",
             links,
-            textures,
-            textures_rgb,
-            textures_scale,
+            texture_nodes,
+            vertex_color_nodes,
             color.inputs["Red"],
             is_data=False,
         )
@@ -665,9 +670,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             assignments[5].y,
             "y",
             links,
-            textures,
-            textures_rgb,
-            textures_scale,
+            texture_nodes,
+            vertex_color_nodes,
             color.inputs["Green"],
             is_data=False,
         )
@@ -675,9 +679,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             assignments[5].z,
             "z",
             links,
-            textures,
-            textures_rgb,
-            textures_scale,
+            texture_nodes,
+            vertex_color_nodes,
             color.inputs["Blue"],
             is_data=False,
         )
@@ -704,9 +707,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
                 assignments[1].y,
                 "y",
                 links,
-                textures,
-                textures_rgb,
-                textures_scale,
+                texture_nodes,
+                vertex_color_nodes,
                 invert.inputs[1],
             )
             links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
@@ -728,7 +730,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
 
 def assign_normal_map(
-    nodes, links, bsdf, assignments, textures, textures_rgb, textures_scale
+    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
 ):
     if assignments[2].x is None and assignments[2].y is None:
         return
@@ -749,18 +751,16 @@ def assign_normal_map(
         assignments[2].x,
         "x",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         group.inputs["X"],
     )
     assign_channel(
         assignments[2].y,
         "y",
         links,
-        textures,
-        textures_rgb,
-        textures_scale,
+        texture_nodes,
+        vertex_color_nodes,
         group.inputs["Y"],
     )
 
@@ -831,12 +831,14 @@ def assign_channel(
     channel_assignment,
     output_channel,
     links,
-    textures,
-    textures_rgb,
-    textures_scale,
+    texture_nodes,
+    vertex_color_nodes,
     output,
     is_data=True,
 ):
+    textures, textures_rgb, textures_scale = texture_nodes
+    vertex_color_rgb, vertex_color = vertex_color_nodes
+
     # Assign one output channel.
     if channel_assignment is not None:
         texture_assignments = channel_assignment.textures()
@@ -850,8 +852,18 @@ def assign_channel(
             except:
                 output.default_value = (value, value, value, 1.0)
         elif attribute is not None:
-            # TODO: vColor
-            pass
+            # TODO: Handle other attributes.
+            if attribute.name == "vColor":
+                channel_index = attribute.channel_index
+                input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
+
+                # Alpha isn't part of the RGB node.
+                if input_channel == "Alpha":
+                    input = vertex_color.outputs["Alpha"]
+                else:
+                    input = vertex_color_rgb.outputs[input_channel]
+
+                links.new(input, output)
         elif texture_assignments is not None and len(texture_assignments) > 0:
             # Try and assign the current channel in case multiple channels are used.
             # TODO: Find a better way to fix assignments for color and normal maps.
