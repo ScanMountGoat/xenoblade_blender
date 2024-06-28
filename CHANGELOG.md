@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added support for specular color maps to generated materials.
+* Added support for texture scale to generated materials.
 
 ### Fixed
 * Fixed an issue where glossiness would use the incorrect material assignment.

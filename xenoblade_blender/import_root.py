@@ -289,7 +289,6 @@ def import_mesh(
 
     # Set vertex attributes.
     # TODO: Set remaining attributes
-    # TODO: Helper functions for setting each attribute type.
     vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
     for attribute in vertex_buffer.attributes:
         data = attribute.data[min_index : max_index + 1]
@@ -384,8 +383,6 @@ def import_mesh(
                 weight_buffer, start_index, obj, vertex_buffer, min_index, max_index
             )
 
-    # TODO: Is there a way to not do this for every instance?
-    # Only non instanced character meshes have shape keys in practice.
     if len(vertex_buffer.morph_targets) > 0:
         import_shape_keys(
             vertex_buffer,
@@ -525,14 +522,28 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     textures = []
     textures_rgb = []
+    textures_scale = []
     for i, texture in enumerate(material.textures):
+        location_y = 300 - i * 300
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.label = str(i)
         texture_node.width = 330
-        texture_node.location = (-900, 300 - i * 300)
+        texture_node.location = (-900, location_y)
         texture_node.image = blender_images[texture.image_texture_index]
 
-        # TODO: Create mapping at -1100 and uv at -1300
+        # TODO: Use the full mat2x4 transform.
+        scale = nodes.new("ShaderNodeVectorMath")
+        scale.location = (-1100, location_y)
+        scale.operation = "MULTIPLY"
+        scale.inputs[1].default_value = (1.0, 1.0, 1.0)
+        textures_scale.append(scale)
+
+        uv = nodes.new("ShaderNodeUVMap")
+        uv.location = (-1300, location_y)
+        uv.uv_map = "TexCoord0"
+
+        links.new(uv.outputs["UV"], scale.inputs["Vector"])
+        links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
 
         # TODO: Check if U and V have the same address mode.
         try:
@@ -550,12 +561,12 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         textures.append(texture_node)
 
         texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
-        texture_rgb_node.location = (-500, 300 - i * 300)
+        texture_rgb_node.location = (-500, location_y)
         textures_rgb.append(texture_rgb_node)
         links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
 
     # TODO: Alpha testing.
-    # TODO: Select UV map and scale for each texture.
+    # TODO: Select UV map for each texture.
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
     base_color.location = (-200, 200)
@@ -565,6 +576,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         links,
         textures,
         textures_rgb,
+        textures_scale,
         base_color.inputs["Red"],
         is_data=False,
     )
@@ -574,6 +586,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         links,
         textures,
         textures_rgb,
+        textures_scale,
         base_color.inputs["Green"],
         is_data=False,
     )
@@ -583,6 +596,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         links,
         textures,
         textures_rgb,
+        textures_scale,
         base_color.inputs["Blue"],
         is_data=False,
     )
@@ -599,10 +613,18 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     else:
         links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
 
-    assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb)
+    assign_normal_map(
+        nodes, links, bsdf, assignments, textures, textures_rgb, textures_scale
+    )
 
     assign_channel(
-        assignments[1].x, "x", links, textures, textures_rgb, bsdf.inputs["Metallic"]
+        assignments[1].x,
+        "x",
+        links,
+        textures,
+        textures_rgb,
+        textures_scale,
+        bsdf.inputs["Metallic"],
     )
 
     if (
@@ -618,6 +640,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             links,
             textures,
             textures_rgb,
+            textures_scale,
             color.inputs["Red"],
             is_data=False,
         )
@@ -627,6 +650,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             links,
             textures,
             textures_rgb,
+            textures_scale,
             color.inputs["Green"],
             is_data=False,
         )
@@ -636,6 +660,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             links,
             textures,
             textures_rgb,
+            textures_scale,
             color.inputs["Blue"],
             is_data=False,
         )
@@ -659,7 +684,13 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             invert.operation = "SUBTRACT"
             invert.inputs[0].default_value = 1.0
             assign_channel(
-                assignments[1].y, "y", links, textures, textures_rgb, invert.inputs[1]
+                assignments[1].y,
+                "y",
+                links,
+                textures,
+                textures_rgb,
+                textures_scale,
+                invert.inputs[1],
             )
             links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
@@ -679,7 +710,9 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     return blender_material
 
 
-def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
+def assign_normal_map(
+    nodes, links, bsdf, assignments, textures, textures_rgb, textures_scale
+):
     if assignments[2].x is None and assignments[2].y is None:
         return
 
@@ -696,10 +729,22 @@ def assign_normal_map(nodes, links, bsdf, assignments, textures, textures_rgb):
     group.inputs["Y"].default_value = 0.5
 
     assign_channel(
-        assignments[2].x, "x", links, textures, textures_rgb, group.inputs["X"]
+        assignments[2].x,
+        "x",
+        links,
+        textures,
+        textures_rgb,
+        textures_scale,
+        group.inputs["X"],
     )
     assign_channel(
-        assignments[2].y, "y", links, textures, textures_rgb, group.inputs["Y"]
+        assignments[2].y,
+        "y",
+        links,
+        textures,
+        textures_rgb,
+        textures_scale,
+        group.inputs["Y"],
     )
 
     links.new(group.outputs["Normal"], bsdf.inputs["Normal"])
@@ -771,6 +816,7 @@ def assign_channel(
     links,
     textures,
     textures_rgb,
+    textures_scale,
     output,
     is_data=True,
 ):
@@ -822,7 +868,12 @@ def assign_channel(
                     links.new(input, output)
 
                     if texture_assignment.texcoord_scale is not None:
-                        pass
+                        scale_u, scale_v = texture_assignment.texcoord_scale
+                        textures_scale[texture_index].inputs[1].default_value = (
+                            scale_u,
+                            scale_v,
+                            1.0,
+                        )
                 except IndexError:
                     # TODO: Better error checking.
                     print(f"Texture index {texture_index} out of range")
