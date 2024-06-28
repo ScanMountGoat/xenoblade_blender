@@ -506,10 +506,10 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     nodes.clear()
 
     bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.location = (0, 0)
+    bsdf.location = (200, 0)
 
     output_node = nodes.new("ShaderNodeOutputMaterial")
-    output_node.location = (300, 0)
+    output_node.location = (500, 0)
 
     links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
@@ -600,6 +600,23 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         base_color.inputs["Blue"],
         is_data=False,
     )
+
+    mix_ao = nodes.new("ShaderNodeMix")
+    mix_ao.data_type = "RGBA"
+    mix_ao.blend_type = "MULTIPLY"
+    mix_ao.inputs[0].default_value = 1.0
+    mix_ao.inputs[7].default_value = (1.0, 1.0, 1.0, 1.0)
+
+    assign_channel(
+        assignments[2].z,
+        "z",
+        links,
+        textures,
+        textures_rgb,
+        textures_scale,
+        mix_ao.inputs[7],
+    )
+
     if (
         assignments[0].x is None
         and assignments[0].y is None
@@ -607,11 +624,11 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     ):
         # TODO: multiply by gMatCol instead?
         # TODO: more accurate gamma handling
-        bsdf.inputs["Base Color"].default_value = [
-            c**2.2 for c in material.parameters.mat_color
-        ]
+        mix_ao.inputs[6].default_value = [c**2.2 for c in material.parameters.mat_color]
     else:
-        links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
+        links.new(base_color.outputs["Color"], mix_ao.inputs[6])
+
+    links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
 
     assign_normal_map(
         nodes, links, bsdf, assignments, textures, textures_rgb, textures_scale
@@ -828,7 +845,10 @@ def assign_channel(
 
         # Values or attributes are assigned directly in shaders and should take priority.
         if value is not None:
-            output.default_value = value
+            try:
+                output.default_value = value
+            except:
+                output.default_value = (value, value, value, 1.0)
         elif attribute is not None:
             # TODO: vColor
             pass
