@@ -657,6 +657,11 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     ):
         color = nodes.new("ShaderNodeCombineColor")
         color.location = (-200, -400)
+        if mat_id in [2, 5] or mat_id is None:
+            color.inputs["Red"].default_value = 1.0
+            color.inputs["Green"].default_value = 1.0
+            color.inputs["Blue"].default_value = 1.0
+
         assign_channel(
             assignments[5].x,
             "x",
