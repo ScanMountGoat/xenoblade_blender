@@ -904,11 +904,14 @@ def assign_channel(
 
                     links.new(input, output)
 
-                    if texture_assignment.texcoord_scale is not None:
-                        scale_u, scale_v = texture_assignment.texcoord_scale
+                    # TODO: Create a node group for the mat2x4 transform (two dot products).
+                    if texture_assignment.texcoord_transforms is not None:
+                        transform_u, transform_v = (
+                            texture_assignment.texcoord_transforms
+                        )
                         textures_scale[texture_index].inputs[1].default_value = (
-                            scale_u,
-                            scale_v,
+                            transform_u[0],
+                            transform_v[1],
                             1.0,
                         )
                 except IndexError:
