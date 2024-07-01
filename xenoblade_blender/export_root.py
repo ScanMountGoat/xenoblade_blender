@@ -480,19 +480,23 @@ def export_mesh_inner(
         ext_mesh_index = original_mesh.ext_mesh_index
         base_mesh_index = original_mesh.base_mesh_index
 
+    original_material = original_materials[material_index]
+    material_texture_indices = get_texture_assignments(mesh_data, original_material)
+
     if is_new_material:
         # Add a new material with the given name.
         # Avoid potentially referencing an added material here.
-        original = original_materials[material_index]
-        new_material = copy_material(original)
+        new_material = copy_material(original_material)
         new_material.name = material_name
-        update_texture_assignments(mesh_data, new_material)
+        apply_texture_indices(new_material, material_texture_indices)
 
         material_index = len(root.models.materials)
         root.models.materials.append(new_material)
     else:
         # Update an existing material.
-        update_texture_assignments(mesh_data, root.models.materials[material_index])
+        apply_texture_indices(
+            root.models.materials[material_index], material_texture_indices
+        )
 
     mesh = xc3_model_py.Mesh(
         vertex_buffer_index,
@@ -519,11 +523,24 @@ def export_mesh_inner(
         # TODO: This can be generated more reliably based on the base material once flags are figured out.
         for mesh in original_meshes:
             if mesh.base_mesh_index == original_mesh_index:
+                # Avoid modifying existing speff materials if the material is new.
+                speff_material_index = mesh.material_index
+                if is_new_material:
+                    material = copy_material(root.models.materials[mesh.material_index])
+                    apply_texture_indices(material, material_texture_indices)
+                    speff_material_index = len(root.models.materials)
+                    root.models.materials.append(material)
+                else:
+                    apply_texture_indices(
+                        root.models.materials[mesh.material_index],
+                        material_texture_indices,
+                    )
+
                 speff_mesh = xc3_model_py.Mesh(
                     vertex_buffer_index,
                     index_buffer_index,
                     index_buffer_index2,
-                    mesh.material_index,
+                    speff_material_index,
                     mesh.flags1,
                     mesh.flags2,
                     lod_item_index,
@@ -541,7 +558,15 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
-def update_texture_assignments(mesh_data, material):
+def apply_texture_indices(material, indices):
+    for texture in material.textures:
+        image_index = indices.get(texture.image_texture_index)
+        if image_index is not None:
+            texture.image_texture_index = image_index
+
+
+def get_texture_assignments(mesh_data, material):
+    old_to_new_index = {}
     # TODO: error if there are no nodes or not enough textures?
     for node in mesh_data.materials[0].node_tree.nodes:
         if node.bl_idname != "ShaderNodeTexImage":
@@ -552,7 +577,11 @@ def update_texture_assignments(mesh_data, material):
         texture_index = parse_int(node.label)
         image_index = extract_image_index(node.image.name)
         if texture_index is not None and image_index is not None:
-            material.textures[texture_index].image_texture_index = image_index
+            old_to_new_index[material.textures[texture_index].image_texture_index] = (
+                image_index
+            )
+
+    return old_to_new_index
 
 
 def export_shape_keys(

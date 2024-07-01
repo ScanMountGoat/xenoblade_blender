@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where glossiness would use the incorrect material assignment.
+* Fixed an issue where material edits would not apply to generated "_speff" materials for Xenoblade 3.
 
 ## 0.9.1 - 2024-06-24
 ### Fixed
