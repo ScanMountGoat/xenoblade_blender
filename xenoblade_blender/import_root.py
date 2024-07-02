@@ -341,18 +341,14 @@ def import_mesh(
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal:
             # We can't assume that the attribute data is normalized.
             data = attribute.data[min_index : max_index + 1, :3]
-            lengths = np.linalg.norm(data, ord=2, axis=1)
-            # TODO: Prevent divide by zero?
-            normals = data / lengths.reshape((-1, 1))
+            normals = normalize(data)
             blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     for attribute in vertex_buffer.morph_blend_target:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal4:
             # We can't assume that the attribute data is normalized.
             data = attribute.data[min_index : max_index + 1, :3] * 2.0 - 1.0
-            lengths = np.linalg.norm(data, ord=2, axis=1)
-            # TODO: Prevent divide by zero?
-            normals = data / lengths.reshape((-1, 1))
+            normals = normalize(data)
             blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     blender_mesh.validate()
@@ -402,6 +398,13 @@ def import_mesh(
         modifier.object = root_obj
 
     collection.objects.link(obj)
+
+
+def normalize(data: np.ndarray) -> np.ndarray:
+    lengths = np.linalg.norm(data, ord=2, axis=1)
+    # Prevent divide by zero.
+    lengths[lengths == 0] = 1.0
+    return data / lengths.reshape((-1, 1))
 
 
 def import_shape_keys(
@@ -523,6 +526,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     textures = []
     textures_rgb = []
     textures_scale = []
+    textures_uv = []
     for i, texture in enumerate(material.textures):
         location_y = 300 - i * 300
         texture_node = nodes.new("ShaderNodeTexImage")
@@ -541,6 +545,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         uv = nodes.new("ShaderNodeUVMap")
         uv.location = (-1300, location_y)
         uv.uv_map = "TexCoord0"
+        textures_uv.append(uv)
 
         links.new(uv.outputs["UV"], scale.inputs["Vector"])
         links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
@@ -574,7 +579,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     links.new(vertex_color.outputs["Color"], vertex_color_rgb.inputs["Color"])
 
     vertex_color_nodes = (vertex_color_rgb, vertex_color)
-    texture_nodes = (textures, textures_rgb, textures_scale)
+    texture_nodes = (textures, textures_rgb, textures_scale, textures_uv)
 
     # TODO: Alpha testing.
     # TODO: Select UV map for each texture.
@@ -841,7 +846,7 @@ def assign_channel(
     output,
     is_data=True,
 ):
-    textures, textures_rgb, textures_scale = texture_nodes
+    textures, textures_rgb, textures_scale, textures_uv = texture_nodes
     vertex_color_rgb, vertex_color = vertex_color_nodes
 
     # Assign one output channel.
@@ -903,6 +908,10 @@ def assign_channel(
                         input = textures_rgb[texture_index].outputs[input_channel]
 
                     links.new(input, output)
+
+                    for i in range(9):
+                        if texture_assignment.texcoord_name == f"vTex{i}":
+                            textures_uv[texture_index].uv_map = f"TexCoord{i}"
 
                     # TODO: Create a node group for the mat2x4 transform (two dot products).
                     if texture_assignment.texcoord_transforms is not None:
