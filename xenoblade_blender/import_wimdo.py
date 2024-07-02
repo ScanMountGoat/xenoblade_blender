@@ -100,7 +100,8 @@ def import_wimdo(
 ):
     start = time.time()
 
-    root = xc3_model_py.load_model(path, database_path)
+    database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+    root = xc3_model_py.load_model(path, database)
 
     end = time.time()
     print(f"Load Root: {end - start}")

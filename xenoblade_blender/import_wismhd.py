@@ -88,7 +88,8 @@ def import_wismhd(
 ):
     start = time.time()
 
-    roots = xc3_model_py.load_map(path, database_path)
+    database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+    roots = xc3_model_py.load_map(path, database)
 
     end = time.time()
     print(f"Load {len(roots)} Roots: {end - start}")

@@ -620,6 +620,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     mix_ao.inputs[0].default_value = 1.0
     mix_ao.inputs[7].default_value = (1.0, 1.0, 1.0, 1.0)
 
+    # Single channel ambient occlusion.
     assign_channel(
         assignments[2].z,
         "z",
