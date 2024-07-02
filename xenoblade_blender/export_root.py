@@ -111,7 +111,6 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     normals_color.data.foreach_set("vector", loop_normals)
 
     # Check if any faces are not triangles, and convert them into triangles.
-    # TODO: Investigate why triangulation causes weight issues in game.
     if any(len(f.vertices) != 3 for f in mesh.data.polygons):
         bm = bmesh.new()
         bm.from_mesh(mesh.data)
@@ -272,12 +271,11 @@ def export_mesh_inner(
             f"Mesh {mesh_name} will have {vertex_count} vertices after exporting, which exceeds the per mesh limit of 65535."
         )
 
-    # TODO: Is there a better way to account for the change of coordinates?
-    axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
     positions = np.zeros(vertex_count * 3)
     mesh_data.vertices.foreach_get("co", positions)
-    positions = positions.reshape((-1, 3)) @ axis_correction
+    positions = positions.reshape((-1, 3)) @ z_up_to_y_up
 
     vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
     mesh_data.loops.foreach_get("vertex_index", vertex_indices)
@@ -288,7 +286,7 @@ def export_mesh_inner(
     loop_normals = loop_normals.reshape((-1, 3))
 
     normals = np.zeros((vertex_count, 4), dtype=np.float32)
-    normals[:, :3][vertex_indices] = loop_normals @ axis_correction
+    normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
 
     # Tangents are stored per loop instead of per vertex.
     loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
@@ -303,7 +301,7 @@ def export_mesh_inner(
     mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
 
     tangents = np.zeros((vertex_count, 4), dtype=np.float32)
-    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ axis_correction
+    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ z_up_to_y_up
     tangents[:, 3][vertex_indices] = loop_bitangent_signs
 
     # Export Weights
@@ -391,7 +389,7 @@ def export_mesh_inner(
             message += ' Valid names are "VertexColor" and "Blend".'
             raise ExportException(message)
 
-        # TODO: error for unsupported data_type or domain.
+        # TODO: error for unsupported data_type.
         if color_attribute.domain == "POINT":
             colors = np.zeros(vertex_count * 4)
             color_attribute.data.foreach_get("color", colors)
@@ -401,6 +399,9 @@ def export_mesh_inner(
             # Convert per loop data to per vertex data.
             colors = np.zeros((len(mesh_data.vertices), 4))
             colors[vertex_indices] = loop_colors.reshape((-1, 4))
+        else:
+            message = f"Unsupported color attribute domain {color_attribute.domain}"
+            raise ExportException(message)
 
         colors = colors.reshape((-1, 4))
         attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
@@ -591,8 +592,7 @@ def export_shape_keys(
     normals: np.ndarray,
     tangents: np.ndarray,
 ):
-    # TODO: Is there a better way to account for the change of coordinates?
-    axis_correction = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
     morph_targets = []
     if mesh_data.shape_keys is not None:
@@ -612,7 +612,7 @@ def export_shape_keys(
 
             morph_positions = np.zeros(len(mesh_data.vertices) * 3)
             shape_key.points.foreach_get("co", morph_positions)
-            morph_positions = morph_positions.reshape((-1, 3)) @ axis_correction
+            morph_positions = morph_positions.reshape((-1, 3)) @ z_up_to_y_up
 
             position_deltas = morph_positions - positions
 

@@ -290,14 +290,32 @@ def import_mesh(
     # Set vertex attributes.
     # TODO: Set remaining attributes
     vertex_buffer = buffers.vertex_buffers[mesh.vertex_buffer_index]
+
+    # Don't assume the first attribute is position to properly set vertex count.
     for attribute in vertex_buffer.attributes:
         data = attribute.data[min_index : max_index + 1]
 
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Position:
+            blender_mesh.vertices.add(data.shape[0])
+            blender_mesh.vertices.foreach_set("co", data.reshape(-1))
+
+    morph_blend_positions = None
+    for attribute in vertex_buffer.morph_blend_target:
+        data = attribute.data[min_index : max_index + 1]
+
+        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Position2:
+            # Shape keys do their own indexing with the full data.
+            morph_blend_positions = attribute.data
+
             # TODO: Don't assume the first attribute is position to set count.
             blender_mesh.vertices.add(data.shape[0])
             blender_mesh.vertices.foreach_set("co", data.reshape(-1))
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
+
+    # Set attributes now that the vertices are added by the position attribute.
+    for attribute in vertex_buffer.attributes:
+        data = attribute.data[min_index : max_index + 1]
+
+        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
             import_uvs(blender_mesh, indices, data, "TexCoord0", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord1:
             import_uvs(blender_mesh, indices, data, "TexCoord1", flip_uvs)
@@ -316,23 +334,10 @@ def import_mesh(
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord8:
             import_uvs(blender_mesh, indices, data, "TexCoord8", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
-            import_colors(blender_mesh, indices, data, "VertexColor")
+            import_colors(blender_mesh, data, "VertexColor")
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
-            import_colors(blender_mesh, indices, data, "Blend")
+            import_colors(blender_mesh, data, "Blend")
 
-    position_data = None
-    for attribute in vertex_buffer.morph_blend_target:
-        data = attribute.data[min_index : max_index + 1]
-
-        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Position2:
-            # Shape keys do their own indexing with the full data.
-            position_data = attribute.data
-
-            # TODO: Don't assume the first attribute is position to set count.
-            blender_mesh.vertices.add(data.shape[0])
-            blender_mesh.vertices.foreach_set("co", data.reshape(-1))
-
-    # TODO: Will this mess up indexing for weight groups?
     blender_mesh.update()
 
     # The validate call may modify and reindex geometry.
@@ -383,7 +388,7 @@ def import_mesh(
         import_shape_keys(
             vertex_buffer,
             models.morph_controller_names,
-            position_data,
+            morph_blend_positions,
             min_index,
             max_index,
             obj,
@@ -449,19 +454,14 @@ def import_uvs(
 
 def import_colors(
     blender_mesh: bpy.types.Mesh,
-    vertex_indices: np.ndarray,
     data: np.ndarray,
     name: str,
 ):
-    # TODO: Just set this per vertex instead?
     # Byte color still uses floats but restricts their range to 0.0 to 1.0.
     attribute = blender_mesh.color_attributes.new(
-        name=name, type="BYTE_COLOR", domain="CORNER"
+        name=name, type="BYTE_COLOR", domain="POINT"
     )
-
-    # This is set per loop rather than per vertex.
-    loop_colors = data[vertex_indices].reshape(-1)
-    attribute.data.foreach_set("color", loop_colors)
+    attribute.data.foreach_set("color", data.reshape(-1))
 
 
 def import_weight_groups(
