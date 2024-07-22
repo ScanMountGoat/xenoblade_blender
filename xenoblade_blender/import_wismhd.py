@@ -67,7 +67,7 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         database_path = get_database_path(self.game_version)
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
-        import_wismhd(
+        self.import_wismhd(
             context,
             self.filepath,
             database_path,
@@ -77,40 +77,45 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         )
         return {"FINISHED"}
 
+    def import_wismhd(
+        self,
+        context: bpy.types.Context,
+        path: str,
+        database_path: str,
+        pack_images: bool,
+        image_folder: str,
+        import_all_meshes: bool,
+    ):
+        start = time.time()
 
-def import_wismhd(
-    context: bpy.types.Context,
-    path: str,
-    database_path: str,
-    pack_images: bool,
-    image_folder: str,
-    import_all_meshes: bool,
-):
-    start = time.time()
+        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+        roots = xc3_model_py.load_map(path, database)
 
-    database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
-    roots = xc3_model_py.load_map(path, database)
+        end = time.time()
+        print(f"Load {len(roots)} Roots: {end - start}")
 
-    end = time.time()
-    print(f"Load {len(roots)} Roots: {end - start}")
+        start = time.time()
 
-    start = time.time()
+        model_name = os.path.basename(path)
 
-    model_name = os.path.basename(path)
+        for i, root in enumerate(roots):
+            name = model_name.replace(".wismhd", "")
+            blender_images = import_images(
+                root, f"{name}.root{i}", pack_images, image_folder, flip=True
+            )
 
-    for i, root in enumerate(roots):
-        name = model_name.replace(".wismhd", "")
-        blender_images = import_images(
-            root, f"{name}.root{i}", pack_images, image_folder, flip=True
-        )
+            # Maps have no skeletons.
+            root_collection = bpy.data.collections.new(f"{name}.{i}")
+            bpy.context.scene.collection.children.link(root_collection)
 
-        # Maps have no skeletons.
-        root_collection = bpy.data.collections.new(f"{name}.{i}")
-        bpy.context.scene.collection.children.link(root_collection)
+            import_map_root(
+                self,
+                root,
+                root_collection,
+                blender_images,
+                import_all_meshes,
+                flip_uvs=True,
+            )
 
-        import_map_root(
-            root, root_collection, blender_images, import_all_meshes, flip_uvs=True
-        )
-
-    end = time.time()
-    print(f"Import Blender Scene: {end - start}")
+        end = time.time()
+        print(f"Import Blender Scene: {end - start}")

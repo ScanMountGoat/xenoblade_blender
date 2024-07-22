@@ -79,7 +79,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         folder = Path(self.filepath).parent
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
-            import_wimdo(
+            self.import_wimdo(
                 context,
                 abs_path,
                 database_path,
@@ -89,34 +89,36 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
             )
         return {"FINISHED"}
 
+    def import_wimdo(
+        self,
+        context: bpy.types.Context,
+        path: str,
+        database_path: str,
+        pack_images: bool,
+        image_folder: str,
+        import_all_meshes: bool,
+    ):
+        start = time.time()
 
-def import_wimdo(
-    context: bpy.types.Context,
-    path: str,
-    database_path: str,
-    pack_images: bool,
-    image_folder: str,
-    import_all_meshes: bool,
-):
-    start = time.time()
+        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+        root = xc3_model_py.load_model(path, database)
 
-    database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
-    root = xc3_model_py.load_model(path, database)
+        end = time.time()
+        print(f"Load Root: {end - start}")
 
-    end = time.time()
-    print(f"Load Root: {end - start}")
+        start = time.time()
 
-    start = time.time()
+        model_name = os.path.basename(path)
+        blender_images = import_images(
+            root, model_name.replace(".wimdo", ""), pack_images, image_folder, flip=True
+        )
+        armature = import_armature(context, root, model_name)
+        import_model_root(
+            self, root, blender_images, armature, import_all_meshes, flip_uvs=True
+        )
 
-    model_name = os.path.basename(path)
-    blender_images = import_images(
-        root, model_name.replace(".wimdo", ""), pack_images, image_folder, flip=True
-    )
-    armature = import_armature(context, root, model_name)
-    import_model_root(root, blender_images, armature, import_all_meshes, flip_uvs=True)
+        # Store the path to make exporting easier later.
+        armature["original_wimdo"] = path
 
-    # Store the path to make exporting easier later.
-    armature["original_wimdo"] = path
-
-    end = time.time()
-    print(f"Import Blender Scene: {end - start}")
+        end = time.time()
+        print(f"Import Blender Scene: {end - start}")

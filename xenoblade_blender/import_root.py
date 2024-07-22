@@ -121,6 +121,7 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
 
 
 def import_map_root(
+    operator,
     root,
     root_collection: bpy.types.Collection,
     blender_images,
@@ -178,6 +179,7 @@ def import_map_root(
                             continue
 
                     import_mesh(
+                        operator,
                         None,
                         model_collection,
                         buffers,
@@ -209,7 +211,7 @@ def import_map_root(
 
 
 def import_model_root(
-    root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool
+    operator, root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool
 ):
     base_lods = None
     if root.models.lod_data is not None:
@@ -241,6 +243,7 @@ def import_model_root(
                     continue
 
             import_mesh(
+                operator,
                 root_obj,
                 bpy.context.collection,
                 root.buffers,
@@ -254,6 +257,7 @@ def import_model_root(
 
 
 def import_mesh(
+    operator,
     root_obj: Optional[bpy.types.Object],
     collection: bpy.types.Collection,
     buffers,
@@ -316,23 +320,23 @@ def import_mesh(
         data = attribute.data[min_index : max_index + 1]
 
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
-            import_uvs(blender_mesh, indices, data, "TexCoord0", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord0", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord1:
-            import_uvs(blender_mesh, indices, data, "TexCoord1", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord1", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord2:
-            import_uvs(blender_mesh, indices, data, "TexCoord2", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord2", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord3:
-            import_uvs(blender_mesh, indices, data, "TexCoord3", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord3", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord4:
-            import_uvs(blender_mesh, indices, data, "TexCoord4", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord4", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord5:
-            import_uvs(blender_mesh, indices, data, "TexCoord5", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord5", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord6:
-            import_uvs(blender_mesh, indices, data, "TexCoord6", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord6", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord7:
-            import_uvs(blender_mesh, indices, data, "TexCoord7", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord7", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord8:
-            import_uvs(blender_mesh, indices, data, "TexCoord8", flip_uvs)
+            import_uvs(operator, blender_mesh, indices, data, "TexCoord8", flip_uvs)
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
             import_colors(blender_mesh, data, "VertexColor")
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
@@ -437,6 +441,7 @@ def import_shape_keys(
 
 
 def import_uvs(
+    operator,
     blender_mesh: bpy.types.Mesh,
     vertex_indices: np.ndarray,
     data: np.ndarray,
@@ -444,12 +449,18 @@ def import_uvs(
     flip_uvs: bool,
 ):
     uv_layer = blender_mesh.uv_layers.new(name=name)
-    # This is set per loop rather than per vertex.
-    loop_uvs = data[vertex_indices]
-    if flip_uvs:
-        # Flip vertically to match Blender.
-        loop_uvs[:, 1] = 1.0 - loop_uvs[:, 1]
-    uv_layer.data.foreach_set("uv", loop_uvs.reshape(-1))
+
+    if uv_layer is not None:
+        # This is set per loop rather than per vertex.
+        loop_uvs = data[vertex_indices]
+        if flip_uvs:
+            # Flip vertically to match Blender.
+            loop_uvs[:, 1] = 1.0 - loop_uvs[:, 1]
+        uv_layer.data.foreach_set("uv", loop_uvs.reshape(-1))
+    else:
+        # Blender has a limit of 8 UV maps.
+        message = f"Skipping {name} for mesh {blender_mesh.name} to avoid exceeding UV limit of 8"
+        operator.report({"WARNING"}, message)
 
 
 def import_colors(

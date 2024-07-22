@@ -60,31 +60,38 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         folder = Path(self.filepath).parent
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
-            import_camdo(context, abs_path, self.pack_images, image_folder)
+            self.import_camdo(context, abs_path, self.pack_images, image_folder)
 
         return {"FINISHED"}
 
+    def import_camdo(
+        self,
+        context: bpy.types.Context,
+        path: str,
+        pack_images: bool,
+        image_folder: str,
+    ):
+        start = time.time()
 
-def import_camdo(
-    context: bpy.types.Context, path: str, pack_images: bool, image_folder: str
-):
-    start = time.time()
+        root = xc3_model_py.load_model_legacy(path)
 
-    root = xc3_model_py.load_model_legacy(path)
+        end = time.time()
+        print(f"Load Root: {end - start}")
 
-    end = time.time()
-    print(f"Load Root: {end - start}")
+        start = time.time()
 
-    start = time.time()
+        model_name = os.path.basename(path)
+        blender_images = import_images(
+            root,
+            model_name.replace(".camdo", ""),
+            pack_images,
+            image_folder,
+            flip=False,
+        )
+        armature = import_armature(context, root, model_name)
+        import_model_root(
+            self, root, blender_images, armature, import_all_meshes=True, flip_uvs=False
+        )
 
-    model_name = os.path.basename(path)
-    blender_images = import_images(
-        root, model_name.replace(".camdo", ""), pack_images, image_folder, flip=False
-    )
-    armature = import_armature(context, root, model_name)
-    import_model_root(
-        root, blender_images, armature, import_all_meshes=True, flip_uvs=False
-    )
-
-    end = time.time()
-    print(f"Import Blender Scene: {end - start}")
+        end = time.time()
+        print(f"Import Blender Scene: {end - start}")

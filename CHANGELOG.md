@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where models would fail to import if they exceeded Blender's limit of 8 UVs. UVs past the limit will be skipped.
+
 ## 0.10.0 - 2024-07-02
 ### Added
 * Added support for specular color maps to generated materials.
