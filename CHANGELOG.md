@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Improved material assignment accuracy for Xenoblade X camdo models using a shader database.
+
 ### Fixed
 * Fixed an issue where models would fail to import if they exceeded Blender's limit of 8 UVs. UVs past the limit will be skipped.
 

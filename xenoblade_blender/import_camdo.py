@@ -73,7 +73,9 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
     ):
         start = time.time()
 
-        root = xc3_model_py.load_model_legacy(path)
+        database_path = os.path.join(os.path.dirname(__file__), "xcx.json")
+        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+        root = xc3_model_py.load_model_legacy(path, database)
 
         end = time.time()
         print(f"Load Root: {end - start}")
