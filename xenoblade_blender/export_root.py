@@ -88,14 +88,14 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     mesh.data.transform(mesh.matrix_basis)
     mesh.matrix_basis.identity()
 
-    # Apply Modifiers
+    # Apply modifiers other than armature and outlines.
     override = context.copy()
     override["object"] = mesh
     override["active_object"] = mesh
     override["selected_objects"] = [mesh]
     with context.temp_override(**override):
         for modifier in mesh.modifiers:
-            if modifier.type != "ARMATURE":
+            if modifier.type != "ARMATURE" and modifier.type != "SOLIDIFY":
                 bpy.ops.object.modifier_apply(modifier=modifier.name)
 
     # Get the custom normals from the original mesh.

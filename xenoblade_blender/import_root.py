@@ -398,6 +398,22 @@ def import_mesh(
             obj,
         )
 
+    # TODO: Add an option to enable/disable outliens on import.
+    if vertex_buffer.outline_buffer_index is not None:
+        # TODO: Outline attributes for color and vertex group for thickness.
+        # TODO: Find and use the original outline material if present.
+        # TODO: Update the shader database to properly support outline materials.
+        outline_material = create_outline_material()
+        blender_mesh.materials.append(outline_material)
+
+        # Create outlines using a single mesh and a modifier.
+        # The outline data can be regenerated if needed for export.
+        modifier = obj.modifiers.new(name="Solidify Outlines", type="SOLIDIFY")
+        modifier.use_rim = False
+        modifier.use_flip_normals = True
+        modifier.material_offset = 1
+        modifier.thickness = -0.0015
+
     # Attach the mesh to the armature or empty.
     # Assume the root_obj is an armature if there are weights.
     # TODO: Find a more reliable way of checking this.
@@ -407,6 +423,51 @@ def import_mesh(
         modifier.object = root_obj
 
     collection.objects.link(obj)
+
+def create_outline_material():
+    outline_material = bpy.data.materials.new("outlines")
+    outline_material.use_nodes = True
+    outline_material.use_backface_culling = True
+
+    nodes = outline_material.node_tree.nodes
+    links = outline_material.node_tree.links
+
+    # Create the nodes from scratch to ensure the required nodes are present.
+    # This avoids hard coding names like "Material Output" that depend on the UI language.
+    nodes.clear()
+
+    # TODO: Properly set outline color from vertex color.
+    emission = nodes.new("ShaderNodeEmission")
+    emission.location = (-100, 0)
+    emission.inputs["Color"].default_value = (0.0, 0.0, 0.0, 1.0)
+
+    # Workaround to make inverted hull outlines work in cycles.
+    transparent = nodes.new("ShaderNodeBsdfTransparent")
+    transparent.location = (-100, -150)
+
+    geometry = nodes.new("ShaderNodeNewGeometry")
+    geometry.location = (-100, 400)
+
+    mix1 = nodes.new("ShaderNodeMixShader")
+    mix1.location = (100, 0)
+    links.new(geometry.outputs["Backfacing"], mix1.inputs["Fac"])
+    links.new(emission.outputs["Emission"], mix1.inputs[1])
+    links.new(transparent.outputs["BSDF"], mix1.inputs[2])
+
+    light_path = nodes.new("ShaderNodeLightPath")
+    light_path.location = (100, 400)
+
+    mix2 = nodes.new("ShaderNodeMixShader")
+    mix2.location = (300, 0)
+    links.new(light_path.outputs["Is Camera Ray"], mix2.inputs["Fac"])
+    links.new(transparent.outputs["BSDF"], mix2.inputs[1])
+    links.new(mix1.outputs["Shader"], mix2.inputs[2])
+
+    output_node = nodes.new("ShaderNodeOutputMaterial")
+    output_node.location = (500, 0)
+    links.new(mix2.outputs["Shader"], output_node.inputs["Surface"])
+
+    return outline_material
 
 
 def normalize(data: np.ndarray) -> np.ndarray:
