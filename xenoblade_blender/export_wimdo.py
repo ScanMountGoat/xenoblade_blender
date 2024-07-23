@@ -113,6 +113,14 @@ def export_wimdo(
             create_speff_meshes,
         )
 
+    # The vertex shaders have a limited SSBO size for preskinned transform matrices.
+    # XC3 has a higher limit (12000) than XC2, so use the lower limit (8000) to be safe.
+    weight_count = len(combined_weights.bone_indices)
+    if weight_count > 8000:
+        message = f"Unique weight count {weight_count} exceeds in game limit of 8000."
+        message += " Simplify or quantize weights or limit the number of vertices."
+        raise ExportException(message)
+
     root.buffers.weights.update_weights(combined_weights)
 
     # Detect the default import behavior of a single lod level in each group.
