@@ -406,7 +406,7 @@ def import_mesh(
             obj,
         )
 
-    # TODO: Add an option to enable/disable outliens on import.
+    # TODO: Add an option to enable/disable outlines on import.
     if vertex_buffer.outline_buffer_index is not None:
         # TODO: Outline attributes for color and vertex group for thickness.
         # TODO: Find and use the original outline material if present.

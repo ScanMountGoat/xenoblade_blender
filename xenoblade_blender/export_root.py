@@ -345,69 +345,17 @@ def export_mesh_inner(
     ]
 
     for uv_layer in mesh_data.uv_layers:
-        texcoords = np.zeros((positions.shape[0], 2), dtype=np.float32)
-        loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
-        uv_layer.data.foreach_get("uv", loop_uvs)
-        texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
-        # Flip vertically to match in game.
-        texcoords[:, 1] = 1.0 - texcoords[:, 1]
-
-        ty = xc3_model_py.vertex.AttributeType.TexCoord0
-        if uv_layer.name == "TexCoord0":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord0
-        elif uv_layer.name == "TexCoord1":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord1
-        elif uv_layer.name == "TexCoord2":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord2
-        elif uv_layer.name == "TexCoord3":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord3
-        elif uv_layer.name == "TexCoord4":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord4
-        elif uv_layer.name == "TexCoord5":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord5
-        elif uv_layer.name == "TexCoord6":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord6
-        elif uv_layer.name == "TexCoord7":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord7
-        elif uv_layer.name == "TexCoord8":
-            ty = xc3_model_py.vertex.AttributeType.TexCoord8
-        else:
-            message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
-            message += ' Valid names are "TexCoord0" to "TexCoord8".'
-            raise ExportException(message)
-
-        attributes.append(xc3_model_py.vertex.AttributeData(ty, texcoords))
+        attribute = export_uv_layer(
+            mesh_name, mesh_data, positions, vertex_indices, uv_layer
+        )
+        attributes.append(attribute)
 
     for color_attribute in mesh_data.color_attributes:
-        ty = xc3_model_py.vertex.AttributeType.VertexColor
-        if color_attribute.name == "VertexColor":
-            ty = xc3_model_py.vertex.AttributeType.VertexColor
-        elif color_attribute.name == "Blend":
-            ty = xc3_model_py.vertex.AttributeType.Blend
-        elif color_attribute.name == "OutlineVertexColor":
-            # TODO: update the outline buffer.
-            pass
-        else:
-            message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
-            message += ' Valid names are "VertexColor" and "Blend".'
-            raise ExportException(message)
-
-        # TODO: error for unsupported data_type.
-        if color_attribute.domain == "POINT":
-            colors = np.zeros(vertex_count * 4)
-            color_attribute.data.foreach_get("color", colors)
-        elif color_attribute.domain == "CORNER":
-            loop_colors = np.zeros(len(mesh_data.loops) * 4)
-            color_attribute.data.foreach_get("color", loop_colors)
-            # Convert per loop data to per vertex data.
-            colors = np.zeros((len(mesh_data.vertices), 4))
-            colors[vertex_indices] = loop_colors.reshape((-1, 4))
-        else:
-            message = f"Unsupported color attribute domain {color_attribute.domain}"
-            raise ExportException(message)
-
-        colors = colors.reshape((-1, 4))
-        attributes.append(xc3_model_py.vertex.AttributeData(ty, colors))
+        if color_attribute.name != "OutlineVertexColor":
+            attribute = export_color_attribute(
+                mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
+            )
+            attributes.append(attribute)
 
     morph_targets = export_shape_keys(
         morph_names, mesh_data, positions, normals, tangents
@@ -553,13 +501,143 @@ def export_mesh_inner(
                 )
                 root.models.models[0].meshes.append(speff_mesh)
 
+    # TODO: Is there a more reliable way to check for outlines?
+    has_outlines = False
+    for modifier in blender_mesh.modifiers:
+        if modifier.type == "SOLIDIFY":
+            has_outlines = True
+            break
+
+    # TODO: report a warning if this fails.
+    if has_outlines is not None and original_mesh_index is not None:
+        # Find the outline material for this material.
+        # Use the original index in case the name is new.
+        outline_material_index = None
+        for i, material in enumerate(root.models.materials):
+            # TODO: How to handle materials with the same name?
+            if material.name == root.models.materials[material_index].name + "_outline":
+                outline_material_index = i
+                break
+
+        # Find the original outline mesh.
+        # TODO: Find a way to generate outline meshes instead.
+        original_outline_mesh = None
+        for i, mesh in enumerate(original_meshes):
+            if mesh.material_index == outline_material_index:
+                original_outline_mesh = mesh
+                break
+
+        if original_outline_mesh is not None and outline_material_index is not None:
+            outline_mesh = xc3_model_py.Mesh(
+                vertex_buffer_index,
+                index_buffer_index,
+                index_buffer_index2,
+                outline_material_index,
+                original_outline_mesh.flags1,
+                original_outline_mesh.flags2,
+                lod_item_index,
+                ext_mesh_index,
+                base_mesh_index=mesh_index,
+            )
+            root.models.models[0].meshes.append(outline_mesh)
+
+    outline_buffer_index = None
+    if has_outlines:
+        # xc3_model will fill in missing required attributes with default values.
+        # TODO: Raise an error if the color data is missing?
+        # TODO: How to handle the alpha for outline width?
+        outline_attributes = [
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Normal, normals
+            ),
+        ]
+        for color_attribute in mesh_data.color_attributes:
+            if color_attribute.name == "OutlineVertexColor":
+                attribute = export_color_attribute(
+                    mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
+                )
+                outline_attributes.append(attribute)
+
+        outline_buffer_index = len(root.buffers.outline_buffers)
+        outline_buffer = xc3_model_py.vertex.OutlineBuffer(outline_attributes)
+        root.buffers.outline_buffers.append(outline_buffer)
+
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
-        attributes, morph_blend_target, morph_targets, None
+        attributes, morph_blend_target, morph_targets, outline_buffer_index
     )
     index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
+
+
+def export_color_attribute(
+    mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
+):
+    ty = xc3_model_py.vertex.AttributeType.VertexColor
+    if color_attribute.name == "VertexColor":
+        ty = xc3_model_py.vertex.AttributeType.VertexColor
+    elif color_attribute.name == "Blend":
+        ty = xc3_model_py.vertex.AttributeType.Blend
+    elif color_attribute.name == "OutlineVertexColor":
+        ty = xc3_model_py.vertex.AttributeType.VertexColor
+    else:
+        message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
+        message += ' Valid names are "VertexColor" and "Blend".'
+        raise ExportException(message)
+
+        # TODO: error for unsupported data_type.
+    if color_attribute.domain == "POINT":
+        colors = np.zeros(vertex_count * 4)
+        color_attribute.data.foreach_get("color", colors)
+    elif color_attribute.domain == "CORNER":
+        loop_colors = np.zeros(len(mesh_data.loops) * 4)
+        color_attribute.data.foreach_get("color", loop_colors)
+        # Convert per loop data to per vertex data.
+        colors = np.zeros((len(mesh_data.vertices), 4))
+        colors[vertex_indices] = loop_colors.reshape((-1, 4))
+    else:
+        message = f"Unsupported color attribute domain {color_attribute.domain}"
+        raise ExportException(message)
+
+    colors = colors.reshape((-1, 4))
+    a = xc3_model_py.vertex.AttributeData(ty, colors)
+    return a
+
+
+def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
+    texcoords = np.zeros((positions.shape[0], 2), dtype=np.float32)
+    loop_uvs = np.zeros(len(mesh_data.loops) * 2, dtype=np.float32)
+    uv_layer.data.foreach_get("uv", loop_uvs)
+    texcoords[vertex_indices] = loop_uvs.reshape((-1, 2))
+    # Flip vertically to match in game.
+    texcoords[:, 1] = 1.0 - texcoords[:, 1]
+
+    ty = xc3_model_py.vertex.AttributeType.TexCoord0
+    if uv_layer.name == "TexCoord0":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord0
+    elif uv_layer.name == "TexCoord1":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord1
+    elif uv_layer.name == "TexCoord2":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord2
+    elif uv_layer.name == "TexCoord3":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord3
+    elif uv_layer.name == "TexCoord4":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord4
+    elif uv_layer.name == "TexCoord5":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord5
+    elif uv_layer.name == "TexCoord6":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord6
+    elif uv_layer.name == "TexCoord7":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord7
+    elif uv_layer.name == "TexCoord8":
+        ty = xc3_model_py.vertex.AttributeType.TexCoord8
+    else:
+        message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
+        message += ' Valid names are "TexCoord0" to "TexCoord8".'
+        raise ExportException(message)
+
+    return xc3_model_py.vertex.AttributeData(ty, texcoords)
 
 
 def apply_texture_indices(material, indices):

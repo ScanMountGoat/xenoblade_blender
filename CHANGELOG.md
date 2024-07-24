@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added support for outline rendering using the solidify modifier.
+* Added support for exporting outline data for wimdo exports.
 
 ### Changed
 * Improved material assignment accuracy for Xenoblade X camdo models using a shader database.
