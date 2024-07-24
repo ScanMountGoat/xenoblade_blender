@@ -342,6 +342,14 @@ def import_mesh(
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
             import_colors(blender_mesh, data, "Blend")
 
+    if vertex_buffer.outline_buffer_index is not None:
+        outline_buffer = buffers.outline_buffers[vertex_buffer.outline_buffer_index]
+        for a in outline_buffer.attributes:
+            # Use a unique name to avoid conflicting with existing attributes.
+            if a.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
+                data = a.data[min_index : max_index + 1]
+                import_colors(blender_mesh, data, "OutlineVertexColor")
+
     blender_mesh.update()
 
     # The validate call may modify and reindex geometry.
@@ -424,6 +432,7 @@ def import_mesh(
 
     collection.objects.link(obj)
 
+
 def create_outline_material():
     outline_material = bpy.data.materials.new("outlines")
     outline_material.use_nodes = True
@@ -436,10 +445,13 @@ def create_outline_material():
     # This avoids hard coding names like "Material Output" that depend on the UI language.
     nodes.clear()
 
-    # TODO: Properly set outline color from vertex color.
     emission = nodes.new("ShaderNodeEmission")
     emission.location = (-100, 0)
-    emission.inputs["Color"].default_value = (0.0, 0.0, 0.0, 1.0)
+
+    vertex_color = nodes.new("ShaderNodeVertexColor")
+    vertex_color.location = (-300, 0)
+    vertex_color.layer_name = "OutlineVertexColor"
+    links.new(vertex_color.outputs["Color"], emission.inputs["Color"])
 
     # Workaround to make inverted hull outlines work in cycles.
     transparent = nodes.new("ShaderNodeBsdfTransparent")

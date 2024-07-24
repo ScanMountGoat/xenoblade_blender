@@ -88,6 +88,7 @@ def export_wimdo(
     original_materials = [copy_material(m) for m in root.models.materials]
     morph_names = root.models.morph_controller_names
     root.buffers.vertex_buffers = []
+    root.buffers.outline_buffers = []
     root.buffers.index_buffers = []
     root.models.models[0].meshes = []
 

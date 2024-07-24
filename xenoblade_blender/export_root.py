@@ -384,6 +384,9 @@ def export_mesh_inner(
             ty = xc3_model_py.vertex.AttributeType.VertexColor
         elif color_attribute.name == "Blend":
             ty = xc3_model_py.vertex.AttributeType.Blend
+        elif color_attribute.name == "OutlineVertexColor":
+            # TODO: update the outline buffer.
+            pass
         else:
             message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
             message += ' Valid names are "VertexColor" and "Blend".'
