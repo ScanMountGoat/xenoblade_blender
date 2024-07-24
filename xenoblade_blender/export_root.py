@@ -273,58 +273,12 @@ def export_mesh_inner(
 
     z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
-    positions = np.zeros(vertex_count * 3)
-    mesh_data.vertices.foreach_get("co", positions)
-    positions = positions.reshape((-1, 3)) @ z_up_to_y_up
+    positions = export_positions(mesh_data, z_up_to_y_up)
+    vertex_indices = export_vertex_indices(mesh_data)
+    normals = export_normals(mesh_data, z_up_to_y_up, vertex_indices)
+    tangents = export_tangents(mesh_data, z_up_to_y_up, vertex_indices)
 
-    vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
-    mesh_data.loops.foreach_get("vertex_index", vertex_indices)
-
-    # Normals are stored per loop instead of per vertex.
-    loop_normals = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
-    mesh_data.loops.foreach_get("normal", loop_normals)
-    loop_normals = loop_normals.reshape((-1, 3))
-
-    normals = np.zeros((vertex_count, 4), dtype=np.float32)
-    normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
-
-    # Tangents are stored per loop instead of per vertex.
-    loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
-    try:
-        # TODO: Why do some meshes not have UVs for Pyra?
-        mesh_data.calc_tangents()
-        mesh_data.loops.foreach_get("tangent", loop_tangents)
-    except:
-        pass
-
-    loop_bitangent_signs = np.zeros(len(mesh_data.loops), dtype=np.float32)
-    mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
-
-    tangents = np.zeros((vertex_count, 4), dtype=np.float32)
-    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ z_up_to_y_up
-    tangents[:, 3][vertex_indices] = loop_bitangent_signs
-
-    # Export Weights
-    # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
-    # TODO: Does Blender not expose this directly?
-    group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
-
-    for vertex in mesh_data.vertices:
-        # Blender doesn't enforce normalization, since it normalizes while animating.
-        # Normalize on export to ensure the weights work correctly in game.
-        weight_sum = sum([g.weight for g in vertex.groups])
-        for group in vertex.groups:
-            weight = xc3_model_py.skinning.VertexWeight(
-                vertex.index, group.weight / weight_sum
-            )
-            group_to_weights[group.group][1].append(weight)
-
-    influences = []
-    for name, weights in group_to_weights.values():
-        if len(weights) > 0:
-            influence = xc3_model_py.skinning.Influence(name, weights)
-            influences.append(influence)
-
+    influences = export_influences(blender_mesh, mesh_data)
     weight_indices = combined_weights.add_influences(influences, positions.shape[0])
 
     # Export all available vertex attributes.
@@ -353,7 +307,7 @@ def export_mesh_inner(
     for color_attribute in mesh_data.color_attributes:
         if color_attribute.name != "OutlineVertexColor":
             attribute = export_color_attribute(
-                mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
+                mesh_name, mesh_data, vertex_indices, color_attribute
             )
             attributes.append(attribute)
 
@@ -554,7 +508,7 @@ def export_mesh_inner(
         for color_attribute in mesh_data.color_attributes:
             if color_attribute.name == "OutlineVertexColor":
                 attribute = export_color_attribute(
-                    mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
+                    mesh_name, mesh_data, vertex_indices, color_attribute
                 )
                 outline_attributes.append(attribute)
 
@@ -571,9 +525,75 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
-def export_color_attribute(
-    mesh_name, mesh_data, vertex_count, vertex_indices, color_attribute
-):
+def export_influences(blender_mesh, mesh_data):
+    # Export Weights
+    # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
+    # TODO: Does Blender not expose this directly?
+    group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
+
+    for vertex in mesh_data.vertices:
+        # Blender doesn't enforce normalization, since it normalizes while animating.
+        # Normalize on export to ensure the weights work correctly in game.
+        weight_sum = sum([g.weight for g in vertex.groups])
+        for group in vertex.groups:
+            weight = xc3_model_py.skinning.VertexWeight(
+                vertex.index, group.weight / weight_sum
+            )
+            group_to_weights[group.group][1].append(weight)
+
+    influences = []
+    for name, weights in group_to_weights.values():
+        if len(weights) > 0:
+            influence = xc3_model_py.skinning.Influence(name, weights)
+            influences.append(influence)
+
+    return influences
+
+
+def export_positions(mesh_data, z_up_to_y_up):
+    positions = np.zeros(len(mesh_data.vertices) * 3)
+    mesh_data.vertices.foreach_get("co", positions)
+    positions = positions.reshape((-1, 3)) @ z_up_to_y_up
+    return positions
+
+
+def export_vertex_indices(mesh_data):
+    vertex_indices = np.zeros(len(mesh_data.loops), dtype=np.uint32)
+    mesh_data.loops.foreach_get("vertex_index", vertex_indices)
+    return vertex_indices
+
+
+def export_normals(mesh_data, z_up_to_y_up, vertex_indices):
+    # Normals are stored per loop instead of per vertex.
+    loop_normals = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
+    mesh_data.loops.foreach_get("normal", loop_normals)
+    loop_normals = loop_normals.reshape((-1, 3))
+
+    normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
+    normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
+    return normals
+
+
+def export_tangents(mesh_data, z_up_to_y_up, vertex_indices):
+    # Tangents are stored per loop instead of per vertex.
+    loop_tangents = np.zeros(len(mesh_data.loops) * 3, dtype=np.float32)
+    try:
+        # TODO: Why do some meshes not have UVs for Pyra?
+        mesh_data.calc_tangents()
+        mesh_data.loops.foreach_get("tangent", loop_tangents)
+    except:
+        pass
+
+    loop_bitangent_signs = np.zeros(len(mesh_data.loops), dtype=np.float32)
+    mesh_data.loops.foreach_get("bitangent_sign", loop_bitangent_signs)
+
+    tangents = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
+    tangents[:, :3][vertex_indices] = loop_tangents.reshape((-1, 3)) @ z_up_to_y_up
+    tangents[:, 3][vertex_indices] = loop_bitangent_signs
+    return tangents
+
+
+def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute):
     ty = xc3_model_py.vertex.AttributeType.VertexColor
     if color_attribute.name == "VertexColor":
         ty = xc3_model_py.vertex.AttributeType.VertexColor
@@ -588,7 +608,7 @@ def export_color_attribute(
 
         # TODO: error for unsupported data_type.
     if color_attribute.domain == "POINT":
-        colors = np.zeros(vertex_count * 4)
+        colors = np.zeros(len(mesh_data.vertices) * 4)
         color_attribute.data.foreach_get("color", colors)
     elif color_attribute.domain == "CORNER":
         loop_colors = np.zeros(len(mesh_data.loops) * 4)
