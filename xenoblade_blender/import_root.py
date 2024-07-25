@@ -728,7 +728,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     ):
         # TODO: multiply by gMatCol instead?
         # TODO: more accurate gamma handling
-        mix_ao.inputs[6].default_value = [c**2.2 for c in material.parameters.mat_color]
+        mix_ao.inputs[6].default_value = [c**2.2 for c in material.color]
     else:
         links.new(base_color.outputs["Color"], mix_ao.inputs[6])
 
