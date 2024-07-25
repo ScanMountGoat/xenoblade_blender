@@ -67,6 +67,12 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         default=False,
     )
 
+    import_outlines: BoolProperty(
+        name="Import Outlines",
+        description="Import data required to render and export outline meshes",
+        default=True,
+    )
+
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
         log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
@@ -86,6 +92,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
                 self.pack_images,
                 image_folder,
                 self.import_all_meshes,
+                self.import_outlines,
             )
         return {"FINISHED"}
 
@@ -97,6 +104,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         pack_images: bool,
         image_folder: str,
         import_all_meshes: bool,
+        import_outlines: bool,
     ):
         start = time.time()
 
@@ -114,7 +122,13 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         )
         armature = import_armature(context, root, model_name)
         import_model_root(
-            self, root, blender_images, armature, import_all_meshes, flip_uvs=True
+            self,
+            root,
+            blender_images,
+            armature,
+            import_all_meshes,
+            import_outlines,
+            flip_uvs=True,
         )
 
         # Store the path to make exporting easier later.

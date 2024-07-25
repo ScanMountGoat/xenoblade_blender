@@ -92,7 +92,13 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         )
         armature = import_armature(context, root, model_name)
         import_model_root(
-            self, root, blender_images, armature, import_all_meshes=True, flip_uvs=False
+            self,
+            root,
+            blender_images,
+            armature,
+            import_all_meshes=True,
+            import_outlines=True,
+            flip_uvs=False,
         )
 
         end = time.time()

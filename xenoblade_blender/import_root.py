@@ -211,7 +211,13 @@ def import_map_root(
 
 
 def import_model_root(
-    operator, root, blender_images, root_obj, import_all_meshes: bool, flip_uvs: bool
+    operator,
+    root,
+    blender_images,
+    root_obj,
+    import_all_meshes: bool,
+    import_outlines: bool,
+    flip_uvs: bool,
 ):
     base_lods = None
     if root.models.lod_data is not None:
@@ -253,6 +259,7 @@ def import_model_root(
                 material.name,
                 flip_uvs,
                 i,
+                import_outlines,
             )
 
 
@@ -267,6 +274,7 @@ def import_mesh(
     material_name: str,
     flip_uvs: bool,
     i: int,
+    import_outlines: bool,
 ):
     blender_mesh = bpy.data.meshes.new(f"{i}.{material_name}")
 
@@ -406,8 +414,7 @@ def import_mesh(
             obj,
         )
 
-    # TODO: Add an option to enable/disable outlines on import.
-    if vertex_buffer.outline_buffer_index is not None:
+    if import_outlines and vertex_buffer.outline_buffer_index is not None:
         # TODO: Outline attributes for color and vertex group for thickness.
         # TODO: Find and use the original outline material if present.
         # TODO: Update the shader database to properly support outline materials.
