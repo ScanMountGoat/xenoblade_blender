@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.11.0 - 2024-07-26
 ### Added
 * Added support for outline rendering using the solidify modifier.
 * Added support for exporting outline data for wimdo exports.
@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where models would fail to import if they exceeded Blender's limit of 8 UVs. UVs past the limit will be skipped.
+* Fixed an issue where some wimdo models would not export properly due to incorrectly saving skeleton data.
 
 ## 0.10.0 - 2024-07-02
 ### Added
