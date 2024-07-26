@@ -189,6 +189,7 @@ def import_map_root(
                         material.name,
                         flip_uvs,
                         i,
+                        import_outlines=True
                     )
 
                 # Instances technically apply to the entire model.
