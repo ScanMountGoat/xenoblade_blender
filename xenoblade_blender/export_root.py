@@ -749,6 +749,7 @@ def copy_material(material):
         material.flags,
         material.render_flags,
         material.state_flags,
+        material.color,
         textures,
         material.work_values,
         material.shader_vars,
