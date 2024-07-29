@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Fixed
 * Fixed an issue where exporting would fail if an image texture did not use the expected naming convention.
+* Fixed an issue where some models would not correctly generate outline meshes for all relevant meshes.
 
 ## 0.11.0 - 2024-07-26
 ### Added

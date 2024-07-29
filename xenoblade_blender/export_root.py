@@ -467,21 +467,21 @@ def export_mesh_inner(
 
     # TODO: report a warning if this fails.
     if has_outlines is not None and original_mesh_index is not None:
-        # Find the outline material for this material.
-        # Use the original index in case the name is new.
-        outline_material_index = None
-        for i, material in enumerate(root.models.materials):
-            # TODO: How to handle materials with the same name?
-            if material.name == root.models.materials[material_index].name + "_outline":
-                outline_material_index = i
-                break
+        original_mesh = original_meshes[original_mesh_index]
 
-        # Find the original outline mesh.
-        # TODO: Find a way to generate outline meshes instead.
+        # Find the original outline mesh and its outline material.
+        # TODO: Find a way to generate outline meshes and materials instead.
         original_outline_mesh = None
+        outline_material_index = None
         for i, mesh in enumerate(original_meshes):
-            if mesh.material_index == outline_material_index:
+            # Outlines use the same vertex data but a different material.
+            if (
+                mesh.vertex_buffer_index == original_mesh.vertex_buffer_index
+                and mesh.index_buffer_index == original_mesh.index_buffer_index
+                and original_materials[mesh.material_index].name.endswith("_outline")
+            ):
                 original_outline_mesh = mesh
+                outline_material_index = mesh.material_index
                 break
 
         if original_outline_mesh is not None and outline_material_index is not None:
@@ -503,11 +503,17 @@ def export_mesh_inner(
         # xc3_model will fill in missing required attributes with default values.
         # TODO: Raise an error if the color data is missing?
         # TODO: How to handle the alpha for outline width?
-        outline_attributes = [
-            xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Normal, normals
-            ),
-        ]
+        outline_attributes = []
+
+        # Buffers with morphs should omit the normals to work properly in game.
+        # The normals are already provided by the morph attributes.
+        if len(morph_targets) == 0:
+            outline_attributes.append(
+                xc3_model_py.vertex.AttributeData(
+                    xc3_model_py.vertex.AttributeType.Normal, normals
+                )
+            )
+
         for color_attribute in mesh_data.color_attributes:
             if color_attribute.name == "OutlineVertexColor":
                 attribute = export_color_attribute(
