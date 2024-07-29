@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Improved the error message when attempting to install the addon on an unsupported Blender version.
+
 ### Fixed
 * Fixed an issue where exporting would fail if an image texture did not use the expected naming convention.
 * Fixed an issue where some models would not correctly generate outline meshes for all relevant meshes.

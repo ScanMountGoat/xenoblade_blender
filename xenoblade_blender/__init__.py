@@ -55,6 +55,13 @@ classes = [
 
 
 def register():
+    if bpy.app.version < bl_info["blender"]:
+        current_version = ".".join(str(v) for v in bpy.app.version)
+        expected_version = ".".join(str(v) for v in bl_info["blender"])
+        raise ImportError(
+            f"Blender version {current_version} is incompatible. Use version {expected_version} or later."
+        )
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
