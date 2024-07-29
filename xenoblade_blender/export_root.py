@@ -77,7 +77,10 @@ def extract_index(name: str) -> Tuple[Optional[int], str]:
 def extract_image_index(name: str) -> Optional[int]:
     # model_name.index.image_name
     name_parts = name.split(".")
-    return parse_int(name_parts[1])
+    if len(name_parts) > 1:
+        return parse_int(name_parts[1])
+    else:
+        return None
 
 
 # Updated from the processing code written for Smash Ultimate:

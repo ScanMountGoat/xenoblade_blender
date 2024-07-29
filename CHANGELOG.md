@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where exporting would fail if an image texture did not use the expected naming convention.
+
 ## 0.11.0 - 2024-07-26
 ### Added
 * Added support for outline rendering using the solidify modifier.
