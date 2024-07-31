@@ -285,9 +285,10 @@ def export_mesh_inner(
     # Avoid messing up vertex weights by removing outline information.
     # This is safe since we're working on a copy of the original mesh.
     outline_vertex_group = blender_mesh.vertex_groups.get("OutlineThickness")
-    outline_alpha = np.zeros(positions.shape[0])
+    outline_alpha = None
     if outline_vertex_group is not None:
         # TODO: Is there a way to do this without looping?
+        outline_alpha = np.zeros(positions.shape[0])
         for i in range(positions.shape[0]):
             outline_alpha[i] = outline_vertex_group.weight(i)
 
@@ -535,7 +536,10 @@ def export_mesh_inner(
                     mesh_name, mesh_data, vertex_indices, color_attribute
                 )
                 # Get the outline thickness used by the solidify modifier.
-                attribute.data[:, 3] = outline_alpha
+                # Use imported vertex color alpha as a default.
+                if outline_alpha is not None:
+                    attribute.data[:, 3] = outline_alpha
+
                 outline_attributes.append(attribute)
 
         outline_buffer_index = len(root.buffers.outline_buffers)
