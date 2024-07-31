@@ -441,6 +441,9 @@ def import_mesh(
         modifier.material_offset = 1
         modifier.thickness = -0.0015
         modifier.vertex_group = "OutlineThickness"
+        # Prevent rendering issues with overlapping geoemtry.
+        # The in game shaders discard fragments with 0.0 outline alpha.
+        modifier.thickness_vertex_group = 0.0001
 
     # Attach the mesh to the armature or empty.
     # Assume the root_obj is an armature if there are weights.
