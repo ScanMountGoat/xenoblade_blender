@@ -221,6 +221,7 @@ def add_duplicate_uv_edges(edges_to_split, bm, uv_layer):
 
 def export_mesh(
     context: bpy.types.Context,
+    operator: bpy.types.Operator,
     root: xc3_model_py.ModelRoot,
     blender_mesh: bpy.types.Object,
     combined_weights: xc3_model_py.skinning.SkinWeights,
@@ -237,7 +238,7 @@ def export_mesh(
         process_export_mesh(context, mesh_copy)
 
         export_mesh_inner(
-            context,
+            operator,
             root,
             mesh_copy,
             blender_mesh.name,
@@ -253,7 +254,7 @@ def export_mesh(
 
 # TODO: Split this into more functions.
 def export_mesh_inner(
-    context: bpy.types.Context,
+    operator: bpy.types.Operator,
     root: xc3_model_py.ModelRoot,
     blender_mesh: bpy.types.Object,
     mesh_name: str,
@@ -477,7 +478,7 @@ def export_mesh_inner(
             break
 
     # TODO: report a warning if this fails.
-    if has_outlines is not None and original_mesh_index is not None:
+    if has_outlines and original_mesh_index is not None:
         original_mesh = original_meshes[original_mesh_index]
 
         # Find the original outline mesh and its outline material.
@@ -508,6 +509,9 @@ def export_mesh_inner(
                 base_mesh_index=mesh_index,
             )
             root.models.models[0].meshes.append(outline_mesh)
+        else:
+            message = f"Unable to find outline mesh for {mesh_name} in original wimdo to generate outlines"
+            operator.report({"WARNING"}, message)
 
     outline_buffer_index = None
     if has_outlines:

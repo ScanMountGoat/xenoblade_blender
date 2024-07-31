@@ -105,6 +105,7 @@ def export_wimdo(
     for object in sorted_objects:
         export_mesh(
             context,
+            operator,
             root,
             object,
             combined_weights,
