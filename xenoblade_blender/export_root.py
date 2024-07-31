@@ -281,6 +281,17 @@ def export_mesh_inner(
     normals = export_normals(mesh_data, z_up_to_y_up, vertex_indices)
     tangents = export_tangents(mesh_data, z_up_to_y_up, vertex_indices)
 
+    # Avoid messing up vertex weights by removing outline information.
+    # This is safe since we're working on a copy of the original mesh.
+    outline_vertex_group = blender_mesh.vertex_groups.get("OutlineThickness")
+    outline_alpha = np.zeros(positions.shape[0])
+    if outline_vertex_group is not None:
+        # TODO: Is there a way to do this without looping?
+        for i in range(positions.shape[0]):
+            outline_alpha[i] = outline_vertex_group.weight(i)
+
+        blender_mesh.vertex_groups.remove(outline_vertex_group)
+
     influences = export_influences(blender_mesh, mesh_data)
     weight_indices = combined_weights.add_influences(influences, positions.shape[0])
 
@@ -519,6 +530,8 @@ def export_mesh_inner(
                 attribute = export_color_attribute(
                     mesh_name, mesh_data, vertex_indices, color_attribute
                 )
+                # Get the outline thickness used by the solidify modifier.
+                attribute.data[:, 3] = outline_alpha
                 outline_attributes.append(attribute)
 
         outline_buffer_index = len(root.buffers.outline_buffers)

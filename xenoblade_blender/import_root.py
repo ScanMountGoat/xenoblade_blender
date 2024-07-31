@@ -351,6 +351,7 @@ def import_mesh(
         elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
             import_colors(blender_mesh, data, "Blend")
 
+    outline_vertex_colors = None
     if vertex_buffer.outline_buffer_index is not None:
         outline_buffer = buffers.outline_buffers[vertex_buffer.outline_buffer_index]
         for a in outline_buffer.attributes:
@@ -358,6 +359,7 @@ def import_mesh(
             if a.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
                 data = a.data[min_index : max_index + 1]
                 import_colors(blender_mesh, data, "OutlineVertexColor")
+                outline_vertex_colors = data
 
     blender_mesh.update()
 
@@ -416,6 +418,15 @@ def import_mesh(
         )
 
     if import_outlines and vertex_buffer.outline_buffer_index is not None:
+        # The vertex alpha controls the thickness.
+        # The solidify modifier can only use vertex groups.
+        # Vertex groups are also easier to paint and modify in Blender.
+        # TODO: Is there a faster way than setting weights per vertex?
+        group = obj.vertex_groups.new(name="OutlineThickness")
+        if outline_vertex_colors is not None:
+            for i in range(outline_vertex_colors.shape[0]):
+                group.add([i], outline_vertex_colors[i, 3], "REPLACE")
+
         # TODO: Outline attributes for color and vertex group for thickness.
         # TODO: Find and use the original outline material if present.
         # TODO: Update the shader database to properly support outline materials.
@@ -429,6 +440,7 @@ def import_mesh(
         modifier.use_flip_normals = True
         modifier.material_offset = 1
         modifier.thickness = -0.0015
+        modifier.vertex_group = "OutlineThickness"
 
     # Attach the mesh to the armature or empty.
     # Assume the root_obj is an armature if there are weights.
