@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where some camdo models would not correctly remap material texture assignments.
+* Fixed an issue where importing would fail if Pack Images was not checked.
 
 ## 0.11.1 - 2024-07-29
 ### Changed
