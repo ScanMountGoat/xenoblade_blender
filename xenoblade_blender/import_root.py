@@ -748,7 +748,16 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     else:
         links.new(base_color.outputs["Color"], mix_ao.inputs[6])
 
-    links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
+    if material.state_flags.blend_mode == xc3_model_py.BlendMode.Multiply:
+        # Workaround for Blender not supporting alpha blending modes.
+        transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
+        transparent_bsdf.location = (300, 100)
+        links.new(mix_ao.outputs["Result"], transparent_bsdf.inputs["Color"])
+        links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+
+        blender_material.blend_method = "BLEND"
+    else:
+        links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
 
     assign_normal_map(
         nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes

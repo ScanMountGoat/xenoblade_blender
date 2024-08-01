@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for multiplicative blending to generated materials.
+
 ### Changed
 * Changed solidify modifier to use the "OutlineThickness" vertex group for thickness.
 * Changed wimdo export to use the "OutlineThickness" vertex group for "OutlineVertexColor" alpha.
