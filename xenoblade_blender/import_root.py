@@ -366,7 +366,10 @@ def import_mesh(
     # The validate call may modify and reindex geometry.
     # Assign normals now that the mesh has been updated.
     for attribute in vertex_buffer.attributes:
-        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal:
+        if attribute.attribute_type in [
+            xc3_model_py.vertex.AttributeType.Normal,
+            xc3_model_py.vertex.AttributeType.Normal2,
+        ]:
             # We can't assume that the attribute data is normalized.
             data = attribute.data[min_index : max_index + 1, :3]
             normals = normalize(data)

@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Changed solidify modifier to use the "OutlineThickness" vertex group for thickness.
 * Changed wimdo export to use the "OutlineThickness" vertex group for "OutlineVertexColor" alpha.
 * Adjusted wimdo export to report warnings if outlines cannot be generated.
+* Improved accuracy of vertex data rebuilding.
 
 ### Fixed
 * Fixed an issue where some camdo models would not correctly remap material texture assignments.

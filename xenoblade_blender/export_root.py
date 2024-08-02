@@ -549,7 +549,8 @@ def export_mesh_inner(
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
         attributes, morph_blend_target, morph_targets, outline_buffer_index
     )
-    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices)
+    primitive_type = xc3_model_py.vertex.PrimitiveType.TriangleList
+    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices, primitive_type)
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
