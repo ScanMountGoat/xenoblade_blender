@@ -294,7 +294,9 @@ def export_mesh_inner(
 
         blender_mesh.vertex_groups.remove(outline_vertex_group)
 
-    influences = export_influences(blender_mesh, mesh_data)
+    influences = export_influences(
+        operator, blender_mesh, mesh_data, mesh_name, combined_weights.bone_names
+    )
     weight_indices = combined_weights.add_influences(influences, positions.shape[0])
 
     # Export all available vertex attributes.
@@ -556,7 +558,9 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
-def export_influences(blender_mesh, mesh_data):
+def export_influences(
+    operator, blender_mesh, mesh_data, mesh_name: str, bone_names: list[str]
+):
     # Export Weights
     # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
     # TODO: Does Blender not expose this directly?
@@ -574,7 +578,10 @@ def export_influences(blender_mesh, mesh_data):
 
     influences = []
     for name, weights in group_to_weights.values():
-        if len(weights) > 0:
+        if name != "OutlineThickness" and name not in bone_names:
+            message = f"Vertex group {name} for {mesh_name} is not in original skeleton and will be skipped."
+            operator.report({"WARNING"}, message)
+        elif len(weights) > 0:
             influence = xc3_model_py.skinning.Influence(name, weights)
             influences.append(influence)
 

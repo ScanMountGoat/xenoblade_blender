@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Adjusted wimdo export to report warnings if vertex groups are not part of the original skeleton.
+
 ## 0.12.0 - 2024-08-02
 ### Added
 * Added support for multiplicative blending to generated materials.
