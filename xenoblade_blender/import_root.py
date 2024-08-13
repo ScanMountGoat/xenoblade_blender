@@ -73,9 +73,8 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
     blender_images = []
 
     if pack:
-        for i, (image, decoded) in enumerate(
-            zip(root.image_textures, root.decode_images_rgbaf32())
-        ):
+        decoded_images = xc3_model_py.decode_images_rgbaf32(root.image_textures)
+        for i, (image, decoded) in enumerate(zip(root.image_textures, decoded_images)):
             # Use the same naming conventions as the saved PNG images and xc3_tex.
             if image.name is not None:
                 name = f"{model_name}.{i}.{image.name}"
@@ -817,6 +816,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
         # TODO: Toon and hair shaders always use specular color?
         # Xenoblade X models typically use specular but don't have a mat id value yet.
+        # TODO: use the material render flags instead for better accuracy.
         if mat_id in [2, 5] or mat_id is None:
             links.new(color.outputs["Color"], bsdf.inputs["Specular Tint"])
         else:
