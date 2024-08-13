@@ -20,6 +20,9 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Import any of the supported file types using the new menu options under File > Import.  
 Select the game version before importing for correct material texture assignments.
 
+## Updating
+Update the addon by reinstalling the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Windows users will need to disable the previous version of the addon, restart Blender, remove the addon, and then install the new version's zip file to properly upgrade. MacOS and Linux users can reinstall the addon without any additional steps.
+
 ## Building
 Clone the repository with `git clone https://github.com/ScanMountGoat/xenoblade_blender --recursive`. 
 
