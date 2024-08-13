@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added an option to replaces textures with assigned images from current scene for wimdo export.
+* Added an option to specify an image folder for replacing textures for wimdo export.
 
 ### Changed
 * Adjusted wimdo export to report warnings if vertex groups are not part of the original skeleton.

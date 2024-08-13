@@ -5,12 +5,19 @@ import logging
 import numpy as np
 from pathlib import Path
 import re
+import os
 
-from .export_root import ExportException, copy_material, export_mesh
+from .export_root import (
+    ExportException,
+    copy_material,
+    export_mesh,
+    extract_image_index,
+)
 
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ExportHelper
+from bpy_extras import image_utils
 from bpy.props import StringProperty, BoolProperty
 
 
@@ -41,15 +48,16 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
 
     export_images: BoolProperty(
         name="Export Images",
-        description="Replace images in the exported wimdo from the current scene",
+        description="Replace images in the exported wimdo from the Blender scene",
         default=False,
     )
 
     # TODO: Only show this if export images is checked
-    # image_folder: StringProperty(
-    #     name="Image Folder",
-    #     description="Use DDS or PNG images from this folder instead of packed scene textures. Has no effect if Export images is unchecked",
-    # )
+    image_folder: StringProperty(
+        name="Image Folder",
+        description="Use images from this folder instead of the Blender scene. Has no effect if Export images is unchecked",
+        default="",
+    )
 
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
@@ -64,6 +72,7 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
                 self.original_wimdo.strip('"'),
                 self.create_speff_meshes,
                 self.export_images,
+                self.image_folder,
             )
         except ExportException as e:
             self.report({"ERROR"}, str(e))
@@ -85,6 +94,7 @@ def export_wimdo(
     wimdo_path: str,
     create_speff_meshes: bool,
     export_images: bool,
+    image_folder: str,
 ):
     start = time.time()
 
@@ -155,7 +165,10 @@ def export_wimdo(
                 g.lod_count = 1
 
     if export_images:
-        export_packed_images(root, image_replacements)
+        if image_folder != "":
+            export_external_images(root, image_folder)
+        else:
+            export_internal_images(root, image_replacements)
 
     end = time.time()
     print(f"Create ModelRoot: {end - start}")
@@ -175,41 +188,85 @@ def export_wimdo(
     print(f"Export Files: {end - start}")
 
 
-def export_packed_images(root, image_replacements):
+def export_internal_images(root, image_replacements):
     # TODO: Support adding images
     # TODO: Check out of bounds indices.
     # TODO: Will this encode some images more than once?
     start = time.time()
+
     encode_image_args = []
     for i, image in image_replacements:
-        width, height = image.size
-        # Flip vertically to match in game.
-        image_data = np.zeros(width * height * 4, dtype=np.float32)
-        image.pixels.foreach_get(image_data)
-
-        image_data = np.flip(
-            image_data.reshape((width, height, 4)),
-            axis=0,
-        )
-
-        # TODO: How to speed this up?
-        args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
-            width,
-            height,
-            1,
-            xc3_model_py.ViewDimension.D2,
-            root.image_textures[i].image_format,
-            root.image_textures[i].mipmap_count > 1,
-            image_data.reshape(-1),
-            root.image_textures[i].name,
-            root.image_textures[i].usage,
-        )
+        image_texture = root.image_textures[i]
+        args = encode_args_from_image(image, image_texture)
         encode_image_args.append(args)
+
     end = time.time()
-    print(end - start)
+    print(f"Load images: {end - start}")
 
     # Encode images in parallel for better performance.
     image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
 
     for (i, _), image_texture in zip(image_replacements, image_textures):
+        root.image_textures[i] = image_texture
+
+
+def encode_args_from_image(image, image_texture):
+    width, height = image.size
+    # Flip vertically to match in game.
+    # TODO: How to speed this up?
+    image_data = np.zeros(width * height * 4, dtype=np.float32)
+    image.pixels.foreach_get(image_data)
+
+    image_data = np.flip(
+        image_data.reshape((width, height, 4)),
+        axis=0,
+    )
+
+    args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
+        width,
+        height,
+        1,
+        xc3_model_py.ViewDimension.D2,
+        image_texture.image_format,
+        image_texture.mipmap_count > 1,
+        image_data.reshape(-1),
+        image_texture.name,
+        image_texture.usage,
+    )
+
+    return args
+
+
+def export_external_images(root, image_folder: str):
+    # TODO: Support adding images
+    # TODO: Check out of bounds indices.
+    image_indices = []
+    encode_image_args = []
+    # TODO: Should DDS take priority over PNG?
+    start = time.time()
+    for name in os.listdir(image_folder):
+        path = os.path.join(image_folder, name)
+        # TODO: also extract the name
+        i = extract_image_index(path)
+        if i is not None:
+            # TODO: Create opaque wrapper types for image and dds?
+            if path.endswith(".dds"):
+                pass
+            else:
+                # Assume other file types are images.
+                image = image_utils.load_image(
+                    path, place_holder=True, check_existing=False
+                )
+                image_texture = root.image_textures[i]
+                args = encode_args_from_image(image, image_texture)
+                encode_image_args.append(args)
+                image_indices.append(i)
+
+    end = time.time()
+    print(f"Load images: {end - start}")
+
+    # Encode images in parallel for better performance.
+    image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
+
+    for i, image_texture in zip(image_indices, image_textures):
         root.image_textures[i] = image_texture
