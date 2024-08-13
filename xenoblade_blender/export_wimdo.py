@@ -1,3 +1,4 @@
+from typing import Tuple
 import bpy
 import time
 import logging
@@ -154,26 +155,7 @@ def export_wimdo(
                 g.lod_count = 1
 
     if export_images:
-        for i, image in image_replacements:
-            # TODO: Support adding images
-            if i < len(root.image_textures):
-                width, height = image.size
-                # Flip vertically to match in game.
-                image_data = np.flip(
-                    np.array(image.pixels).reshape((width, height, 4)), axis=0
-                )
-
-                root.image_textures[i] = xc3_model_py.ImageTexture.encode_image_rgbaf32(
-                    width,
-                    height,
-                    1,
-                    xc3_model_py.ViewDimension.D2,
-                    root.image_textures[i].image_format,
-                    root.image_textures[i].mipmap_count > 1,
-                    image_data.reshape(-1),
-                    root.image_textures[i].name,
-                    root.image_textures[i].usage,
-                )
+        export_packed_images(root, image_replacements)
 
     end = time.time()
     print(f"Create ModelRoot: {end - start}")
@@ -191,3 +173,43 @@ def export_wimdo(
 
     end = time.time()
     print(f"Export Files: {end - start}")
+
+
+def export_packed_images(root, image_replacements):
+    # TODO: Support adding images
+    # TODO: Check out of bounds indices.
+    # TODO: Will this encode some images more than once?
+    start = time.time()
+    encode_image_args = []
+    for i, image in image_replacements:
+        width, height = image.size
+        # Flip vertically to match in game.
+        image_data = np.zeros(width * height * 4, dtype=np.float32)
+        image.pixels.foreach_get(image_data)
+
+        image_data = np.flip(
+            image_data.reshape((width, height, 4)),
+            axis=0,
+        )
+
+        # TODO: How to speed this up?
+        args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
+            width,
+            height,
+            1,
+            xc3_model_py.ViewDimension.D2,
+            root.image_textures[i].image_format,
+            root.image_textures[i].mipmap_count > 1,
+            image_data.reshape(-1),
+            root.image_textures[i].name,
+            root.image_textures[i].usage,
+        )
+        encode_image_args.append(args)
+    end = time.time()
+    print(end - start)
+
+    # Encode images in parallel for better performance.
+    image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
+
+    for (i, _), image_texture in zip(image_replacements, image_textures):
+        root.image_textures[i] = image_texture
