@@ -38,6 +38,18 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
         default=True,
     )
 
+    export_images: BoolProperty(
+        name="Export Images",
+        description="Replace images in the exported wimdo from the current scene",
+        default=False,
+    )
+
+    # TODO: Only show this if export images is checked
+    # image_folder: StringProperty(
+    #     name="Image Folder",
+    #     description="Use DDS or PNG images from this folder instead of packed scene textures. Has no effect if Export images is unchecked",
+    # )
+
     def execute(self, context: bpy.types.Context):
         # Log any errors from Rust.
         log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
@@ -50,6 +62,7 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
                 self.filepath,
                 self.original_wimdo.strip('"'),
                 self.create_speff_meshes,
+                self.export_images,
             )
         except ExportException as e:
             self.report({"ERROR"}, str(e))
@@ -70,6 +83,7 @@ def export_wimdo(
     output_wimdo_path: str,
     wimdo_path: str,
     create_speff_meshes: bool,
+    export_images: bool,
 ):
     start = time.time()
 
@@ -99,6 +113,8 @@ def export_wimdo(
         np.array([]), np.array([]), bone_names
     )
 
+    image_replacements = set()
+
     # Use a consistent ordering since Blender collections don't have one.
     sorted_objects = [o for o in armature.children]
     sorted_objects.sort(key=lambda o: name_sort_index(o.name))
@@ -113,6 +129,7 @@ def export_wimdo(
             original_materials,
             morph_names,
             create_speff_meshes,
+            image_replacements,
         )
 
     # The vertex shaders have a limited SSBO size for preskinned transform matrices.
@@ -135,6 +152,28 @@ def export_wimdo(
         ):
             for g in lod_data.groups:
                 g.lod_count = 1
+
+    if export_images:
+        for i, image in image_replacements:
+            # TODO: Support adding images
+            if i < len(root.image_textures):
+                width, height = image.size
+                # Flip vertically to match in game.
+                image_data = np.flip(
+                    np.array(image.pixels).reshape((width, height, 4)), axis=0
+                )
+
+                root.image_textures[i] = xc3_model_py.ImageTexture.encode_image_rgbaf32(
+                    width,
+                    height,
+                    1,
+                    xc3_model_py.ViewDimension.D2,
+                    root.image_textures[i].image_format,
+                    root.image_textures[i].mipmap_count > 1,
+                    image_data.reshape(-1),
+                    root.image_textures[i].name,
+                    root.image_textures[i].usage,
+                )
 
     end = time.time()
     print(f"Create ModelRoot: {end - start}")

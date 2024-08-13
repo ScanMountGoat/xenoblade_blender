@@ -229,6 +229,7 @@ def export_mesh(
     original_materials,
     morph_names: list[str],
     create_speff_meshes: bool,
+    image_replacements: set,
 ):
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
@@ -247,6 +248,7 @@ def export_mesh(
             original_materials,
             morph_names,
             create_speff_meshes,
+            image_replacements,
         )
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
@@ -263,6 +265,7 @@ def export_mesh_inner(
     original_materials,
     morph_names: list[str],
     create_speff_meshes: bool,
+    image_replacements: set,
 ):
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
@@ -421,6 +424,9 @@ def export_mesh_inner(
         apply_texture_indices(
             root.models.materials[material_index], material_texture_indices
         )
+
+    for i, image in material_texture_indices.values():
+        image_replacements.add((i, image))
 
     mesh = xc3_model_py.Mesh(
         vertex_buffer_index,
@@ -700,11 +706,12 @@ def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
 
 def apply_texture_indices(material, indices):
     for texture in material.textures:
-        image_index = indices.get(texture.image_texture_index)
+        image_index, _ = indices.get(texture.image_texture_index)
         if image_index is not None:
             texture.image_texture_index = image_index
 
 
+# TODO: also get the images themselves
 def get_texture_assignments(mesh_data, material):
     old_to_new_index = {}
     # TODO: error if there are no nodes or not enough textures?
@@ -718,7 +725,8 @@ def get_texture_assignments(mesh_data, material):
         image_index = extract_image_index(node.image.name)
         if texture_index is not None and image_index is not None:
             old_to_new_index[material.textures[texture_index].image_texture_index] = (
-                image_index
+                image_index,
+                node.image,
             )
 
     return old_to_new_index
@@ -762,7 +770,6 @@ def export_shape_keys(
             vertex_indices = np.where(
                 ~np.all(np.isclose(position_deltas, 0, atol=1e-6), axis=1)
             )[0]
-            print(vertex_indices.shape)
 
             target = xc3_model_py.vertex.MorphTarget(
                 morph_controller_index,
