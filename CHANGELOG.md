@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 * Adjusted wimdo export to report warnings if vertex groups are not part of the original skeleton.
 * Improved texture alpha assignment accuracy for generated materials.
+* Improved accuracy of vertex data rebuilding.
 
 ### Fixed
 * Fixed an issue where packed images would import without alpha channels.
