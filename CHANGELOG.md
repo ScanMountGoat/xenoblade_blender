@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 * Adjusted wimdo export to report warnings if vertex groups are not part of the original skeleton.
 
+### Fixed
+* Fixed an issue where packed images would import without alpha channels.
+
 ## 0.12.0 - 2024-08-02
 ### Added
 * Added support for multiplicative blending to generated materials.

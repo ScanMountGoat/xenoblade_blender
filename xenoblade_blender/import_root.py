@@ -81,7 +81,9 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
             else:
                 name = f"{model_name}.{i}"
 
-            blender_image = bpy.data.images.new(name, image.width, image.height)
+            blender_image = bpy.data.images.new(
+                name, image.width, image.height, alpha=True
+            )
 
             # TODO: why is this necessary?
             decoded_size = image.width * image.height * 4
