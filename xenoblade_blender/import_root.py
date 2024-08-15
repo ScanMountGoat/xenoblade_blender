@@ -724,7 +724,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         base_color.inputs["Blue"],
         is_data=False,
     )
-    
+
     if material.state_flags.blend_mode not in [
         xc3_model_py.BlendMode.Disabled,
         xc3_model_py.BlendMode.Disabled2,
