@@ -55,7 +55,7 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
     # TODO: Only show this if export images is checked
     image_folder: StringProperty(
         name="Image Folder",
-        description="Use images from this folder instead of the Blender scene. Has no effect if Export images is unchecked",
+        description="Use images from this folder instead of the Blender scene. Has no effect if Export Images is unchecked",
         default="",
     )
 
@@ -242,6 +242,7 @@ def export_external_images(root, image_folder: str):
     # TODO: Check out of bounds indices.
     image_indices = []
     encode_image_args = []
+    dds_images = []
     # TODO: Should DDS take priority over PNG?
     start = time.time()
     for name in os.listdir(image_folder):
@@ -249,9 +250,9 @@ def export_external_images(root, image_folder: str):
         # TODO: also extract the name
         i = extract_image_index(path)
         if i is not None:
-            # TODO: Create opaque wrapper types for image and dds?
             if path.endswith(".dds"):
-                pass
+                dds = xc3_model_py.Dds.from_file(path)
+                dds_images.append((i, dds))
             else:
                 # Assume other file types are images.
                 image = image_utils.load_image(
@@ -268,5 +269,14 @@ def export_external_images(root, image_folder: str):
     # Encode images in parallel for better performance.
     image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
 
+    # TODO: Avoid replacing a texture more than once.
     for i, image_texture in zip(image_indices, image_textures):
-        root.image_textures[i] = image_texture
+        if i < len(root.image_textures):
+            root.image_textures[i] = image_texture
+
+    for i, dds in dds_images:
+        if i < len(root.image_textures):
+            image_texture = root.image_textures[i]
+            root.image_textures[i] = xc3_model_py.ImageTexture.from_dds(
+                dds, image_texture.name, image_texture.usage
+            )
