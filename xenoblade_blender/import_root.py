@@ -724,6 +724,15 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         base_color.inputs["Blue"],
         is_data=False,
     )
+    assign_channel(
+        assignments[0].w,
+        "w",
+        links,
+        texture_nodes,
+        vertex_color_nodes,
+        bsdf.inputs["Alpha"],
+        is_data=False,
+    )
 
     mix_ao = nodes.new("ShaderNodeMix")
     mix_ao.data_type = "RGBA"
