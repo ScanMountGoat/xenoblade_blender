@@ -377,7 +377,7 @@ def import_mesh(
     for attribute in vertex_buffer.morph_blend_target:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal4:
             # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1, :3] * 2.0 - 1.0
+            data = attribute.data[min_index : max_index + 1, :3]
             normals = normalize(data)
             blender_mesh.normals_split_custom_set_from_vertices(normals)
 

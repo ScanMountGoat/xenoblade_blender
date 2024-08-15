@@ -344,13 +344,13 @@ def export_mesh_inner(
                 xc3_model_py.vertex.AttributeType.Position2, positions
             ),
             xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Normal4, normals * 0.5 + 0.5
+                xc3_model_py.vertex.AttributeType.Normal4, normals
             ),
             xc3_model_py.vertex.AttributeData(
                 xc3_model_py.vertex.AttributeType.OldPosition, positions
             ),
             xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Tangent2, tangents * 0.5 + 0.5
+                xc3_model_py.vertex.AttributeType.Tangent2, tangents
             ),
         ]
 
