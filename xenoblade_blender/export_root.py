@@ -706,8 +706,9 @@ def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
 
 def apply_texture_indices(material, indices):
     for texture in material.textures:
-        image_index, _ = indices.get(texture.image_texture_index)
-        if image_index is not None:
+        image_index_image = indices.get(texture.image_texture_index)
+        if image_index_image is not None:
+            image_index, _ = image_index_image
             texture.image_texture_index = image_index
 
 
