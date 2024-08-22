@@ -610,8 +610,11 @@ def import_weight_groups(
 
 def import_material(name: str, material, blender_images, image_textures, samplers):
     blender_material = bpy.data.materials.new(name)
-    blender_material.use_nodes = True
 
+    # Add some custom properties to make debugging easier.
+    blender_material["technique_index"] = material.technique_index
+
+    blender_material.use_nodes = True
     nodes = blender_material.node_tree.nodes
     links = blender_material.node_tree.links
 
@@ -875,19 +878,24 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     return blender_material
 
 
+def create_node_group(nodes, name: str, create_node_tree):
+    # Cache the node group creation.
+    node_tree = bpy.data.node_groups.get(name)
+    if node_tree is None:
+        node_tree = create_node_tree()
+
+    group = nodes.new("ShaderNodeGroup")
+    group.node_tree = node_tree
+    return group
+
+
 def assign_normal_map(
     nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
 ):
     if assignments[2].x is None and assignments[2].y is None:
         return
 
-    # Cache the node group creation.
-    node_tree = bpy.data.node_groups.get("NormalsXY")
-    if node_tree is None:
-        node_tree = normals_xy_node_group()
-
-    group = nodes.new("ShaderNodeGroup")
-    group.node_tree = node_tree
+    group = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
     group.location = (-200, -200)
 
     group.inputs["X"].default_value = 0.5
@@ -910,7 +918,18 @@ def assign_normal_map(
         group.inputs["Y"],
     )
 
-    links.new(group.outputs["Normal"], bsdf.inputs["Normal"])
+    remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.location = (-100, -500)
+    remap_normals.operation = "MULTIPLY_ADD"
+    links.new(group.outputs["Normal"], remap_normals.inputs[0])
+    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
+    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
+
+    normal_map = nodes.new("ShaderNodeNormalMap")
+    normal_map.location = (100, -500)
+    links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
+
+    links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
 
 
 def normals_xy_node_group():
@@ -932,43 +951,138 @@ def normals_xy_node_group():
         in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
     )
 
-    # TODO: Group these nodes in a node group?
+    remap_x = nodes.new("ShaderNodeMath")
+    remap_x.location = (-1200, 100)
+    remap_x.operation = "MULTIPLY_ADD"
+    links.new(input_node.outputs["X"], remap_x.inputs[0])
+    remap_x.inputs[1].default_value = 2.0
+    remap_x.inputs[2].default_value = -1.0
+
+    remap_y = nodes.new("ShaderNodeMath")
+    remap_y.location = (-1200, -100)
+    remap_y.operation = "MULTIPLY_ADD"
+    links.new(input_node.outputs["Y"], remap_y.inputs[0])
+    remap_y.inputs[1].default_value = 2.0
+    remap_y.inputs[2].default_value = -1.0
+
     normal_xy = nodes.new("ShaderNodeCombineXYZ")
-    normal_xy.location = (-1200, 0)
-    links.new(input_node.outputs["X"], normal_xy.inputs["X"])
-    links.new(input_node.outputs["Y"], normal_xy.inputs["Y"])
+    normal_xy.location = (-1000, 0)
+    links.new(remap_x.outputs["Value"], normal_xy.inputs["X"])
+    links.new(remap_y.outputs["Value"], normal_xy.inputs["Y"])
     normal_xy.inputs["Z"].default_value = 0.0
 
     length2 = nodes.new("ShaderNodeVectorMath")
-    length2.location = (-1000, 0)
+    length2.location = (-800, 0)
     length2.operation = "DOT_PRODUCT"
     links.new(normal_xy.outputs["Vector"], length2.inputs[0])
     links.new(normal_xy.outputs["Vector"], length2.inputs[1])
 
     one_minus_length = nodes.new("ShaderNodeMath")
-    one_minus_length.location = (-800, 0)
+    one_minus_length.location = (-600, 0)
     one_minus_length.operation = "SUBTRACT"
     one_minus_length.inputs[0].default_value = 1.0
     links.new(length2.outputs["Value"], one_minus_length.inputs[1])
 
     length = nodes.new("ShaderNodeMath")
-    length.location = (-600, 0)
+    length.location = (-400, 0)
     length.operation = "SQRT"
     links.new(one_minus_length.outputs["Value"], length.inputs[0])
 
     normal_xyz = nodes.new("ShaderNodeCombineXYZ")
-    normal_xyz.location = (-400, 0)
-    links.new(input_node.outputs["X"], normal_xyz.inputs["X"])
-    links.new(input_node.outputs["Y"], normal_xyz.inputs["Y"])
+    normal_xyz.location = (-200, 0)
+    links.new(remap_x.outputs["Value"], normal_xyz.inputs["X"])
+    links.new(remap_y.outputs["Value"], normal_xyz.inputs["Y"])
     links.new(length.outputs["Value"], normal_xyz.inputs["Z"])
-
-    normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.location = (-200, 0)
-    links.new(normal_xyz.outputs["Vector"], normal_map.inputs["Color"])
 
     output_node = nodes.new("NodeGroupOutput")
     output_node.location = (0, 0)
-    links.new(normal_map.outputs["Normal"], output_node.inputs["Normal"])
+    links.new(normal_xyz.outputs["Vector"], output_node.inputs["Normal"])
+
+    return node_tree
+
+
+def add_normals_node_group():
+    node_tree = bpy.data.node_groups.new("AddNormals", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Normal"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    input_node.location = (-1700, 0)
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="N1"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="N2"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+
+    t = nodes.new("ShaderNodeVectorMath")
+    t.location = (-1500, 0)
+    t.operation = "ADD"
+    t.inputs[1].default_value = (0.0, 0.0, 1.0)
+    links.new(input_node.outputs["N1"], t.inputs[0])
+
+    u = nodes.new("ShaderNodeVectorMath")
+    u.location = (-1500, -200)
+    u.operation = "MULTIPLY"
+    u.inputs[1].default_value = (-1.0, -1.0, 1.0)
+    links.new(input_node.outputs["N2"], u.inputs[0])
+
+    dot_t_u = nodes.new("ShaderNodeVectorMath")
+    dot_t_u.location = (-1200, 0)
+    dot_t_u.operation = "DOT_PRODUCT"
+    links.new(t.outputs["Vector"], dot_t_u.inputs[0])
+    links.new(u.outputs["Vector"], dot_t_u.inputs[1])
+
+    t_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    t_xyz.location = (-1200, -200)
+    links.new(t.outputs["Vector"], t_xyz.inputs["Vector"])
+
+    multiply_t = nodes.new("ShaderNodeVectorMath")
+    multiply_t.location = (-1000, 0)
+    multiply_t.operation = "MULTIPLY"
+    links.new(dot_t_u.outputs["Value"], multiply_t.inputs[0])
+    links.new(t.outputs["Vector"], multiply_t.inputs[1])
+
+    multiply_u = nodes.new("ShaderNodeVectorMath")
+    multiply_u.location = (-1000, -200)
+    multiply_u.operation = "MULTIPLY"
+    links.new(u.outputs["Vector"], multiply_u.inputs[0])
+    links.new(t_xyz.outputs["Z"], multiply_u.inputs[1])
+
+    r = nodes.new("ShaderNodeVectorMath")
+    r.location = (-800, -200)
+    r.operation = "SUBTRACT"
+    links.new(multiply_t.outputs["Vector"], r.inputs[0])
+    links.new(multiply_u.outputs["Vector"], r.inputs[1])
+
+    normalize_r = nodes.new("ShaderNodeVectorMath")
+    normalize_r.location = (-600, -200)
+    normalize_r.operation = "NORMALIZE"
+    links.new(r.outputs["Vector"], normalize_r.inputs[0])
+
+    mix = nodes.new("ShaderNodeMix")
+    mix.location = (-400, 0)
+    mix.data_type = "VECTOR"
+    links.new(input_node.outputs["Factor"], mix.inputs["Factor"])
+    links.new(input_node.outputs["N1"], mix.inputs[4])
+    links.new(normalize_r.outputs["Vector"], mix.inputs[5])
+
+    normalize_result = nodes.new("ShaderNodeVectorMath")
+    normalize_result.location = (-200, 0)
+    normalize_result.operation = "NORMALIZE"
+    links.new(mix.outputs["Result"], normalize_result.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    output_node.location = (0, 0)
+    links.new(normalize_result.outputs["Vector"], output_node.inputs["Normal"])
 
     return node_tree
 
