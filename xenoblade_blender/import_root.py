@@ -780,8 +780,15 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     else:
         links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
 
+    normal_layers = material.normal_layers()
     assign_normal_map(
-        nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
+        nodes,
+        links,
+        bsdf,
+        assignments,
+        texture_nodes,
+        vertex_color_nodes,
+        normal_layers,
     )
 
     assign_channel(
@@ -890,16 +897,21 @@ def create_node_group(nodes, name: str, create_node_tree):
 
 
 def assign_normal_map(
-    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
+    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes, normal_layers
 ):
     if assignments[2].x is None and assignments[2].y is None:
         return
 
-    group = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
-    group.location = (-200, -200)
+    normals_x = -200
+    normals_y = -800
 
-    group.inputs["X"].default_value = 0.5
-    group.inputs["Y"].default_value = 0.5
+    base_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    base_normals.location = (-200, normals_y)
+    normals_x += 200
+    normals_y -= 200
+
+    base_normals.inputs["X"].default_value = 0.5
+    base_normals.inputs["Y"].default_value = 0.5
 
     assign_channel(
         assignments[2].x,
@@ -907,7 +919,7 @@ def assign_normal_map(
         links,
         texture_nodes,
         vertex_color_nodes,
-        group.inputs["X"],
+        base_normals.inputs["X"],
     )
     assign_channel(
         assignments[2].y,
@@ -915,18 +927,78 @@ def assign_normal_map(
         links,
         texture_nodes,
         vertex_color_nodes,
-        group.inputs["Y"],
+        base_normals.inputs["Y"],
     )
 
+    texture_assignments = None
+    if assignments[2].x is not None:
+        texture_assignments = assignments[2].x.textures()
+
+    # TODO: move more of this logic to xc3_model_py?
+    # TODO: Store layers in output assignments instead?
+    # The first layer is just the base layer.
+    final_normals = base_normals
+    if len(normal_layers) > 1 and texture_assignments is not None:
+        for layer in normal_layers[1:]:
+            if layer.ratio is not None:
+                add_group = create_node_group(
+                    nodes, "AddNormals", add_normals_node_group
+                )
+                add_group.location = (normals_x, -800)
+                normals_x += 200
+
+                # Find the assignment since this isn't part of the layer.
+                # Assume the assignments are already sorted by layer.
+                n2_assignment_x = None
+                n2_assignment_y = None
+                for a in texture_assignments:
+                    if a.name == layer.name:
+                        if a.channels == "x":
+                            n2_assignment_x = a
+                        elif a.channels == "y":
+                            n2_assignment_y = a
+
+                n2_normals = create_node_group(
+                    nodes, "NormalsXY", normals_xy_node_group
+                )
+                n2_normals.inputs["X"].default_value = 0.5
+                n2_normals.inputs["Y"].default_value = 0.5
+                n2_normals.location = (-200, normals_y)
+                normals_y -= -200
+
+                assign_texture_channel(
+                    n2_assignment_x, links, texture_nodes, n2_normals.inputs["X"]
+                )
+                assign_texture_channel(
+                    n2_assignment_y, links, texture_nodes, n2_normals.inputs["Y"]
+                )
+
+                links.new(n2_normals.outputs["Normal"], add_group.inputs["N2"])
+                assign_channel(
+                    layer.ratio,
+                    "x" if layer.channel is None else layer.channel,
+                    links,
+                    texture_nodes,
+                    vertex_color_nodes,
+                    add_group.inputs["Factor"],
+                )
+
+                # Connect each add group to the next.
+                # This works since everything has a "Normal" output.
+                links.new(final_normals.outputs["Normal"], add_group.inputs["N1"])
+                final_normals = add_group
+
+
     remap_normals = nodes.new("ShaderNodeVectorMath")
-    remap_normals.location = (-100, -500)
+    remap_normals.location = (normals_x, -800)
+    normals_x += 200
     remap_normals.operation = "MULTIPLY_ADD"
-    links.new(group.outputs["Normal"], remap_normals.inputs[0])
+    links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
     remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
     remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
 
     normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.location = (100, -500)
+    normal_map.location = (normals_x, -800)
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
@@ -1133,46 +1205,56 @@ def assign_channel(
                     texture_assignment = assignment
                     break
 
-            channel_index = "xyzw".index(texture_assignment.channels)
-            input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
+            assign_texture_channel(
+                texture_assignment, links, texture_nodes, output, is_data
+            )
 
-            # Only handle sampler uniforms for material textures for now.
-            sampler_to_index = {f"s{i}": i for i in range(10)}
-            texture_index = sampler_to_index.get(texture_assignment.name)
-            if texture_index is not None:
-                try:
-                    # TODO: Find a better way to handle color management.
-                    # TODO: Why can't we just set everything to non color?
-                    # TODO: This won't work if users have different color spaces installed like aces.
-                    if is_data:
-                        textures[texture_index].image.colorspace_settings.name = (
-                            "Non-Color"
-                        )
-                    else:
-                        textures[texture_index].image.colorspace_settings.name = "sRGB"
 
-                    # Alpha isn't part of the RGB node.
-                    if input_channel == "Alpha":
-                        input = textures[texture_index].outputs["Alpha"]
-                    else:
-                        input = textures_rgb[texture_index].outputs[input_channel]
+def assign_texture_channel(
+    texture_assignment,
+    links,
+    texture_nodes,
+    output,
+    is_data=True,
+):
+    textures, textures_rgb, textures_scale, textures_uv = texture_nodes
 
-                    links.new(input, output)
+    channel_index = "xyzw".index(texture_assignment.channels)
+    input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
 
-                    for i in range(9):
-                        if texture_assignment.texcoord_name == f"vTex{i}":
-                            textures_uv[texture_index].uv_map = f"TexCoord{i}"
+    # Only handle sampler uniforms for material textures for now.
+    sampler_to_index = {f"s{i}": i for i in range(10)}
+    texture_index = sampler_to_index.get(texture_assignment.name)
+    if texture_index is not None:
+        try:
+            # TODO: Find a better way to handle color management.
+            # TODO: Why can't we just set everything to non color?
+            # TODO: This won't work if users have different color spaces installed like aces.
+            if is_data:
+                textures[texture_index].image.colorspace_settings.name = "Non-Color"
+            else:
+                textures[texture_index].image.colorspace_settings.name = "sRGB"
+
+                # Alpha isn't part of the RGB node.
+            if input_channel == "Alpha":
+                input = textures[texture_index].outputs["Alpha"]
+            else:
+                input = textures_rgb[texture_index].outputs[input_channel]
+
+            links.new(input, output)
+
+            for i in range(9):
+                if texture_assignment.texcoord_name == f"vTex{i}":
+                    textures_uv[texture_index].uv_map = f"TexCoord{i}"
 
                     # TODO: Create a node group for the mat2x4 transform (two dot products).
-                    if texture_assignment.texcoord_transforms is not None:
-                        transform_u, transform_v = (
-                            texture_assignment.texcoord_transforms
-                        )
-                        textures_scale[texture_index].inputs[1].default_value = (
-                            transform_u[0],
-                            transform_v[1],
-                            1.0,
-                        )
-                except IndexError:
-                    # TODO: Better error checking.
-                    print(f"Texture index {texture_index} out of range")
+            if texture_assignment.texcoord_transforms is not None:
+                transform_u, transform_v = texture_assignment.texcoord_transforms
+                textures_scale[texture_index].inputs[1].default_value = (
+                    transform_u[0],
+                    transform_v[1],
+                    1.0,
+                )
+        except IndexError:
+            # TODO: Better error checking.
+            print(f"Texture index {texture_index} out of range")
