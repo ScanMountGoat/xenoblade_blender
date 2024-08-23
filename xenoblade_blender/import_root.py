@@ -780,7 +780,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     else:
         links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
 
-    normal_layers = material.normal_layers()
     assign_normal_map(
         nodes,
         links,
@@ -788,7 +787,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         assignments,
         texture_nodes,
         vertex_color_nodes,
-        normal_layers,
     )
 
     assign_channel(
@@ -897,7 +895,7 @@ def create_node_group(nodes, name: str, create_node_tree):
 
 
 def assign_normal_map(
-    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes, normal_layers
+    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
 ):
     if assignments[2].x is None and assignments[2].y is None:
         return
@@ -930,64 +928,51 @@ def assign_normal_map(
         base_normals.inputs["Y"],
     )
 
-    texture_assignments = None
-    if assignments[2].x is not None:
-        texture_assignments = assignments[2].x.textures()
-
-    # TODO: move more of this logic to xc3_model_py?
-    # TODO: Store layers in output assignments instead?
-    # The first layer is just the base layer.
     final_normals = base_normals
-    if len(normal_layers) > 1 and texture_assignments is not None:
-        for layer in normal_layers[1:]:
-            if layer.ratio is not None:
-                add_group = create_node_group(
-                    nodes, "AddNormals", add_normals_node_group
-                )
-                add_group.location = (normals_x, -800)
-                normals_x += 200
 
-                # Find the assignment since this isn't part of the layer.
-                # Assume the assignments are already sorted by layer.
-                n2_assignment_x = None
-                n2_assignment_y = None
-                for a in texture_assignments:
-                    if a.name == layer.name:
-                        if a.channels == "x":
-                            n2_assignment_x = a
-                        elif a.channels == "y":
-                            n2_assignment_y = a
+    for layer in assignments[2].layers:
+        add_group = create_node_group(nodes, "AddNormals", add_normals_node_group)
+        add_group.location = (normals_x, -800)
+        normals_x += 200
 
-                n2_normals = create_node_group(
-                    nodes, "NormalsXY", normals_xy_node_group
-                )
-                n2_normals.inputs["X"].default_value = 0.5
-                n2_normals.inputs["Y"].default_value = 0.5
-                n2_normals.location = (-200, normals_y)
-                normals_y -= -200
+        n2_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+        n2_normals.inputs["X"].default_value = 0.5
+        n2_normals.inputs["Y"].default_value = 0.5
+        n2_normals.location = (-200, normals_y)
+        normals_y -= -200
+        links.new(n2_normals.outputs["Normal"], add_group.inputs["N2"])
 
-                assign_texture_channel(
-                    n2_assignment_x, links, texture_nodes, n2_normals.inputs["X"]
-                )
-                assign_texture_channel(
-                    n2_assignment_y, links, texture_nodes, n2_normals.inputs["Y"]
-                )
+        assign_channel(
+            layer.x,
+            "x",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            n2_normals.inputs["X"],
+        )
+        assign_channel(
+            layer.y,
+            "y",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            n2_normals.inputs["Y"],
+        )
 
-                links.new(n2_normals.outputs["Normal"], add_group.inputs["N2"])
-                assign_channel(
-                    layer.ratio,
-                    "x" if layer.channel is None else layer.channel,
-                    links,
-                    texture_nodes,
-                    vertex_color_nodes,
-                    add_group.inputs["Factor"],
-                )
+        # TODO: Should this always assign the X channel?
+        assign_channel(
+            layer.weight,
+            "x",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            add_group.inputs["Factor"],
+        )
 
-                # Connect each add group to the next.
-                # This works since everything has a "Normal" output.
-                links.new(final_normals.outputs["Normal"], add_group.inputs["N1"])
-                final_normals = add_group
-
+        # Connect each add group to the next.
+        # This works since everything has a "Normal" output.
+        links.new(final_normals.outputs["Normal"], add_group.inputs["N1"])
+        final_normals = add_group
 
     remap_normals = nodes.new("ShaderNodeVectorMath")
     remap_normals.location = (normals_x, -800)
