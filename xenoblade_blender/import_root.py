@@ -1153,12 +1153,11 @@ def assign_channel(
     output,
     is_data=True,
 ):
-    textures, textures_rgb, textures_scale, textures_uv = texture_nodes
     vertex_color_rgb, vertex_color = vertex_color_nodes
 
     # Assign one output channel.
     if channel_assignment is not None:
-        texture_assignments = channel_assignment.textures()
+        texture_assignment = channel_assignment.texture()
         value = channel_assignment.value()
         attribute = channel_assignment.attribute()
 
@@ -1181,15 +1180,7 @@ def assign_channel(
                     input = vertex_color_rgb.outputs[input_channel]
 
                 links.new(input, output)
-        elif texture_assignments is not None and len(texture_assignments) > 0:
-            # Try and assign the current channel in case multiple channels are used.
-            # TODO: Find a better way to fix assignments for color and normal maps.
-            texture_assignment = texture_assignments[0]
-            for assignment in texture_assignments:
-                if assignment.channels == output_channel:
-                    texture_assignment = assignment
-                    break
-
+        elif texture_assignment is not None:
             assign_texture_channel(
                 texture_assignment, links, texture_nodes, output, is_data
             )
