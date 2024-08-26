@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for normal map layering to generated materials.
 
+### Changed
+* Improved appearance of textures in game for wimdo model exports when high quality textures have not been streamed in yet.
+
 ### Fixed
 * Fixed an issue where exporting would fail if an image texture node did not have the correct label.
 
