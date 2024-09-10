@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Improved color texture assignment accuracy for generated materials.
+* Improved ambient occlusion texture assignment accuracy for generated materials.
+
 ## 0.14.0 - 2024-08-30
 ### Added
 * Added support for normal map layering to generated materials.
