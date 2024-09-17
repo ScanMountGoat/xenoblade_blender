@@ -745,8 +745,8 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     mix_ao = nodes.new("ShaderNodeMix")
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
-    mix_ao.inputs[0].default_value = 1.0
-    mix_ao.inputs[7].default_value = (1.0, 1.0, 1.0, 1.0)
+    mix_ao.inputs["Factor"].default_value = 1.0
+    mix_ao.inputs["B"].default_value = (1.0, 1.0, 1.0, 1.0)
 
     # Single channel ambient occlusion.
     assign_channel(
@@ -755,7 +755,7 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         links,
         texture_nodes,
         vertex_color_nodes,
-        mix_ao.inputs[7],
+        mix_ao.inputs["B"],
     )
 
     if (
@@ -765,9 +765,9 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     ):
         # TODO: multiply by gMatCol instead?
         # TODO: more accurate gamma handling
-        mix_ao.inputs[6].default_value = [c**2.2 for c in material.color]
+        mix_ao.inputs["A"].default_value = [c**2.2 for c in material.color]
     else:
-        links.new(base_color.outputs["Color"], mix_ao.inputs[6])
+        links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
 
     if material.state_flags.blend_mode == xc3_model_py.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
@@ -931,8 +931,14 @@ def assign_normal_map(
     final_normals = base_normals
 
     for layer in assignments[2].layers:
-        add_group = create_node_group(nodes, "AddNormals", add_normals_node_group)
-        add_group.location = (normals_x, -800)
+        # TODO: handle remaining blend modes.
+        if layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
+            mix_normals = create_node_group(nodes, "AddNormals", add_normals_node_group)
+            mix_normals = nodes.new("ShaderNodeMix")
+            mix_normals.data_type = "VECTOR"
+        else:
+            mix_normals = create_node_group(nodes, "AddNormals", add_normals_node_group)
+        mix_normals.location = (normals_x, -800)
         normals_x += 200
 
         n2_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
@@ -940,7 +946,7 @@ def assign_normal_map(
         n2_normals.inputs["Y"].default_value = 0.5
         n2_normals.location = (-200, normals_y)
         normals_y -= -200
-        links.new(n2_normals.outputs["Normal"], add_group.inputs["N2"])
+        links.new(n2_normals.outputs["Normal"], mix_normals.inputs["B"])
 
         assign_channel(
             layer.x,
@@ -966,19 +972,25 @@ def assign_normal_map(
             links,
             texture_nodes,
             vertex_color_nodes,
-            add_group.inputs["Factor"],
+            mix_normals.inputs["Factor"],
         )
 
         # Connect each add group to the next.
-        # This works since everything has a "Normal" output.
-        links.new(final_normals.outputs["Normal"], add_group.inputs["N1"])
-        final_normals = add_group
+        if "Normal" in final_normals.outputs:
+            links.new(final_normals.outputs["Normal"], mix_normals.inputs["A"])
+        else:
+            links.new(final_normals.outputs["Result"], mix_normals.inputs["A"])
+
+        final_normals = mix_normals
 
     remap_normals = nodes.new("ShaderNodeVectorMath")
     remap_normals.location = (normals_x, -800)
     normals_x += 200
     remap_normals.operation = "MULTIPLY_ADD"
-    links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
+    if "Normal" in final_normals.outputs:
+        links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
+    else:
+        links.new(final_normals.outputs["Result"], remap_normals.inputs[0])
     remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
     remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
 
@@ -1071,26 +1083,26 @@ def add_normals_node_group():
     input_node = nodes.new("NodeGroupInput")
     input_node.location = (-1700, 0)
     node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketVector", name="N1"
-    )
-    node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketVector", name="N2"
-    )
-    node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="A"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="B"
     )
 
     t = nodes.new("ShaderNodeVectorMath")
     t.location = (-1500, 0)
     t.operation = "ADD"
     t.inputs[1].default_value = (0.0, 0.0, 1.0)
-    links.new(input_node.outputs["N1"], t.inputs[0])
+    links.new(input_node.outputs["A"], t.inputs[0])
 
     u = nodes.new("ShaderNodeVectorMath")
     u.location = (-1500, -200)
     u.operation = "MULTIPLY"
     u.inputs[1].default_value = (-1.0, -1.0, 1.0)
-    links.new(input_node.outputs["N2"], u.inputs[0])
+    links.new(input_node.outputs["B"], u.inputs[0])
 
     dot_t_u = nodes.new("ShaderNodeVectorMath")
     dot_t_u.location = (-1200, 0)
@@ -1129,8 +1141,8 @@ def add_normals_node_group():
     mix.location = (-400, 0)
     mix.data_type = "VECTOR"
     links.new(input_node.outputs["Factor"], mix.inputs["Factor"])
-    links.new(input_node.outputs["N1"], mix.inputs[4])
-    links.new(normalize_r.outputs["Vector"], mix.inputs[5])
+    links.new(input_node.outputs["A"], mix.inputs["A"])
+    links.new(normalize_r.outputs["Vector"], mix.inputs["B"])
 
     normalize_result = nodes.new("ShaderNodeVectorMath")
     normalize_result.location = (-200, 0)
