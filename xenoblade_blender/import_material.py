@@ -1,6 +1,7 @@
 import bpy
 from . import xc3_model_py
 
+
 def import_material(name: str, material, blender_images, image_textures, samplers):
     blender_material = bpy.data.materials.new(name)
 
@@ -188,16 +189,33 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         )
 
         # TODO: Should this always assign the X channel?
-        # TODO: Check if this should use fresnel.
         mix_color.inputs["Factor"].default_value = 0.0
-        assign_channel(
-            layer.weight,
-            "x",
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_color.inputs["Factor"],
-        )
+
+        if layer.is_fresnel:
+            fresnel_blend = create_node_group(
+                nodes, "FresnelBlend", fresnel_blend_node_group
+            )
+            fresnel_blend.location = (base_color_x, 600)
+            # TODO: normals?
+
+            assign_channel(
+                layer.weight,
+                "x",
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                fresnel_blend.inputs["Factor"],
+            )
+            links.new(fresnel_blend.outputs["Factor"], mix_color.inputs["Factor"])
+        else:
+            assign_channel(
+                layer.weight,
+                "x",
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                mix_color.inputs["Factor"],
+            )
 
         # Connect each add group to the next.
         if "Result" in base_color.outputs:
@@ -621,6 +639,48 @@ def add_normals_node_group():
     output_node = nodes.new("NodeGroupOutput")
     output_node.location = (0, 0)
     links.new(normalize_result.outputs["Vector"], output_node.inputs["Normal"])
+
+    return node_tree
+
+
+def fresnel_blend_node_group():
+    node_tree = bpy.data.node_groups.new("FresnelBlend", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    input_node.location = (-600, 0)
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Normal"
+    )
+
+    layer_weight = nodes.new("ShaderNodeLayerWeight")
+    layer_weight.location = (-400, 0)
+    links.new(input_node.outputs["Normal"], layer_weight.inputs["Normal"])
+
+    multiply = nodes.new("ShaderNodeMath")
+    multiply.location = (-400, -200)
+    multiply.operation = "MULTIPLY"
+    links.new(input_node.outputs["Factor"], multiply.inputs[0])
+    multiply.inputs[1].default_value = 5.0
+
+    pow_5 = nodes.new("ShaderNodeMath")
+    pow_5.location = (-200, 0)
+    pow_5.operation = "POWER"
+    links.new(layer_weight.outputs["Facing"], pow_5.inputs[0])
+    links.new(multiply.outputs["Value"], pow_5.inputs[1])
+
+    output_node = nodes.new("NodeGroupOutput")
+    output_node.location = (0, 0)
+    links.new(pow_5.outputs["Value"], output_node.inputs["Factor"])
 
     return node_tree
 
