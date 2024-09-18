@@ -742,7 +742,80 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             is_data=False,
         )
 
+    base_color_x = 0
+    base_color_y = 400
+    for layer in assignments[0].layers:
+        # TODO: Share code with normal layers?
+        if layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
+            mix_color = nodes.new("ShaderNodeMix")
+            mix_color.data_type = "RGBA"
+        elif layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.MixRatio:
+            # TODO: This should do mix(a, a*b, ratio)
+            mix_color = nodes.new("ShaderNodeMix")
+            mix_color.data_type = "RGBA"
+        elif layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Add:
+            mix_color = nodes.new("ShaderNodeMix")
+            mix_color.data_type = "RGBA"
+            mix_color.blend_type = "ADD"
+        else:
+            mix_color = nodes.new("ShaderNodeMix")
+            mix_color.data_type = "RGBA"
+
+        mix_color.location = (base_color_x, 400)
+        base_color_x += 200
+
+        layer_value = nodes.new("ShaderNodeCombineColor")
+        layer_value.location = (-200, base_color_y)
+        base_color_y -= -200
+        links.new(layer_value.outputs["Color"], mix_color.inputs["B"])
+
+        assign_channel(
+            layer.x,
+            "x",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            layer_value.inputs["Red"],
+        )
+        assign_channel(
+            layer.y,
+            "y",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            layer_value.inputs["Green"],
+        )
+        assign_channel(
+            layer.z,
+            "z",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            layer_value.inputs["Blue"],
+        )
+
+        # TODO: Should this always assign the X channel?
+        # TODO: Check if this should use fresnel.
+        mix_color.inputs["Factor"].default_value = 0.0
+        assign_channel(
+            layer.weight,
+            "x",
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_color.inputs["Factor"],
+        )
+
+        # Connect each add group to the next.
+        if "Result" in base_color.outputs:
+            links.new(base_color.outputs["Result"], mix_color.inputs["A"])
+        else:
+            links.new(base_color.outputs["Color"], mix_color.inputs["A"])
+
+        base_color = mix_color
+
     mix_ao = nodes.new("ShaderNodeMix")
+    mix_ao.location = (base_color_x, 400)
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
     mix_ao.inputs["Factor"].default_value = 1.0
@@ -767,7 +840,10 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         # TODO: more accurate gamma handling
         mix_ao.inputs["A"].default_value = [c**2.2 for c in material.color]
     else:
-        links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
+        if "Result" in base_color.outputs:
+            links.new(base_color.outputs["Result"], mix_ao.inputs["A"])
+        else:
+            links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
 
     if material.state_flags.blend_mode == xc3_model_py.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.

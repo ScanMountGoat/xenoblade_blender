@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for color map layering to generated materials.
+
 ### Changed
 * Improved color texture assignment accuracy for generated materials.
 * Improved ambient occlusion texture assignment accuracy for generated materials.
