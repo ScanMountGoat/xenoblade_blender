@@ -74,13 +74,17 @@ def extract_index(name: str) -> Tuple[Optional[int], str]:
     return prefix, name
 
 
-def extract_image_index(name: str) -> Optional[int]:
-    # model_name.index.image_name
+def extract_image_name_index(name: str) -> Tuple[str, Optional[int]]:
+    # extract image_name, index from model_name.index.image_name
     name_parts = name.split(".")
-    if len(name_parts) > 1:
-        return parse_int(name_parts[1])
+    if len(name_parts) == 3:
+        return name_parts[2], parse_int(name_parts[1])
+    elif len(name_parts) == 2:
+        return name_parts[1], None
+    elif len(name_parts) == 1:
+        return name, None
     else:
-        return None
+        return "", None
 
 
 # Updated from the processing code written for Smash Ultimate:
@@ -408,7 +412,9 @@ def export_mesh_inner(
         base_mesh_index = original_mesh.base_mesh_index
 
     original_material = original_materials[material_index]
-    material_texture_indices = get_texture_assignments(mesh_data, original_material)
+    material_texture_indices = get_texture_assignments(
+        mesh_data, original_material, root.image_textures
+    )
 
     if is_new_material:
         # Add a new material with the given name.
@@ -713,7 +719,7 @@ def apply_texture_indices(material, indices):
 
 
 # TODO: also get the images themselves
-def get_texture_assignments(mesh_data, material):
+def get_texture_assignments(mesh_data, material, image_textures):
     old_to_new_index = {}
     # TODO: error if there are no nodes or not enough textures?
     for node in mesh_data.materials[0].node_tree.nodes:
@@ -723,8 +729,19 @@ def get_texture_assignments(mesh_data, material):
         # Update material texture assignments.
         # TODO: samplers?
         texture_index = parse_int(node.label)
-        image_index = extract_image_index(node.image.name)
-        if texture_index is not None and image_index is not None:
+        if texture_index is None:
+            continue
+
+        # Find the original image to replace.
+        # TODO: handle new images without an index?
+        image_name, image_index = extract_image_name_index(node.image.name)
+        if image_index is None:
+            for i, image in enumerate(image_textures):
+                if image.name == image_name:
+                    image_index = i
+                    break
+
+        if image_index is not None:
             old_to_new_index[material.textures[texture_index].image_texture_index] = (
                 image_index,
                 node.image,

@@ -6,12 +6,13 @@ import numpy as np
 from pathlib import Path
 import re
 import os
+import math
 
 from .export_root import (
     ExportException,
     copy_material,
     export_mesh,
-    extract_image_index,
+    extract_image_name_index,
 )
 
 from . import xc3_model_py
@@ -194,11 +195,11 @@ def export_internal_images(root, image_replacements):
     # TODO: Will this encode some images more than once?
     start = time.time()
 
-    encode_image_args = []
-    for i, image in image_replacements:
-        image_texture = root.image_textures[i]
-        args = encode_args_from_image(image, image_texture)
-        encode_image_args.append(args)
+    image_replacements = sorted(image_replacements, key=lambda x: x[0])
+
+    validate_image_replacements(root, [i for i, _ in image_replacements])
+
+    encode_image_args = internal_encode_image_args(root, image_replacements)
 
     end = time.time()
     print(f"Load images: {end - start}")
@@ -206,11 +207,38 @@ def export_internal_images(root, image_replacements):
     # Encode images in parallel for better performance.
     image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
 
-    for (i, _), image_texture in zip(image_replacements, image_textures):
-        root.image_textures[i] = image_texture
+    for (i, _), image in zip(image_replacements, image_textures):
+        if i < len(root.image_textures):
+            root.image_textures[i] = image
+        else:
+            # We've already validated that new indices are contiguous.
+            root.image_textures.append(image)
 
 
-def encode_args_from_image(image, image_texture):
+def internal_encode_image_args(root, image_replacements):
+    encode_image_args = []
+    for i, image in image_replacements:
+        original_image = None
+        if i < len(root.image_textures):
+            original_image = root.image_textures[i]
+        args = encode_args_from_image(image, original_image)
+        encode_image_args.append(args)
+    return encode_image_args
+
+
+def validate_image_replacements(root, new_indices):
+    # Validate that indices form a valid range for replacement.
+    indices = set(range(len(root.image_textures)))
+    for i in new_indices:
+        indices.add(i)
+
+    for i, index in enumerate(sorted(indices)):
+        if i != index:
+            message = f"Expected image index {i} but found {index}. Added textures should not skip indices."
+            raise ExportException(message)
+
+
+def encode_args_from_image(image, original_image):
     width, height = image.size
     # Flip vertically to match in game.
     # TODO: How to speed this up?
@@ -222,17 +250,30 @@ def encode_args_from_image(image, image_texture):
         axis=0,
     )
 
-    args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
-        width,
-        height,
-        1,
-        xc3_model_py.ViewDimension.D2,
-        image_texture.image_format,
-        image_texture.mipmap_count > 1,
-        image_data.reshape(-1),
-        image_texture.name,
-        image_texture.usage,
-    )
+    if original_image is not None:
+        args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
+            width,
+            height,
+            1,
+            xc3_model_py.ViewDimension.D2,
+            original_image.image_format,
+            original_image.mipmap_count > 1,
+            image_data.reshape(-1),
+            original_image.name,
+            original_image.usage,
+        )
+    else:
+        args = xc3_model_py.EncodeSurfaceRgba32FloatArgs(
+            width,
+            height,
+            1,
+            xc3_model_py.ViewDimension.D2,
+            xc3_model_py.ImageFormat.BC7Unorm,
+            math.log2(max(width, height)),
+            image_data.reshape(-1),
+            "",
+            xc3_model_py.TextureUsage.Col,
+        )
 
     return args
 
@@ -248,7 +289,7 @@ def export_external_images(root, image_folder: str):
     for name in os.listdir(image_folder):
         path = os.path.join(image_folder, name)
         # TODO: also extract the name
-        i = extract_image_index(path)
+        _, i = extract_image_name_index(path)
         if i is not None:
             if path.endswith(".dds"):
                 dds = xc3_model_py.Dds.from_file(path)
