@@ -1,8 +1,16 @@
+from typing import Optional
 import bpy
 from . import xc3_model_py
 
 
-def import_material(name: str, material, blender_images, image_textures, samplers):
+def import_material(
+    name: str,
+    material,
+    blender_images,
+    image_textures,
+    samplers,
+    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
+):
     blender_material = bpy.data.materials.new(name)
 
     # Add some custom properties to make debugging easier.
@@ -31,11 +39,13 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     mat_id = assignments.mat_id()
     assignments = assignments.assignments
 
-    textures = []
-    textures_rgb = []
-    textures_scale = []
-    textures_uv = []
+    textures = {}
+    textures_rgb = {}
+    textures_scale = {}
+    textures_uv = {}
     for i, texture in enumerate(material.textures):
+        name = f"s{i}"
+
         location_y = 300 - i * 300
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.label = str(i)
@@ -48,12 +58,12 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         scale.location = (-1100, location_y)
         scale.operation = "MULTIPLY"
         scale.inputs[1].default_value = (1.0, 1.0, 1.0)
-        textures_scale.append(scale)
+        textures_scale[name] = scale
 
         uv = nodes.new("ShaderNodeUVMap")
         uv.location = (-1300, location_y)
         uv.uv_map = "TexCoord0"
-        textures_uv.append(uv)
+        textures_uv[name] = uv
 
         links.new(uv.outputs["UV"], scale.inputs["Vector"])
         links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
@@ -71,11 +81,11 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             # TODO: Fix samplers for xcx models.
             pass
 
-        textures.append(texture_node)
+        textures[name] = texture_node
 
         texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
         texture_rgb_node.location = (-500, location_y)
-        textures_rgb.append(texture_rgb_node)
+        textures_rgb[name] = texture_rgb_node
         links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
 
     vertex_color = nodes.new("ShaderNodeVertexColor")
@@ -96,7 +106,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     base_color.location = (-200, 200)
     assign_channel(
         assignments[0].x,
-        "x",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -105,7 +114,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     )
     assign_channel(
         assignments[0].y,
-        "y",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -114,7 +122,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     )
     assign_channel(
         assignments[0].z,
-        "z",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -128,7 +135,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     ]:
         assign_channel(
             assignments[0].w,
-            "w",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -165,7 +171,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
         assign_channel(
             layer.x,
-            "x",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -173,7 +178,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         )
         assign_channel(
             layer.y,
-            "y",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -181,7 +185,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         )
         assign_channel(
             layer.z,
-            "z",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -200,7 +203,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
             assign_channel(
                 layer.weight,
-                "x",
                 links,
                 texture_nodes,
                 vertex_color_nodes,
@@ -210,7 +212,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         else:
             assign_channel(
                 layer.weight,
-                "x",
                 links,
                 texture_nodes,
                 vertex_color_nodes,
@@ -235,7 +236,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
     # Single channel ambient occlusion.
     assign_channel(
         assignments[2].z,
-        "z",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -278,7 +278,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     assign_channel(
         assignments[1].x,
-        "x",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -299,7 +298,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
         assign_channel(
             assignments[5].x,
-            "x",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -308,7 +306,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         )
         assign_channel(
             assignments[5].y,
-            "y",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -317,7 +314,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
         )
         assign_channel(
             assignments[5].z,
-            "z",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -346,7 +342,6 @@ def import_material(name: str, material, blender_images, image_textures, sampler
             invert.inputs[0].default_value = 1.0
             assign_channel(
                 assignments[1].y,
-                "y",
                 links,
                 texture_nodes,
                 vertex_color_nodes,
@@ -356,11 +351,12 @@ def import_material(name: str, material, blender_images, image_textures, sampler
 
     if material.alpha_test is not None:
         texture = material.alpha_test
+        name = f"s{texture.texture_index}"
         channel = ["Red", "Green", "Blue", "Alpha"][texture.channel_index]
         if channel == "Alpha":
-            input = textures[texture.texture_index].outputs["Alpha"]
+            input = textures[name].outputs["Alpha"]
         else:
-            input = textures_rgb[texture.texture_index].outputs[channel]
+            input = textures_rgb[name].outputs[channel]
         links.new(input, bsdf.inputs["Alpha"])
 
         # TODO: Support alpha blending?
@@ -400,7 +396,6 @@ def assign_normal_map(
 
     assign_channel(
         assignments[2].x,
-        "x",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -408,7 +403,6 @@ def assign_normal_map(
     )
     assign_channel(
         assignments[2].y,
-        "y",
         links,
         texture_nodes,
         vertex_color_nodes,
@@ -437,7 +431,6 @@ def assign_normal_map(
 
         assign_channel(
             layer.x,
-            "x",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -445,7 +438,6 @@ def assign_normal_map(
         )
         assign_channel(
             layer.y,
-            "y",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -455,7 +447,6 @@ def assign_normal_map(
         # TODO: Should this always assign the X channel?
         assign_channel(
             layer.weight,
-            "x",
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -687,7 +678,6 @@ def fresnel_blend_node_group():
 
 def assign_channel(
     channel_assignment,
-    output_channel,
     links,
     texture_nodes,
     vertex_color_nodes,
@@ -734,44 +724,43 @@ def assign_texture_channel(
     output,
     is_data=True,
 ):
+    # TODO: lazy load global textures?
     textures, textures_rgb, textures_scale, textures_uv = texture_nodes
 
     channel_index = "xyzw".index(texture_assignment.channels)
     input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
 
-    # Only handle sampler uniforms for material textures for now.
-    sampler_to_index = {f"s{i}": i for i in range(10)}
-    texture_index = sampler_to_index.get(texture_assignment.name)
-    if texture_index is not None:
-        try:
-            # TODO: Find a better way to handle color management.
-            # TODO: Why can't we just set everything to non color?
-            # TODO: This won't work if users have different color spaces installed like aces.
-            if is_data:
-                textures[texture_index].image.colorspace_settings.name = "Non-Color"
-            else:
-                textures[texture_index].image.colorspace_settings.name = "sRGB"
+    name = texture_assignment.name
 
-                # Alpha isn't part of the RGB node.
-            if input_channel == "Alpha":
-                input = textures[texture_index].outputs["Alpha"]
-            else:
-                input = textures_rgb[texture_index].outputs[input_channel]
+    try:
+        # TODO: Find a better way to handle color management.
+        # TODO: Why can't we just set everything to non color?
+        # TODO: This won't work if users have different color spaces installed like aces.
+        if is_data:
+            textures[name].image.colorspace_settings.name = "Non-Color"
+        else:
+            textures[name].image.colorspace_settings.name = "sRGB"
 
-            links.new(input, output)
+            # Alpha isn't part of the RGB node.
+        if input_channel == "Alpha":
+            input = textures[name].outputs["Alpha"]
+        else:
+            input = textures_rgb[name].outputs[input_channel]
 
-            for i in range(9):
-                if texture_assignment.texcoord_name == f"vTex{i}":
-                    textures_uv[texture_index].uv_map = f"TexCoord{i}"
+        links.new(input, output)
 
-                    # TODO: Create a node group for the mat2x4 transform (two dot products).
-            if texture_assignment.texcoord_transforms is not None:
-                transform_u, transform_v = texture_assignment.texcoord_transforms
-                textures_scale[texture_index].inputs[1].default_value = (
-                    transform_u[0],
-                    transform_v[1],
-                    1.0,
-                )
-        except IndexError:
-            # TODO: Better error checking.
-            print(f"Texture index {texture_index} out of range")
+        for i in range(9):
+            if texture_assignment.texcoord_name == f"vTex{i}":
+                textures_uv[name].uv_map = f"TexCoord{i}"
+
+        # TODO: Create a node group for the mat2x4 transform (two dot products).
+        if texture_assignment.texcoord_transforms is not None:
+            transform_u, transform_v = texture_assignment.texcoord_transforms
+            textures_scale[name].inputs[1].default_value = (
+                transform_u[0],
+                transform_v[1],
+                1.0,
+            )
+    except KeyError:
+        # TODO: Better error checking.
+        print(f"Unable to assign texture {name}")

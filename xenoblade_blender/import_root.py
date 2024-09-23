@@ -128,6 +128,7 @@ def import_map_root(
     root,
     root_collection: bpy.types.Collection,
     blender_images,
+    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
     import_all_meshes: bool,
     flip_uvs: bool,
 ):
@@ -167,6 +168,7 @@ def import_map_root(
                             blender_images,
                             root.image_textures,
                             models.samplers,
+                            shader_textures,
                         )
 
                     buffers = group.buffers[model.model_buffers_index]
@@ -219,6 +221,7 @@ def import_model_root(
     root,
     blender_images,
     root_obj,
+    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
     import_all_meshes: bool,
     import_outlines: bool,
     flip_uvs: bool,
@@ -243,6 +246,7 @@ def import_model_root(
                     blender_images,
                     root.image_textures,
                     root.models.samplers,
+                    shader_textures,
                 )
 
             if not import_all_meshes:

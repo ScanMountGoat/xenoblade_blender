@@ -1,3 +1,4 @@
+from pathlib import Path
 import bpy
 import time
 import os
@@ -91,6 +92,15 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         roots = xc3_model_py.load_map(path, database)
 
+        # Assume the path is in a game dump.
+        shader_textures = None
+        for parent in Path(path).parents:
+            folder = parent.joinpath("monolib").joinpath("shader")
+            if folder.exists():
+                shader_textures = xc3_model_py.monolib.ShaderTextures.from_folder(
+                    str(folder)
+                )
+
         end = time.time()
         print(f"Load {len(roots)} Roots: {end - start}")
 
@@ -113,6 +123,7 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
                 root,
                 root_collection,
                 blender_images,
+                shader_textures,
                 import_all_meshes,
                 flip_uvs=True,
             )

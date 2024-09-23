@@ -96,6 +96,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
             root,
             blender_images,
             armature,
+            shader_textures=None,
             import_all_meshes=True,
             import_outlines=True,
             flip_uvs=False,
