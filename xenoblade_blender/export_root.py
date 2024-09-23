@@ -380,7 +380,7 @@ def export_mesh_inner(
 
     if material_index < 0 or material_index >= len(root.models.materials):
         message = f"Material index {material_index} for mesh {mesh_name}"
-        message += f" is out of range for material count {len(root.models.materials)}."
+        message += f" does not reference one of {len(root.models.materials)} original materials."
         raise ExportException(message)
 
     # TODO: why does None not work well in game?
