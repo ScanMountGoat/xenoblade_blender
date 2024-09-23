@@ -75,13 +75,14 @@ def extract_index(name: str) -> Tuple[Optional[int], str]:
 
 
 def extract_image_name_index(name: str) -> Tuple[str, Optional[int]]:
-    # extract image_name, index from model_name.index.image_name
+    # Extract image_name, index from model_name.index.image_name
+    # Use >= to ignore any additional parts like file extension.
     name_parts = name.split(".")
-    if len(name_parts) == 3:
+    if len(name_parts) >= 3:
         return name_parts[2], parse_int(name_parts[1])
-    elif len(name_parts) == 2:
+    elif len(name_parts) >= 2:
         return name_parts[1], None
-    elif len(name_parts) == 1:
+    elif len(name_parts) >= 1:
         return name, None
     else:
         return "", None
@@ -732,14 +733,7 @@ def get_texture_assignments(mesh_data, material, image_textures):
         if texture_index is None:
             continue
 
-        # Find the original image to replace.
-        # TODO: handle new images without an index?
-        image_name, image_index = extract_image_name_index(node.image.name)
-        if image_index is None:
-            for i, image in enumerate(image_textures):
-                if image.name == image_name:
-                    image_index = i
-                    break
+        image_index = image_index_to_replace(image_textures, node.image.name)
 
         if image_index is not None:
             old_to_new_index[material.textures[texture_index].image_texture_index] = (
@@ -748,6 +742,19 @@ def get_texture_assignments(mesh_data, material, image_textures):
             )
 
     return old_to_new_index
+
+
+def image_index_to_replace(images, image_name: str) -> Optional[int]:
+    # Find the original image to replace.
+    # TODO: handle new images without an index?
+    image_name, image_index = extract_image_name_index(image_name)
+    if image_index is None:
+        for i, image in enumerate(images):
+            if image.name == image_name:
+                image_index = i
+                break
+
+    return image_index
 
 
 def export_shape_keys(

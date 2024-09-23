@@ -6,13 +6,12 @@ import numpy as np
 from pathlib import Path
 import re
 import os
-import math
 
 from .export_root import (
     ExportException,
     copy_material,
     export_mesh,
-    extract_image_name_index,
+    image_index_to_replace,
 )
 
 from . import xc3_model_py
@@ -166,6 +165,7 @@ def export_wimdo(
                 g.lod_count = 1
 
     if export_images:
+        # TODO: move this logic to xc3_model_py?
         if image_folder != "":
             export_external_images(root, image_folder)
         else:
@@ -195,6 +195,7 @@ def export_internal_images(root, image_replacements):
     # TODO: Will this encode some images more than once?
     start = time.time()
 
+    # Sort for proper handling of added indices.
     image_replacements = sorted(image_replacements, key=lambda x: x[0])
 
     validate_image_replacements(root, [i for i, _ in image_replacements])
@@ -269,7 +270,7 @@ def encode_args_from_image(image, original_image):
             1,
             xc3_model_py.ViewDimension.D2,
             xc3_model_py.ImageFormat.BC7Unorm,
-            math.log2(max(width, height)),
+            True,
             image_data.reshape(-1),
             "",
             xc3_model_py.TextureUsage.Col,
@@ -279,45 +280,69 @@ def encode_args_from_image(image, original_image):
 
 
 def export_external_images(root, image_folder: str):
-    # TODO: Support adding images
-    # TODO: Check out of bounds indices.
-    image_indices = []
-    encode_image_args = []
-    dds_images = []
-    # TODO: Should DDS take priority over PNG?
+    image_indices_args = []
+    dds_indices_images = []
     start = time.time()
     for name in os.listdir(image_folder):
         path = os.path.join(image_folder, name)
-        # TODO: also extract the name
-        _, i = extract_image_name_index(path)
-        if i is not None:
-            if path.endswith(".dds"):
-                dds = xc3_model_py.Dds.from_file(path)
-                dds_images.append((i, dds))
-            else:
-                # Assume other file types are images.
-                image = image_utils.load_image(
-                    path, place_holder=True, check_existing=False
+
+        i = image_index_to_replace(root.image_textures, name)
+        if i is None:
+            continue
+
+        image_texture = None
+        if i < len(root.image_textures):
+            image_texture = root.image_textures[i]
+
+        if path.endswith(".dds"):
+            dds = xc3_model_py.Dds.from_file(path)
+            if image_texture is not None:
+                image = xc3_model_py.ImageTexture.from_dds(
+                    dds, image_texture.name, image_texture.usage
                 )
-                image_texture = root.image_textures[i]
-                args = encode_args_from_image(image, image_texture)
-                encode_image_args.append(args)
-                image_indices.append(i)
+                dds_indices_images.append((i, image))
+            else:
+                image = xc3_model_py.ImageTexture.from_dds(
+                    dds, "", xc3_model_py.TextureUsage.Col
+                )
+                dds_indices_images.append((i, image))
+        else:
+            # Assume other file types are images.
+            image = image_utils.load_image(
+                path, place_holder=True, check_existing=False
+            )
+            args = encode_args_from_image(image, image_texture)
+            image_indices_args.append((i, args))
 
     end = time.time()
     print(f"Load images: {end - start}")
 
+    new_indices = [i for i, _ in image_indices_args]
+    new_indices.extend(i for i, _ in dds_indices_images)
+    validate_image_replacements(root, new_indices)
+
     # Encode images in parallel for better performance.
+    encode_image_args = [args for _, args in image_indices_args]
     image_textures = xc3_model_py.encode_images_rgbaf32(encode_image_args)
+    image_indices = [i for i, _ in image_indices_args]
+
+    # TODO: Should DDS take always priority over PNG to handle duplicate indices?
+    image_replacements = set()
+    for i, image in zip(image_indices, image_textures):
+        image_replacements.add((i, image))
+
+    for i, image in dds_indices_images:
+        image_replacements.add((i, image))
+
+    # Sort for proper handling of added indices.
+    image_replacements = sorted(image_replacements, key=lambda x: x[0])
+
+    print(image_replacements)
 
     # TODO: Avoid replacing a texture more than once.
-    for i, image_texture in zip(image_indices, image_textures):
+    for i, image_texture in image_replacements:
         if i < len(root.image_textures):
             root.image_textures[i] = image_texture
-
-    for i, dds in dds_images:
-        if i < len(root.image_textures):
-            image_texture = root.image_textures[i]
-            root.image_textures[i] = xc3_model_py.ImageTexture.from_dds(
-                dds, image_texture.name, image_texture.usage
-            )
+        else:
+            # We've already validated that new indices are contiguous.
+            root.image_textures.append(image_texture)
