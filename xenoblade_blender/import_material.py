@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 import bpy
 from . import xc3_model_py
 
@@ -6,10 +6,10 @@ from . import xc3_model_py
 def import_material(
     name: str,
     material,
-    blender_images,
+    blender_images: list[bpy.types.Image],
+    shader_images: Dict[str, bpy.types.Image],
     image_textures,
     samplers,
-    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
 ):
     blender_material = bpy.data.materials.new(name)
 
@@ -43,50 +43,43 @@ def import_material(
     textures_rgb = {}
     textures_scale = {}
     textures_uv = {}
+
     for i, texture in enumerate(material.textures):
-        name = f"s{i}"
-
         location_y = 300 - i * 300
-        texture_node = nodes.new("ShaderNodeTexImage")
-        texture_node.label = str(i)
-        texture_node.width = 330
-        texture_node.location = (-900, location_y)
-        texture_node.image = blender_images[texture.image_texture_index]
-
-        # TODO: Use the full mat2x4 transform.
-        scale = nodes.new("ShaderNodeVectorMath")
-        scale.location = (-1100, location_y)
-        scale.operation = "MULTIPLY"
-        scale.inputs[1].default_value = (1.0, 1.0, 1.0)
-        textures_scale[name] = scale
-
-        uv = nodes.new("ShaderNodeUVMap")
-        uv.location = (-1300, location_y)
-        uv.uv_map = "TexCoord0"
-        textures_uv[name] = uv
-
-        links.new(uv.outputs["UV"], scale.inputs["Vector"])
-        links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
-
-        # TODO: Check if U and V have the same address mode.
-        try:
+        # TODO: xenoblade x samplers?
+        sampler = None
+        if texture.sampler_index < len(samplers):
             sampler = samplers[texture.sampler_index]
-            if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
-                texture_node.extension = "CLIP"
-            elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
-                texture_node.extension = "REPEAT"
-            elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
-                texture_node.extension = "MIRROR"
-        except:
-            # TODO: Fix samplers for xcx models.
-            pass
-
-        textures[name] = texture_node
-
-        texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
-        texture_rgb_node.location = (-500, location_y)
-        textures_rgb[name] = texture_rgb_node
-        links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
+        add_texture_nodes(
+            f"s{i}",
+            blender_images[texture.image_texture_index],
+            sampler,
+            str(i),
+            nodes,
+            links,
+            textures,
+            textures_rgb,
+            textures_scale,
+            textures_uv,
+            location_y,
+        )
+    for i, (name, image) in enumerate(shader_images.items()):
+        # Place global textures after the material textures.
+        # TODO: Don't load unused global textures?
+        location_y = 300 - (i + len(material.textures)) * 300
+        add_texture_nodes(
+            name,
+            image,
+            None,
+            name,
+            nodes,
+            links,
+            textures,
+            textures_rgb,
+            textures_scale,
+            textures_uv,
+            location_y,
+        )
 
     vertex_color = nodes.new("ShaderNodeVertexColor")
     vertex_color.location = (-710, 500)
@@ -364,6 +357,57 @@ def import_material(
         blender_material.shadow_method = "CLIP"
 
     return blender_material
+
+
+def add_texture_nodes(
+    name,
+    image,
+    sampler,
+    label,
+    nodes,
+    links,
+    textures,
+    textures_rgb,
+    textures_scale,
+    textures_uv,
+    location_y,
+):
+    texture_node = nodes.new("ShaderNodeTexImage")
+    texture_node.label = label
+    texture_node.width = 330
+    texture_node.location = (-900, location_y)
+    texture_node.image = image
+
+    # TODO: Use the full mat2x4 transform.
+    scale = nodes.new("ShaderNodeVectorMath")
+    scale.location = (-1100, location_y)
+    scale.operation = "MULTIPLY"
+    scale.inputs[1].default_value = (1.0, 1.0, 1.0)
+    textures_scale[name] = scale
+
+    uv = nodes.new("ShaderNodeUVMap")
+    uv.location = (-1300, location_y)
+    uv.uv_map = "TexCoord0"
+    textures_uv[name] = uv
+
+    links.new(uv.outputs["UV"], scale.inputs["Vector"])
+    links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
+
+    # TODO: Check if U and V have the same address mode.
+    if sampler is not None:
+        if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
+            texture_node.extension = "CLIP"
+        elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
+            texture_node.extension = "REPEAT"
+        elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
+            texture_node.extension = "MIRROR"
+
+    textures[name] = texture_node
+
+    texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
+    texture_rgb_node.location = (-500, location_y)
+    textures_rgb[name] = texture_rgb_node
+    links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
 
 
 def create_node_group(nodes, name: str, create_node_tree):

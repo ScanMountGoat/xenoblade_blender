@@ -11,6 +11,7 @@ from .import_root import (
     get_image_folder,
     import_map_root,
     import_images,
+    import_monolib_shader_images,
 )
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty, EnumProperty, BoolProperty
@@ -92,14 +93,7 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         roots = xc3_model_py.load_map(path, database)
 
-        # Assume the path is in a game dump.
-        shader_textures = None
-        for parent in Path(path).parents:
-            folder = parent.joinpath("monolib").joinpath("shader")
-            if folder.exists():
-                shader_textures = xc3_model_py.monolib.ShaderTextures.from_folder(
-                    str(folder)
-                )
+        shader_images = import_monolib_shader_images(path, flip=True)
 
         end = time.time()
         print(f"Load {len(roots)} Roots: {end - start}")
@@ -123,7 +117,7 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
                 root,
                 root_collection,
                 blender_images,
-                shader_textures,
+                shader_images,
                 import_all_meshes,
                 flip_uvs=True,
             )

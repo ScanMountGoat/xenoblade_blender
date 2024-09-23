@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for textures in the monolib/shader folder to generated materials.
+
 ## 0.14.1 - 2024-09-18
 ### Added
 * Added support for color map layering to generated materials.

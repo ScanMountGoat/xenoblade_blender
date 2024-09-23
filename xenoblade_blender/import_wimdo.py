@@ -11,6 +11,7 @@ from .import_root import (
     import_armature,
     import_model_root,
     import_images,
+    import_monolib_shader_images,
 )
 
 from . import xc3_model_py
@@ -111,14 +112,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         root = xc3_model_py.load_model(path, database)
 
-        # Assume the path is in a game dump.
-        shader_textures = None
-        for parent in Path(path).parents:
-            folder = parent.joinpath("monolib").joinpath("shader")
-            if folder.exists():
-                shader_textures = xc3_model_py.monolib.ShaderTextures.from_folder(
-                    str(folder)
-                )
+        shader_images = import_monolib_shader_images(path, flip=True)
 
         end = time.time()
         print(f"Load Root: {end - start}")
@@ -134,8 +128,8 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
             self,
             root,
             blender_images,
+            shader_images,
             armature,
-            shader_textures,
             import_all_meshes,
             import_outlines,
             flip_uvs=True,

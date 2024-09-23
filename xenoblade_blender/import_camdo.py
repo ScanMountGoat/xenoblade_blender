@@ -90,13 +90,17 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
             image_folder,
             flip=False,
         )
+
+        shader_images = {}
+
         armature = import_armature(context, root, model_name)
+
         import_model_root(
             self,
             root,
             blender_images,
+            shader_images,
             armature,
-            shader_textures=None,
             import_all_meshes=True,
             import_outlines=True,
             flip_uvs=False,

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 import bpy
 import numpy as np
 import os
@@ -71,38 +71,15 @@ def import_armature(context, root, name: str):
     return armature
 
 
-def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bool):
+def import_images(
+    root, model_name: str, pack: bool, image_folder: str, flip: bool
+) -> list[bpy.types.Image]:
     blender_images = []
 
     if pack:
         decoded_images = xc3_model_py.decode_images_rgbaf32(root.image_textures)
         for i, (image, decoded) in enumerate(zip(root.image_textures, decoded_images)):
-            # Use the same naming conventions as the saved PNG images and xc3_tex.
-            if image.name is not None:
-                name = f"{model_name}.{i}.{image.name}"
-            else:
-                name = f"{model_name}.{i}"
-
-            blender_image = bpy.data.images.new(
-                name, image.width, image.height, alpha=True
-            )
-
-            # TODO: why is this necessary?
-            decoded_size = image.width * image.height * 4
-            decoded = decoded[:decoded_size]
-
-            if flip:
-                # Flip vertically to match Blender.
-                decoded = decoded.reshape((image.height, image.width, 4))
-                decoded = np.flip(decoded, axis=0)
-
-            blender_image.pixels.foreach_set(decoded.reshape(-1))
-
-            # TODO: This should depend on srgb vs linear in format.
-            blender_image.colorspace_settings.is_data = True
-
-            # Pack textures to avoid the prompt to save on exit.
-            blender_image.pack()
+            blender_image = import_image(image, decoded, flip, model_name, i)
             blender_images.append(blender_image)
     else:
         # Unpacked textures use less memory and are faster to load.
@@ -123,12 +100,71 @@ def import_images(root, model_name: str, pack: bool, image_folder: str, flip: bo
     return blender_images
 
 
+def import_image(image, decoded, flip: bool, model_name: str, i: int):
+    # Use the same naming conventions as the saved PNG images and xc3_tex.
+    if model_name != "":
+        if image.name is not None:
+            name = f"{model_name}.{i}.{image.name}"
+        else:
+            name = f"{model_name}.{i}"
+    else:
+        name = image.name
+
+    blender_image = bpy.data.images.new(name, image.width, image.height, alpha=True)
+
+    # TODO: why is this necessary?
+    decoded_size = image.width * image.height * 4
+    decoded = decoded[:decoded_size]
+
+    if flip:
+        # Flip vertically to match Blender.
+        decoded = decoded.reshape((image.height, image.width, 4))
+        decoded = np.flip(decoded, axis=0)
+
+    blender_image.pixels.foreach_set(decoded.reshape(-1))
+
+    # TODO: This should depend on srgb vs linear in format.
+    blender_image.colorspace_settings.is_data = True
+
+    # Pack textures to avoid the prompt to save on exit.
+    blender_image.pack()
+
+    return blender_image
+
+
+def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.Image]:
+    # Assume the path is in a game dump.
+    shader_images = {}
+    for parent in Path(path).parents:
+        folder = parent.joinpath("monolib").joinpath("shader")
+        if folder.exists():
+            # TODO: Lazy load these images instead?
+            textures = xc3_model_py.monolib.ShaderTextures.from_folder(str(folder))
+            names = [
+                "gTResidentTex09",
+                "gTResidentTex43",
+                "gTResidentTex44",
+                "gTResidentTex45",
+                "gTResidentTex46",
+            ]
+            images = [textures.global_texture(name) for name in names]
+            images = [i for i in images if i is not None]
+            decoded_images = xc3_model_py.decode_images_rgbaf32(images)
+
+            for name, (image, decoded) in zip(names, zip(images, decoded_images)):
+                # TODO: use the path as the name.
+                image.name = name
+                shader_images[name] = import_image(image, decoded, flip, "", 0)
+
+    return shader_images
+
+
 def import_map_root(
     operator,
     root,
     root_collection: bpy.types.Collection,
-    blender_images,
-    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
+    blender_images: list[bpy.types.Image],
+    shader_images: Dict[str, bpy.types.Image],
     import_all_meshes: bool,
     flip_uvs: bool,
 ):
@@ -166,9 +202,9 @@ def import_map_root(
                             material_name,
                             material,
                             blender_images,
+                            shader_images,
                             root.image_textures,
                             models.samplers,
-                            shader_textures,
                         )
 
                     buffers = group.buffers[model.model_buffers_index]
@@ -219,9 +255,9 @@ def import_map_root(
 def import_model_root(
     operator,
     root,
-    blender_images,
+    blender_images: list[bpy.types.Image],
+    shader_images: Dict[str, bpy.types.Image],
     root_obj,
-    shader_textures: Optional[xc3_model_py.monolib.ShaderTextures],
     import_all_meshes: bool,
     import_outlines: bool,
     flip_uvs: bool,
@@ -244,9 +280,9 @@ def import_model_root(
                     material_name,
                     material,
                     blender_images,
+                    shader_images,
                     root.image_textures,
                     root.models.samplers,
-                    shader_textures,
                 )
 
             if not import_all_meshes:
