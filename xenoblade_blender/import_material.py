@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 import bpy
+
 from . import xc3_model_py
 
 
@@ -356,6 +357,23 @@ def import_material(
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
         blender_material.shadow_method = "CLIP"
+
+    # Remove unused global textures.
+    # TODO: is there a better way of doing this?
+    for name in [
+        "gTResidentTex09",
+        "gTResidentTex43",
+        "gTResidentTex44",
+        "gTResidentTex45",
+        "gTResidentTex46",
+    ]:
+        node = textures_rgb.get(name)
+        if node is not None:
+            if all(len(o.links) == 0 for o in node.outputs):
+                nodes.remove(textures[name])
+                nodes.remove(textures_rgb[name])
+                nodes.remove(textures_scale[name])
+                nodes.remove(textures_uv[name])
 
     return blender_material
 
