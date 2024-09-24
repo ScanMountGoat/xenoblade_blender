@@ -647,7 +647,7 @@ def export_tangents(mesh_data, z_up_to_y_up, vertex_indices):
 
 def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute):
     ty = xc3_model_py.vertex.AttributeType.VertexColor
-    match color.attribute_name:
+    match color_attribute.name:
         case "VertexColor":
             ty = xc3_model_py.vertex.AttributeType.VertexColor
         case "Blend":
