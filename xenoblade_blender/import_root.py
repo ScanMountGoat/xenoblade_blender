@@ -371,28 +371,29 @@ def import_mesh(
     for attribute in vertex_buffer.attributes:
         data = attribute.data[min_index : max_index + 1]
 
-        if attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord0:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord0", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord1:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord1", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord2:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord2", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord3:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord3", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord4:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord4", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord5:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord5", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord6:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord6", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord7:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord7", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.TexCoord8:
-            import_uvs(operator, blender_mesh, indices, data, "TexCoord8", flip_uvs)
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.VertexColor:
-            import_colors(blender_mesh, data, "VertexColor")
-        elif attribute.attribute_type == xc3_model_py.vertex.AttributeType.Blend:
-            import_colors(blender_mesh, data, "Blend")
+        match attribute.attribute_type:
+            case xc3_model_py.vertex.AttributeType.TexCoord0:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord0", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord1:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord1", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord2:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord2", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord3:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord3", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord4:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord4", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord5:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord5", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord6:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord6", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord7:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord7", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.TexCoord8:
+                import_uvs(operator, blender_mesh, indices, data, "TexCoord8", flip_uvs)
+            case xc3_model_py.vertex.AttributeType.VertexColor:
+                import_colors(blender_mesh, data, "VertexColor")
+            case xc3_model_py.vertex.AttributeType.Blend:
+                import_colors(blender_mesh, data, "Blend")
 
     outline_vertex_colors = None
     if vertex_buffer.outline_buffer_index is not None:

@@ -653,16 +653,17 @@ def export_tangents(mesh_data, z_up_to_y_up, vertex_indices):
 
 def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute):
     ty = xc3_model_py.vertex.AttributeType.VertexColor
-    if color_attribute.name == "VertexColor":
-        ty = xc3_model_py.vertex.AttributeType.VertexColor
-    elif color_attribute.name == "Blend":
-        ty = xc3_model_py.vertex.AttributeType.Blend
-    elif color_attribute.name == "OutlineVertexColor":
-        ty = xc3_model_py.vertex.AttributeType.VertexColor
-    else:
-        message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
-        message += ' Valid names are "VertexColor" and "Blend".'
-        raise ExportException(message)
+    match color.attribute_name:
+        case "VertexColor":
+            ty = xc3_model_py.vertex.AttributeType.VertexColor
+        case "Blend":
+            ty = xc3_model_py.vertex.AttributeType.Blend
+        case "OutlineVertexColor":
+            ty = xc3_model_py.vertex.AttributeType.VertexColor
+        case _:
+            message = f'"{color_attribute.name}" for mesh {mesh_name} is not one of the supported color attribute names.'
+            message += ' Valid names are "VertexColor" and "Blend".'
+            raise ExportException(message)
 
         # TODO: error for unsupported data_type.
     if color_attribute.domain == "POINT":
@@ -692,28 +693,29 @@ def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
     texcoords[:, 1] = 1.0 - texcoords[:, 1]
 
     ty = xc3_model_py.vertex.AttributeType.TexCoord0
-    if uv_layer.name == "TexCoord0":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord0
-    elif uv_layer.name == "TexCoord1":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord1
-    elif uv_layer.name == "TexCoord2":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord2
-    elif uv_layer.name == "TexCoord3":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord3
-    elif uv_layer.name == "TexCoord4":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord4
-    elif uv_layer.name == "TexCoord5":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord5
-    elif uv_layer.name == "TexCoord6":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord6
-    elif uv_layer.name == "TexCoord7":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord7
-    elif uv_layer.name == "TexCoord8":
-        ty = xc3_model_py.vertex.AttributeType.TexCoord8
-    else:
-        message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
-        message += ' Valid names are "TexCoord0" to "TexCoord8".'
-        raise ExportException(message)
+    match uv_layer.name:
+        case "TexCoord0":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord0
+        case "TexCoord1":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord1
+        case "TexCoord2":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord2
+        case "TexCoord3":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord3
+        case "TexCoord4":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord4
+        case "TexCoord5":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord5
+        case "TexCoord6":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord6
+        case "TexCoord7":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord7
+        case "TexCoord8":
+            ty = xc3_model_py.vertex.AttributeType.TexCoord8
+        case _:
+            message = f'"{uv_layer.name}" for mesh {mesh_name} is not one of the supported UV map names.'
+            message += ' Valid names are "TexCoord0" to "TexCoord8".'
+            raise ExportException(message)
 
     return xc3_model_py.vertex.AttributeData(ty, texcoords)
 

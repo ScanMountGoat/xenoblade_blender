@@ -139,20 +139,21 @@ def import_material(
     base_color_y = 400
     for layer in assignments[0].layers:
         # TODO: Share code with normal layers?
-        if layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
-            mix_color = nodes.new("ShaderNodeMix")
-            mix_color.data_type = "RGBA"
-        elif layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.MixRatio:
-            # TODO: This should do mix(a, a*b, ratio)
-            mix_color = nodes.new("ShaderNodeMix")
-            mix_color.data_type = "RGBA"
-        elif layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Add:
-            mix_color = nodes.new("ShaderNodeMix")
-            mix_color.data_type = "RGBA"
-            mix_color.blend_type = "ADD"
-        else:
-            mix_color = nodes.new("ShaderNodeMix")
-            mix_color.data_type = "RGBA"
+        match layer.blend_mode:
+            case xc3_model_py.shader_database.LayerBlendMode.Mix:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+            case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
+                # TODO: This should do mix(a, a*b, ratio)
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+            case xc3_model_py.shader_database.LayerBlendMode.Add:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+                mix_color.blend_type = "ADD"
+            case _:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
 
         mix_color.location = (base_color_x, 400)
         base_color_x += 200
@@ -395,12 +396,13 @@ def add_texture_nodes(
 
     # TODO: Check if U and V have the same address mode.
     if sampler is not None:
-        if sampler.address_mode_u == xc3_model_py.AddressMode.ClampToEdge:
-            texture_node.extension = "CLIP"
-        elif sampler.address_mode_u == xc3_model_py.AddressMode.Repeat:
-            texture_node.extension = "REPEAT"
-        elif sampler.address_mode_u == xc3_model_py.AddressMode.MirrorRepeat:
-            texture_node.extension = "MIRROR"
+        match sampler.address_mode_u:
+            case xc3_model_py.AddressMode.ClampToEdge:
+                texture_node.extension = "CLIP"
+            case xc3_model_py.AddressMode.Repeat:
+                texture_node.extension = "REPEAT"
+            case xc3_model_py.AddressMode.MirrorRepeat:
+                texture_node.extension = "MIRROR"
 
     textures[name] = texture_node
 
