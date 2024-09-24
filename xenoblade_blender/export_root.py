@@ -363,25 +363,9 @@ def export_mesh_inner(
     vertex_buffer_index = len(root.buffers.vertex_buffers)
     index_buffer_index = len(root.buffers.index_buffers)
 
-    # Use names as a less accurate fallback for the original material.
-    blender_material_name = mesh_data.materials[0].name
-    material_index, material_name = extract_index(blender_material_name)
-    is_new_material = True
-    for i, material in enumerate(root.models.materials):
-        if material.name == material_name:
-            is_new_material = False
-            if material_index is None:
-                material_index = i
-            break
-
-    if material_index is None:
-        message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
-        raise ExportException(message)
-
-    if material_index < 0 or material_index >= len(root.models.materials):
-        message = f"Material index {material_index} for mesh {mesh_name}"
-        message += f" does not reference one of {len(root.models.materials)} original materials."
-        raise ExportException(message)
+    material_index, material_name, is_new_material = extract_material_name_info(
+        root, mesh_name, mesh_data
+    )
 
     # TODO: why does None not work well in game?
     lod_item_index = 0
@@ -394,16 +378,11 @@ def export_mesh_inner(
     # We don't use the original index since the new buffers are different.
     index_buffer_index2 = index_buffer_index
 
-    # Preserve original fields for meshes like "0.material"
-    # Perform this before potentially adding materials.
-    original_mesh_index, _ = extract_index(mesh_name)
-    if original_mesh_index is None:
-        for i, mesh in enumerate(original_meshes):
-            if mesh.material_index == material_index:
-                original_mesh_index = i
-                break
+    original_mesh_index = extract_mesh_index(mesh_name, original_meshes, material_index)
 
     if original_mesh_index is not None:
+        # Preserve original fields for meshes like "0.material"
+        # Perform this before potentially adding materials.
         original_mesh = original_meshes[original_mesh_index]
 
         lod_item_index = original_mesh.lod_item_index
@@ -435,7 +414,7 @@ def export_mesh_inner(
     for i, image in material_texture_indices.values():
         image_replacements.add((i, image))
 
-    mesh = xc3_model_py.Mesh(
+    new_mesh = xc3_model_py.Mesh(
         vertex_buffer_index,
         index_buffer_index,
         index_buffer_index2,
@@ -448,7 +427,7 @@ def export_mesh_inner(
     )
 
     mesh_index = len(root.models.models[0].meshes)
-    root.models.models[0].meshes.append(mesh)
+    root.models.models[0].meshes.append(new_mesh)
 
     # XC1 and XC2 don't use speff meshes.
     only_base_meshes = all(m.base_mesh_index == 0 for m in original_meshes)
@@ -473,17 +452,11 @@ def export_mesh_inner(
                         material_texture_indices,
                     )
 
-                speff_mesh = xc3_model_py.Mesh(
-                    vertex_buffer_index,
-                    index_buffer_index,
-                    index_buffer_index2,
-                    speff_material_index,
-                    mesh.flags1,
-                    mesh.flags2,
-                    lod_item_index,
-                    ext_mesh_index,
-                    base_mesh_index=mesh_index,
-                )
+                speff_mesh = copy_mesh(new_mesh)
+                speff_mesh.material_index = speff_material_index
+                speff_mesh.flags1 = mesh.flags1
+                speff_mesh.flags2 = mesh.flags2
+                speff_mesh.base_mesh_index = mesh_index
                 root.models.models[0].meshes.append(speff_mesh)
 
     # TODO: Is there a more reliable way to check for outlines?
@@ -569,6 +542,40 @@ def export_mesh_inner(
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
+
+
+def extract_mesh_index(mesh_name, original_meshes, material_index):
+    mesh_index, _ = extract_index(mesh_name)
+    if mesh_index is None:
+        for i, mesh in enumerate(original_meshes):
+            if mesh.material_index == material_index:
+                mesh_index = i
+                break
+
+    return mesh_index
+
+
+def extract_material_name_info(root, mesh_name, mesh_data):
+    # Use names as a less accurate fallback for the original material.
+    blender_material_name = mesh_data.materials[0].name
+    material_index, material_name = extract_index(blender_material_name)
+    is_new_material = True
+    for i, material in enumerate(root.models.materials):
+        if material.name == material_name:
+            is_new_material = False
+            if material_index is None:
+                material_index = i
+            break
+
+    if material_index is None:
+        message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
+        raise ExportException(message)
+
+    if material_index < 0 or material_index >= len(root.models.materials):
+        message = f"Material index {material_index} for mesh {mesh_name}"
+        message += f" does not reference one of {len(root.models.materials)} original materials."
+        raise ExportException(message)
+    return material_index, material_name, is_new_material
 
 
 def export_influences(
@@ -836,4 +843,18 @@ def copy_material(material):
         material.m_unks3_1,
         material.alpha_test,
         material.shader,
+    )
+
+
+def copy_mesh(mesh: xc3_model_py.Mesh) -> xc3_model_py.Mesh:
+    return xc3_model_py.Mesh(
+        mesh.vertex_buffer_index,
+        mesh.index_buffer_index,
+        mesh.index_buffer_index2,
+        mesh.material_index,
+        mesh.flags1,
+        mesh.flags2,
+        mesh.lod_item_index,
+        mesh.ext_mesh_index,
+        mesh.base_mesh_index,
     )
