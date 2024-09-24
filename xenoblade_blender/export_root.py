@@ -279,9 +279,9 @@ def export_mesh_inner(
     # TODO: Support 32 bit indices eventually and make this a warning.
     vertex_count = len(mesh_data.vertices)
     if vertex_count > 65535:
-        raise ExportException(
-            f"Mesh {mesh_name} will have {vertex_count} vertices after exporting, which exceeds the per mesh limit of 65535."
-        )
+        message = f"Mesh {mesh_name} will have {vertex_count} vertices after exporting," 
+        message += " which exceeds the per mesh limit of 65535."
+        raise ExportException(message)
 
     z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
 
@@ -486,17 +486,11 @@ def export_mesh_inner(
                 break
 
         if original_outline_mesh is not None and outline_material_index is not None:
-            outline_mesh = xc3_model_py.Mesh(
-                vertex_buffer_index,
-                index_buffer_index,
-                index_buffer_index2,
-                outline_material_index,
-                original_outline_mesh.flags1,
-                original_outline_mesh.flags2,
-                lod_item_index,
-                ext_mesh_index,
-                base_mesh_index=mesh_index,
-            )
+            outline_mesh = copy_mesh(new_mesh)
+            outline_mesh.material_index = outline_material_index
+            outline_mesh.flags1 = original_outline_mesh.flags1
+            outline_mesh.flags2 = original_outline_mesh.flags2
+            outline_mesh.base_mesh_index = mesh_index
             root.models.models[0].meshes.append(outline_mesh)
         else:
             message = f"Unable to find outline mesh for {mesh_name} in original wimdo to generate outlines"
