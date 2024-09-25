@@ -610,9 +610,10 @@ def import_colors(
     data: np.ndarray,
     name: str,
 ):
-    # Byte color still uses floats but restricts their range to 0.0 to 1.0.
+    # The in game data is technically only 8 bits per channel.
+    # Use full precision to avoid rounding errors on export.
     attribute = blender_mesh.color_attributes.new(
-        name=name, type="BYTE_COLOR", domain="POINT"
+        name=name, type="FLOAT_COLOR", domain="POINT"
     )
     attribute.data.foreach_set("color", data.reshape(-1))
 

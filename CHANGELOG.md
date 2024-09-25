@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for textures in the monolib/shader folder to generated materials.
 
+### Changed
+* Improved precision for vertex color import.
+
 ### Fixed
 * Fixed an issue where exporting wimdo models after removing all meshes with shape keys could cause crashes in game.
 
