@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where exporting wimdo models after removing all meshes with shape keys could cause crashes in game.
+* Fixed an issue where texture layers would only assign the first channel.
 
 ## 0.14.1 - 2024-09-18
 ### Added
