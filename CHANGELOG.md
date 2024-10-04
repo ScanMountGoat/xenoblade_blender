@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where some Xenoblade 2 models did not use the correct color layering information.
+
 ## 0.14.2 - 2024-09-25
 ### Added
 * Added support for textures in the monolib/shader folder to generated materials.
