@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for toon gradient textures to generated materials.
+
 ### Fixed
 * Fixed an issue where some Xenoblade 2 models did not use the correct color layering information.
+* Fixed an issue where global textures would not import correctly for some models.
 
 ## 0.14.2 - 2024-09-25
 ### Added

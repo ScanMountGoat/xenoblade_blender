@@ -251,16 +251,84 @@ def import_material(
         else:
             links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
 
+    final_albedo = mix_ao
+
+    # Toon shading.
+    if mat_id == 2:
+        texture_node = nodes.new("ShaderNodeTexImage")
+        texture_node.label = "gTToonGrad"
+        texture_node.location = (100, 850)
+        if "gTToonGrad" in shader_images:
+            texture_node.image = shader_images["gTToonGrad"]
+
+        uv = nodes.new("ShaderNodeCombineXYZ")
+        uv.location = (-100, 850)
+        links.new(uv.outputs["Vector"], texture_node.inputs["Vector"])
+
+        # Using the actual lighting requires shader to RGB.
+        # Use view based "lighting" to still support cycles.
+        invert_facing = nodes.new("ShaderNodeMath")
+        invert_facing.location = (-300, 850)
+        invert_facing.operation = "SUBTRACT"
+        invert_facing.inputs[0].default_value = 1.0
+        links.new(invert_facing.outputs["Value"], uv.inputs["X"])
+
+        layer_weight = nodes.new("ShaderNodeLayerWeight")
+        layer_weight.location = (-500, 850)
+        links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
+
+        flip_uvs = nodes.new("ShaderNodeMath")
+        flip_uvs.location = (-300, 700)
+        flip_uvs.label = "Flip UVs"
+        flip_uvs.operation = "SUBTRACT"
+        flip_uvs.inputs[0].default_value = 1.0
+        links.new(flip_uvs.outputs["Value"], uv.inputs["Y"])
+
+        div = nodes.new("ShaderNodeMath")
+        div.location = (-500, 700)
+        div.operation = "DIVIDE"
+        div.inputs[1].default_value = 256.0
+        links.new(div.outputs["Value"], flip_uvs.inputs[1])
+
+        add = nodes.new("ShaderNodeMath")
+        add.location = (-700, 700)
+        add.operation = "ADD"
+        add.inputs[1].default_value = 0.5
+        links.new(add.outputs["Value"], div.inputs[0])
+
+        row_index = nodes.new("ShaderNodeValue")
+        row_index.location = (-900, 700)
+        row_index.label = "Toon Gradient Row"
+        links.new(row_index.outputs["Value"], add.inputs[0])
+        # Try and find the non processed value.
+        # This works since type 26 only seems to be used for toon gradients.
+        for c in material.work_callbacks:
+            if c.unk1 == 26:
+                row_index.outputs[0].default_value = material.work_values[c.unk2 + 1]
+                break
+
+        # Approximate the lighting ramp by multiplying base color.
+        # This preserves compatibility with Cycles.
+        mix_ramp = nodes.new("ShaderNodeMix")
+        mix_ramp.location = (400, 850)
+        mix_ramp.data_type = "RGBA"
+        mix_ramp.blend_type = "MULTIPLY"
+        mix_ramp.inputs["Factor"].default_value = 1.0
+        links.new(texture_node.outputs["Color"], mix_ramp.inputs["A"])
+        links.new(mix_ao.outputs["Result"], mix_ramp.inputs["B"])
+
+        final_albedo = mix_ramp
+
     if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
         transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
         transparent_bsdf.location = (300, 100)
-        links.new(mix_ao.outputs["Result"], transparent_bsdf.inputs["Color"])
+        links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
         links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
         blender_material.blend_method = "BLEND"
     else:
-        links.new(mix_ao.outputs["Result"], bsdf.inputs["Base Color"])
+        links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
 
     assign_normal_map(
         nodes,

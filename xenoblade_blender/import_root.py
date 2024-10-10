@@ -131,6 +131,7 @@ def import_image(image, decoded, flip: bool, model_name: str, i: int):
 
     return blender_image
 
+
 def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.Image]:
     # Assume the path is in a game dump.
     shader_images = {}
@@ -145,12 +146,16 @@ def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.I
                 "gTResidentTex44",
                 "gTResidentTex45",
                 "gTResidentTex46",
+                "gTToonGrad",
             ]
-            images = [textures.global_texture(name) for name in names]
-            images = [i for i in images if i is not None]
-            decoded_images = xc3_model_py.decode_images_rgbaf32(images)
+            images = [(name, textures.global_texture(name)) for name in names]
+            images = [(name, i) for (name, i) in images if i is not None]
 
-            for name, (image, decoded) in zip(names, zip(images, decoded_images)):
+            decoded_images = xc3_model_py.decode_images_rgbaf32(
+                [i for (_, i) in images]
+            )
+
+            for (name, image), decoded in zip(images, decoded_images):
                 # TODO: use the path as the name.
                 image.name = name
                 shader_images[name] = import_image(image, decoded, flip, "", 0)
