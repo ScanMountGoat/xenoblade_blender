@@ -251,6 +251,15 @@ def import_material(
         else:
             links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
 
+    normal_map = assign_normal_map(
+        nodes,
+        links,
+        bsdf,
+        assignments,
+        texture_nodes,
+        vertex_color_nodes,
+    )
+
     final_albedo = mix_ao
 
     # Toon shading.
@@ -261,6 +270,7 @@ def import_material(
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
+        # TODO: make a node group for the toon UVs.
         uv = nodes.new("ShaderNodeCombineXYZ")
         uv.location = (800, 850)
         links.new(uv.outputs["Vector"], texture_node.inputs["Vector"])
@@ -275,7 +285,10 @@ def import_material(
 
         layer_weight = nodes.new("ShaderNodeLayerWeight")
         layer_weight.location = (400, 850)
+        layer_weight.inputs["Blend"].default_value = 0.5
         links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
+        if normal_map is not None:
+            links.new(normal_map.outputs["Normal"], layer_weight.inputs["Normal"])
 
         flip_uvs = nodes.new("ShaderNodeMath")
         flip_uvs.location = (600, 700)
@@ -329,15 +342,6 @@ def import_material(
         blender_material.blend_method = "BLEND"
     else:
         links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
-
-    assign_normal_map(
-        nodes,
-        links,
-        bsdf,
-        assignments,
-        texture_nodes,
-        vertex_color_nodes,
-    )
 
     assign_channel(
         assignments[1].x,
@@ -609,6 +613,8 @@ def assign_normal_map(
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
+
+    return normal_map
 
 
 def normals_xy_node_group():
