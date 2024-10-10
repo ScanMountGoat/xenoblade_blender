@@ -257,47 +257,47 @@ def import_material(
     if mat_id == 2:
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.label = "gTToonGrad"
-        texture_node.location = (100, 850)
+        texture_node.location = (1000, 850)
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
         uv = nodes.new("ShaderNodeCombineXYZ")
-        uv.location = (-100, 850)
+        uv.location = (800, 850)
         links.new(uv.outputs["Vector"], texture_node.inputs["Vector"])
 
         # Using the actual lighting requires shader to RGB.
         # Use view based "lighting" to still support cycles.
         invert_facing = nodes.new("ShaderNodeMath")
-        invert_facing.location = (-300, 850)
+        invert_facing.location = (600, 850)
         invert_facing.operation = "SUBTRACT"
         invert_facing.inputs[0].default_value = 1.0
         links.new(invert_facing.outputs["Value"], uv.inputs["X"])
 
         layer_weight = nodes.new("ShaderNodeLayerWeight")
-        layer_weight.location = (-500, 850)
+        layer_weight.location = (400, 850)
         links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
 
         flip_uvs = nodes.new("ShaderNodeMath")
-        flip_uvs.location = (-300, 700)
+        flip_uvs.location = (600, 700)
         flip_uvs.label = "Flip UVs"
         flip_uvs.operation = "SUBTRACT"
         flip_uvs.inputs[0].default_value = 1.0
         links.new(flip_uvs.outputs["Value"], uv.inputs["Y"])
 
         div = nodes.new("ShaderNodeMath")
-        div.location = (-500, 700)
+        div.location = (400, 700)
         div.operation = "DIVIDE"
         div.inputs[1].default_value = 256.0
         links.new(div.outputs["Value"], flip_uvs.inputs[1])
 
         add = nodes.new("ShaderNodeMath")
-        add.location = (-700, 700)
+        add.location = (200, 700)
         add.operation = "ADD"
         add.inputs[1].default_value = 0.5
         links.new(add.outputs["Value"], div.inputs[0])
 
         row_index = nodes.new("ShaderNodeValue")
-        row_index.location = (-900, 700)
+        row_index.location = (0, 700)
         row_index.label = "Toon Gradient Row"
         links.new(row_index.outputs["Value"], add.inputs[0])
         # Try and find the non processed value.
@@ -310,7 +310,7 @@ def import_material(
         # Approximate the lighting ramp by multiplying base color.
         # This preserves compatibility with Cycles.
         mix_ramp = nodes.new("ShaderNodeMix")
-        mix_ramp.location = (400, 850)
+        mix_ramp.location = (1300, 850)
         mix_ramp.data_type = "RGBA"
         mix_ramp.blend_type = "MULTIPLY"
         mix_ramp.inputs["Factor"].default_value = 1.0
