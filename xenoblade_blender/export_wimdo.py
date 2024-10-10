@@ -273,7 +273,7 @@ def encode_args_from_image(image, original_image):
             True,
             image_data.reshape(-1),
             "",
-            xc3_model_py.TextureUsage.Col,
+            xc3_model_py.material.TextureUsage.Col,
         )
 
     return args
@@ -303,7 +303,7 @@ def export_external_images(root, image_folder: str):
                 dds_indices_images.append((i, image))
             else:
                 image = xc3_model_py.ImageTexture.from_dds(
-                    dds, "", xc3_model_py.TextureUsage.Col
+                    dds, "", xc3_model_py.material.TextureUsage.Col
                 )
                 dds_indices_images.append((i, image))
         else:

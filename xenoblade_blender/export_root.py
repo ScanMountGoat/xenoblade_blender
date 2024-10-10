@@ -279,7 +279,7 @@ def export_mesh_inner(
     # TODO: Support 32 bit indices eventually and make this a warning.
     vertex_count = len(mesh_data.vertices)
     if vertex_count > 65535:
-        message = f"Mesh {mesh_name} will have {vertex_count} vertices after exporting," 
+        message = f"Mesh {mesh_name} will have {vertex_count} vertices after exporting,"
         message += " which exceeds the per mesh limit of 65535."
         raise ExportException(message)
 
@@ -814,10 +814,10 @@ def export_shape_keys(
 def copy_material(material):
     # TODO: does pyo3 support deep copy?
     textures = [
-        xc3_model_py.Texture(t.image_texture_index, t.sampler_index)
+        xc3_model_py.material.Texture(t.image_texture_index, t.sampler_index)
         for t in material.textures
     ]
-    return xc3_model_py.Material(
+    return xc3_model_py.material.Material(
         material.name,
         material.flags,
         material.render_flags,
@@ -839,6 +839,7 @@ def copy_material(material):
         material.m_unks3_1,
         material.alpha_test,
         material.shader,
+        material.fur_params,
     )
 
 

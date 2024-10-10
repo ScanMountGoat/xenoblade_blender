@@ -124,8 +124,8 @@ def import_material(
     )
 
     if material.state_flags.blend_mode not in [
-        xc3_model_py.BlendMode.Disabled,
-        xc3_model_py.BlendMode.Disabled2,
+        xc3_model_py.material.BlendMode.Disabled,
+        xc3_model_py.material.BlendMode.Disabled2,
     ]:
         assign_channel(
             assignments[0].w,
@@ -251,7 +251,7 @@ def import_material(
         else:
             links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
 
-    if material.state_flags.blend_mode == xc3_model_py.BlendMode.Multiply:
+    if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
         transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
         transparent_bsdf.location = (300, 100)
