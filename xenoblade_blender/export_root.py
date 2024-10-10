@@ -396,20 +396,20 @@ def export_mesh_inner(
         mesh_data, original_material, root.image_textures
     )
 
+    # TODO: Share code with editing speff materials.
     if is_new_material:
         # Add a new material with the given name.
         # Avoid potentially referencing an added material here.
-        new_material = copy_material(original_material)
-        new_material.name = material_name
-        apply_texture_indices(new_material, material_texture_indices)
-
+        material_to_edit = copy_material(original_material)
+        material_to_edit.name = material_name
         material_index = len(root.models.materials)
-        root.models.materials.append(new_material)
+        root.models.materials.append(material_to_edit)
     else:
         # Update an existing material.
-        apply_texture_indices(
-            root.models.materials[material_index], material_texture_indices
-        )
+        material_to_edit = root.models.materials[material_index]
+
+    apply_texture_indices(material_to_edit, material_texture_indices)
+    apply_toon_gradient_row(mesh_data, material_to_edit)
 
     for i, image in material_texture_indices.values():
         image_replacements.add((i, image))
@@ -442,15 +442,16 @@ def export_mesh_inner(
                 # Avoid modifying existing speff materials if the material is new.
                 speff_material_index = mesh.material_index
                 if is_new_material:
-                    material = copy_material(root.models.materials[mesh.material_index])
-                    apply_texture_indices(material, material_texture_indices)
-                    speff_material_index = len(root.models.materials)
-                    root.models.materials.append(material)
-                else:
-                    apply_texture_indices(
-                        root.models.materials[mesh.material_index],
-                        material_texture_indices,
+                    material_to_edit = copy_material(
+                        root.models.materials[mesh.material_index]
                     )
+                    speff_material_index = len(root.models.materials)
+                    root.models.materials.append(material_to_edit)
+                else:
+                    material_to_edit = root.models.materials[mesh.material_index]
+
+                apply_texture_indices(material_to_edit, material_texture_indices)
+                apply_toon_gradient_row(mesh_data, material_to_edit)
 
                 speff_mesh = copy_mesh(new_mesh)
                 speff_mesh.material_index = speff_material_index
@@ -538,6 +539,17 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
+def apply_toon_gradient_row(mesh_data, material):
+    # Try and find the non processed toon gradient value.
+    # This works since type 26 only seems to be used for toon gradients.
+    toon_row_index = extract_toon_gradient_row(mesh_data)
+    if toon_row_index is not None:
+        for c in material.work_callbacks:
+            if c.unk1 == 26:
+                material.work_values[c.unk2] = toon_row_index
+                material.work_values[c.unk2 + 1] = toon_row_index
+
+
 def extract_mesh_index(mesh_name, original_meshes, material_index):
     mesh_index, _ = extract_index(mesh_name)
     if mesh_index is None:
@@ -547,6 +559,13 @@ def extract_mesh_index(mesh_name, original_meshes, material_index):
                 break
 
     return mesh_index
+
+
+def extract_toon_gradient_row(mesh_data) -> Optional[float]:
+    for node in mesh_data.materials[0].node_tree.nodes:
+        if node.label == "Toon Gradient Row":
+            return node.outputs[0].default_value
+    return None
 
 
 def extract_material_name_info(root, mesh_name, mesh_data):

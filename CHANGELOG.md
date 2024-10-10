@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Added
 * Added support for toon gradient textures to generated materials.
+* Added support for editing the selected toon gradient ramp for wimdo exports.
 
 ### Fixed
 * Fixed an issue where some Xenoblade 2 models did not use the correct color layering information.
