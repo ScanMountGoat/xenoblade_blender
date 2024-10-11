@@ -270,49 +270,18 @@ def import_material(
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
-        # TODO: make a node group for the toon UVs.
-        uv = nodes.new("ShaderNodeCombineXYZ")
-        uv.location = (800, 850)
-        links.new(uv.outputs["Vector"], texture_node.inputs["Vector"])
+        uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
+        uvs.location = (800, 850)
+        links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
 
-        # Using the actual lighting requires shader to RGB.
-        # Use view based "lighting" to still support cycles.
-        invert_facing = nodes.new("ShaderNodeMath")
-        invert_facing.location = (600, 850)
-        invert_facing.operation = "SUBTRACT"
-        invert_facing.inputs[0].default_value = 1.0
-        links.new(invert_facing.outputs["Value"], uv.inputs["X"])
-
-        layer_weight = nodes.new("ShaderNodeLayerWeight")
-        layer_weight.location = (400, 850)
-        layer_weight.inputs["Blend"].default_value = 0.5
-        links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
         if normal_map is not None:
-            links.new(normal_map.outputs["Normal"], layer_weight.inputs["Normal"])
-
-        flip_uvs = nodes.new("ShaderNodeMath")
-        flip_uvs.location = (600, 700)
-        flip_uvs.label = "Flip UVs"
-        flip_uvs.operation = "SUBTRACT"
-        flip_uvs.inputs[0].default_value = 1.0
-        links.new(flip_uvs.outputs["Value"], uv.inputs["Y"])
-
-        div = nodes.new("ShaderNodeMath")
-        div.location = (400, 700)
-        div.operation = "DIVIDE"
-        div.inputs[1].default_value = 256.0
-        links.new(div.outputs["Value"], flip_uvs.inputs[1])
-
-        add = nodes.new("ShaderNodeMath")
-        add.location = (200, 700)
-        add.operation = "ADD"
-        add.inputs[1].default_value = 0.5
-        links.new(add.outputs["Value"], div.inputs[0])
+            links.new(normal_map.outputs["Normal"], uvs.inputs["Normal"])
 
         row_index = nodes.new("ShaderNodeValue")
-        row_index.location = (0, 700)
+        row_index.location = (600, 700)
         row_index.label = "Toon Gradient Row"
-        links.new(row_index.outputs["Value"], add.inputs[0])
+        links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
+        
         # Try and find the non processed value.
         # This works since type 26 only seems to be used for toon gradients.
         for c in material.work_callbacks:
@@ -448,6 +417,69 @@ def import_material(
                 nodes.remove(textures_uv[name])
 
     return blender_material
+
+
+def toon_grad_uvs_node_group():
+    node_tree = bpy.data.node_groups.new("ToonGradUVs", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    input_node.location = (-1000, 0)
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Row Index"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Normal"
+    )
+
+    uv = nodes.new("ShaderNodeCombineXYZ")
+    uv.location = (-200, 150)
+
+    # Using the actual lighting requires shader to RGB.
+    # Use view based "lighting" to still support cycles.
+    invert_facing = nodes.new("ShaderNodeMath")
+    invert_facing.location = (-400, 150)
+    invert_facing.operation = "SUBTRACT"
+    invert_facing.inputs[0].default_value = 1.0
+    links.new(invert_facing.outputs["Value"], uv.inputs["X"])
+
+    layer_weight = nodes.new("ShaderNodeLayerWeight")
+    layer_weight.location = (-600, 150)
+    layer_weight.inputs["Blend"].default_value = 0.5
+    links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
+    links.new(input_node.outputs["Normal"], layer_weight.inputs["Normal"])
+
+    flip_uvs = nodes.new("ShaderNodeMath")
+    flip_uvs.location = (-400, 0)
+    flip_uvs.label = "Flip UVs"
+    flip_uvs.operation = "SUBTRACT"
+    flip_uvs.inputs[0].default_value = 1.0
+    links.new(flip_uvs.outputs["Value"], uv.inputs["Y"])
+
+    div = nodes.new("ShaderNodeMath")
+    div.location = (-600, 0)
+    div.operation = "DIVIDE"
+    div.inputs[1].default_value = 256.0
+    links.new(div.outputs["Value"], flip_uvs.inputs[1])
+
+    add = nodes.new("ShaderNodeMath")
+    add.location = (-800, 0)
+    add.operation = "ADD"
+    add.inputs[1].default_value = 0.5
+    links.new(input_node.outputs["Row Index"], add.inputs[0])
+    links.new(add.outputs["Value"], div.inputs[0])
+
+    output_node = nodes.new("NodeGroupOutput")
+    output_node.location = (0, 0)
+    links.new(uv.outputs["Vector"], output_node.inputs["Vector"])
+
+    return node_tree
 
 
 def add_texture_nodes(
