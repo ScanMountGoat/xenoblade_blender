@@ -281,7 +281,7 @@ def import_material(
         row_index.location = (600, 700)
         row_index.label = "Toon Gradient Row"
         links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
-        
+
         # Try and find the non processed value.
         # This works since type 26 only seems to be used for toon gradients.
         for c in material.work_callbacks:
@@ -401,12 +401,14 @@ def import_material(
 
     # Remove unused global textures.
     # TODO: is there a better way of doing this?
+    # TODO: Create a variable for this somewhere.
     for name in [
         "gTResidentTex09",
         "gTResidentTex43",
         "gTResidentTex44",
         "gTResidentTex45",
         "gTResidentTex46",
+        "gTToonGrad",
     ]:
         node = textures_rgb.get(name)
         if node is not None:
