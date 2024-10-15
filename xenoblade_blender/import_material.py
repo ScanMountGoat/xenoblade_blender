@@ -262,8 +262,8 @@ def import_material(
 
     final_albedo = mix_ao
 
-    # Toon shading.
-    if mat_id == 2:
+    # Toon and hair materials use toon gradient ramps.
+    if mat_id in [2, 5]:
         texture_node = nodes.new("ShaderNodeTexImage")
         texture_node.label = "gTToonGrad"
         texture_node.location = (1000, 850)
