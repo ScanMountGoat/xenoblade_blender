@@ -1,11 +1,5 @@
 import bpy
 
-from . import import_mot
-from . import import_wimdo
-from . import import_wismhd
-from . import import_camdo
-from . import export_wimdo
-
 bl_info = {
     "name": "Xenoblade Blender",
     "description": "Import and export Xenoblade models, maps, and animations",
@@ -20,41 +14,10 @@ bl_info = {
 }
 
 
-def menu_import_mot(self, context):
-    text = "Xenoblade Animation (.mot)"
-    self.layout.operator(import_mot.ImportMot.bl_idname, text=text)
-
-
-def menu_import_wimdo(self, context):
-    text = "Xenoblade Model (.wimdo)"
-    self.layout.operator(import_wimdo.ImportWimdo.bl_idname, text=text)
-
-
-def menu_export_wimdo(self, context):
-    text = "Xenoblade Model (.wimdo)"
-    self.layout.operator(export_wimdo.ExportWimdo.bl_idname, text=text)
-
-
-def menu_import_wismhd(self, context):
-    text = "Xenoblade Map (.wismhd)"
-    self.layout.operator(import_wismhd.ImportWismhd.bl_idname, text=text)
-
-
-def menu_import_camdo(self, context):
-    text = "Xenoblade Model (.camdo)"
-    self.layout.operator(import_camdo.ImportCamdo.bl_idname, text=text)
-
-
-classes = [
-    import_mot.ImportMot,
-    import_wimdo.ImportWimdo,
-    import_wismhd.ImportWismhd,
-    import_camdo.ImportCamdo,
-    export_wimdo.ExportWimdo,
-]
-
-
 def register():
+    # Check the Blender version before importing the xc3_model_py module.
+    # This avoids showing a DLL import error if the Python version
+    # has changed between the current and expected Blender version.
     if bpy.app.version < bl_info["blender"]:
         current_version = ".".join(str(v) for v in bpy.app.version)
         expected_version = ".".join(str(v) for v in bl_info["blender"])
@@ -62,27 +25,15 @@ def register():
             f"Blender version {current_version} is incompatible. Use version {expected_version} or later."
         )
 
-    for cls in classes:
-        bpy.utils.register_class(cls)
+    from . import addon
 
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_mot)
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_wimdo)
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_wismhd)
-    bpy.types.TOPBAR_MT_file_import.append(menu_import_camdo)
-
-    bpy.types.TOPBAR_MT_file_export.append(menu_export_wimdo)
+    addon.register()
 
 
 def unregister():
-    for cls in classes:
-        bpy.utils.unregister_class(cls)
+    from . import addon
 
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_mot)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_wimdo)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_wismhd)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_import_camdo)
-
-    bpy.types.TOPBAR_MT_file_export.remove(menu_export_wimdo)
+    addon.unregister()
 
 
 if __name__ == "__main__":

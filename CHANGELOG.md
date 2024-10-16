@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 * Fixed an issue where some hair materials did not correctly generate toon gradient nodes.
 
+### Changed
+* Improved the error message when enabling the addon on an unsupported Blender version.
+
 ## 0.15.0 - 2024-10-11
 ### Added
 * Added support for toon gradient textures to generated materials.
