@@ -193,7 +193,7 @@ def import_material(
             fresnel_blend = create_node_group(
                 nodes, "FresnelBlend", fresnel_blend_node_group
             )
-            fresnel_blend.location = (base_color_x, 600)
+            fresnel_blend.location = (mix_color.location[0] - 200, 600)
             # TODO: normals?
 
             assign_channel(
@@ -260,57 +260,11 @@ def import_material(
         vertex_color_nodes,
     )
 
-    final_albedo = mix_ao
-
-    # Toon and hair materials use toon gradient ramps.
-    if mat_id in [2, 5]:
-        texture_node = nodes.new("ShaderNodeTexImage")
-        texture_node.label = "gTToonGrad"
-        texture_node.location = (1000, 850)
-        if "gTToonGrad" in shader_images:
-            texture_node.image = shader_images["gTToonGrad"]
-
-        uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
-        uvs.location = (800, 850)
-        links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
-
-        if normal_map is not None:
-            links.new(normal_map.outputs["Normal"], uvs.inputs["Normal"])
-
-        row_index = nodes.new("ShaderNodeValue")
-        row_index.location = (600, 700)
-        row_index.label = "Toon Gradient Row"
-        links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
-
-        # Try and find the non processed value.
-        # This works since type 26 only seems to be used for toon gradients.
-        for c in material.work_callbacks:
-            if c.unk1 == 26:
-                row_index.outputs[0].default_value = material.work_values[c.unk2 + 1]
-                break
-
-        # Approximate the lighting ramp by multiplying base color.
-        # This preserves compatibility with Cycles.
-        mix_ramp = nodes.new("ShaderNodeMix")
-        mix_ramp.location = (1300, 850)
-        mix_ramp.data_type = "RGBA"
-        mix_ramp.blend_type = "MULTIPLY"
-        mix_ramp.inputs["Factor"].default_value = 1.0
-        links.new(texture_node.outputs["Color"], mix_ramp.inputs["A"])
-        links.new(mix_ao.outputs["Result"], mix_ramp.inputs["B"])
-
-        final_albedo = mix_ramp
-
-    if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
-        # Workaround for Blender not supporting alpha blending modes.
-        transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
-        transparent_bsdf.location = (300, 100)
-        links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
-        links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
-
-        blender_material.blend_method = "BLEND"
-    else:
-        links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
+    # Place the BSDF and output after all other nodes.
+    if normal_map is not None:
+        if normal_map.location[0] > bsdf.location[0]:
+            bsdf.location[0] = normal_map.location[0] + 300
+            output_node.location[0] = bsdf.location[0] + 300
 
     assign_channel(
         assignments[1].x,
@@ -384,6 +338,64 @@ def import_material(
                 invert.inputs[1],
             )
             links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
+
+    final_albedo = mix_ao
+
+    # Toon and hair materials use toon gradient ramps.
+    if mat_id in [2, 5]:
+        x_start = final_albedo.location[0] + 200
+        texture_node = nodes.new("ShaderNodeTexImage")
+        texture_node.label = "gTToonGrad"
+        texture_node.location = (x_start - 300, 900)
+        if "gTToonGrad" in shader_images:
+            texture_node.image = shader_images["gTToonGrad"]
+
+        uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
+        uvs.location = (x_start - 500, 900)
+        links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
+
+        if normal_map is not None:
+            links.new(normal_map.outputs["Normal"], uvs.inputs["Normal"])
+
+        row_index = nodes.new("ShaderNodeValue")
+        row_index.location = (x_start - 700, 900)
+        row_index.label = "Toon Gradient Row"
+        links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
+
+        # Try and find the non processed value.
+        # This works since type 26 only seems to be used for toon gradients.
+        for c in material.work_callbacks:
+            if c.unk1 == 26:
+                row_index.outputs[0].default_value = material.work_values[c.unk2 + 1]
+                break
+
+        # Approximate the lighting ramp by multiplying base color.
+        # This preserves compatibility with Cycles.
+        mix_ramp = nodes.new("ShaderNodeMix")
+        mix_ramp.location = (x_start, 900)
+        mix_ramp.data_type = "RGBA"
+        mix_ramp.blend_type = "MULTIPLY"
+        mix_ramp.inputs["Factor"].default_value = 1.0
+        links.new(texture_node.outputs["Color"], mix_ramp.inputs["A"])
+        links.new(mix_ao.outputs["Result"], mix_ramp.inputs["B"])
+
+        final_albedo = mix_ramp
+
+    # Place the BSDF and output after all other nodes.
+    if final_albedo.location[0] > bsdf.location[0]:
+        bsdf.location[0] = final_albedo.location[0] + 300
+        output_node.location[0] = bsdf.location[0] + 300
+
+    if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
+        # Workaround for Blender not supporting alpha blending modes.
+        transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
+        transparent_bsdf.location = (300, 100)
+        links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
+        links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+
+        blender_material.blend_method = "BLEND"
+    else:
+        links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
 
     if material.alpha_test is not None:
         texture = material.alpha_test

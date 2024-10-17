@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Improved node layout for materials with multiple texture layers.
+
 ### Fixed
 * Fixed an issue where some hair materials did not correctly generate toon gradient nodes.
 
