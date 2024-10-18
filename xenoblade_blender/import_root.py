@@ -25,7 +25,7 @@ def get_image_folder(image_folder: str, filepath: str) -> str:
 
 
 # https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/import_model.py#L371
-def import_armature(context, root, name: str):
+def import_armature(operator, context, root, name: str):
     armature = bpy.data.objects.new(name, bpy.data.armatures.new(name))
     bpy.context.collection.objects.link(armature)
 
@@ -65,6 +65,10 @@ def import_armature(context, root, name: str):
             # Prevent Blender from removing any bones.
             if bone.length < 0.01:
                 bone.length = 0.01
+    elif root.buffers.weights is not None:
+        message = "Unable to load skeleton for model with skin weights."
+        message += " The .arc or .chr file is missing or does not contain bone data."
+        operator.report({"WARNING"}, message)
 
     bpy.ops.object.mode_set(mode="OBJECT")
 

@@ -93,7 +93,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
 
         shader_images = {}
 
-        armature = import_armature(context, root, model_name)
+        armature = import_armature(self, context, root, model_name)
 
         import_model_root(
             self,

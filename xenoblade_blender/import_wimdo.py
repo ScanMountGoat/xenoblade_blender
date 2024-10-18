@@ -95,6 +95,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
                 self.import_all_meshes,
                 self.import_outlines,
             )
+
         return {"FINISHED"}
 
     def import_wimdo(
@@ -123,7 +124,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         blender_images = import_images(
             root, model_name.replace(".wimdo", ""), pack_images, image_folder, flip=True
         )
-        armature = import_armature(context, root, model_name)
+        armature = import_armature(self, context, root, model_name)
         import_model_root(
             self,
             root,
