@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.15.1 - 2024-10-18
 ### Changed
 * Improved node layout for materials with multiple texture layers.
 * Improved the error message when enabling the addon on an unsupported Blender version.
