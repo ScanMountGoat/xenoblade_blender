@@ -392,10 +392,14 @@ def import_material(
         transparent_bsdf.location = (300, 100)
         links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
         links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
-
-        blender_material.blend_method = "BLEND"
     else:
         links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
+
+    if material.state_flags.blend_mode not in [
+        xc3_model_py.material.BlendMode.Disabled,
+        xc3_model_py.material.BlendMode.Disabled2,
+    ]:
+        blender_material.blend_method = "BLEND"
 
     if material.alpha_test is not None:
         texture = material.alpha_test

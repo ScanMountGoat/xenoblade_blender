@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where some hair materials did not correctly generate toon gradient nodes.
+* Fixed an issue where some materials would render as black due to incorrect blending settings.
 
 ## 0.15.0 - 2024-10-11
 ### Added
