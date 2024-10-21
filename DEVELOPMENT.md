@@ -59,3 +59,17 @@ cp xc3_model_py/target/release/libxc3_model_py.dylib "$OUTPUT/xc3_model_py.so"
 
 ## Troubleshooting Loading Errors
 The addon will not be enabled if the code has errors. Check the addon preferences to check if any error messages come up when trying to manually enable the addon. After fixing the error, close Blender and reload the addon using the script. You will need to manually enable the addon again from the preferences menu after opening Blender.
+
+## Profiling
+```python
+import cProfile, pstats
+profiler = cProfile.Profile()
+profiler.enable()
+
+# run code here
+
+profiler.disable()
+with open(r"profile.txt", "w") as stream:
+    stats = pstats.Stats(profiler, stream=stream).sort_stats("cumtime")
+    stats.print_stats()
+```
