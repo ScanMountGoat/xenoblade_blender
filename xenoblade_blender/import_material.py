@@ -138,9 +138,12 @@ def import_material(
 
     base_color_x = 0
     base_color_y = 400
-    for layer in assignments[0].layers:
+    for layer_x, layer_y, layer_z in zip(
+        assignments[0].x_layers, assignments[0].y_layers, assignments[0].z_layers
+    ):
+        # Assume the XYZ layers use the same values just with different channels.
         # TODO: Share code with normal layers?
-        match layer.blend_mode:
+        match layer_x.blend_mode:
             case xc3_model_py.shader_database.LayerBlendMode.Mix:
                 mix_color = nodes.new("ShaderNodeMix")
                 mix_color.data_type = "RGBA"
@@ -152,6 +155,10 @@ def import_material(
                 mix_color = nodes.new("ShaderNodeMix")
                 mix_color.data_type = "RGBA"
                 mix_color.blend_type = "ADD"
+            case xc3_model_py.shader_database.LayerBlendMode.Overlay:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+                mix_color.blend_type = "OVERLAY"
             case _:
                 mix_color = nodes.new("ShaderNodeMix")
                 mix_color.data_type = "RGBA"
@@ -165,21 +172,21 @@ def import_material(
         links.new(layer_value.outputs["Color"], mix_color.inputs["B"])
 
         assign_channel(
-            layer.x,
+            layer_x.value,
             links,
             texture_nodes,
             vertex_color_nodes,
             layer_value.inputs["Red"],
         )
         assign_channel(
-            layer.y,
+            layer_y.value,
             links,
             texture_nodes,
             vertex_color_nodes,
             layer_value.inputs["Green"],
         )
         assign_channel(
-            layer.z,
+            layer_z.value,
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -189,7 +196,7 @@ def import_material(
         # TODO: Should this always assign the X channel?
         mix_color.inputs["Factor"].default_value = 0.0
 
-        if layer.is_fresnel:
+        if layer_x.is_fresnel:
             fresnel_blend = create_node_group(
                 nodes, "FresnelBlend", fresnel_blend_node_group
             )
@@ -197,7 +204,7 @@ def import_material(
             # TODO: normals?
 
             assign_channel(
-                layer.weight,
+                layer_x.weight,
                 links,
                 texture_nodes,
                 vertex_color_nodes,
@@ -206,7 +213,7 @@ def import_material(
             links.new(fresnel_blend.outputs["Factor"], mix_color.inputs["Factor"])
         else:
             assign_channel(
-                layer.weight,
+                layer_x.weight,
                 links,
                 texture_nodes,
                 vertex_color_nodes,
@@ -597,9 +604,10 @@ def assign_normal_map(
 
     final_normals = base_normals
 
-    for layer in assignments[2].layers:
+    # Assume the XY layers use the same values just with different channels.
+    for layer_x, layer_y in zip(assignments[2].x_layers, assignments[2].y_layers):
         # TODO: handle remaining blend modes.
-        if layer.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
+        if layer_x.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
             mix_normals = create_node_group(nodes, "AddNormals", add_normals_node_group)
             mix_normals = nodes.new("ShaderNodeMix")
             mix_normals.data_type = "VECTOR"
@@ -616,14 +624,14 @@ def assign_normal_map(
         links.new(n2_normals.outputs["Normal"], mix_normals.inputs["B"])
 
         assign_channel(
-            layer.x,
+            layer_x.value,
             links,
             texture_nodes,
             vertex_color_nodes,
             n2_normals.inputs["X"],
         )
         assign_channel(
-            layer.y,
+            layer_y.value,
             links,
             texture_nodes,
             vertex_color_nodes,
@@ -632,7 +640,7 @@ def assign_normal_map(
 
         # TODO: Should this always assign the X channel?
         assign_channel(
-            layer.weight,
+            layer_x.weight,
             links,
             texture_nodes,
             vertex_color_nodes,

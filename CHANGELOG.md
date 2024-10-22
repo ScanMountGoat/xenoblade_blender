@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where some materials would render as black due to incorrect blending settings.
+* Fixed an issue where generated materials for camdo models would not use sampler information.
+
 ## 0.15.1 - 2024-10-18
 ### Changed
 * Improved node layout for materials with multiple texture layers.
@@ -11,7 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where some hair materials did not correctly generate toon gradient nodes.
-* Fixed an issue where some materials would render as black due to incorrect blending settings.
 
 ## 0.15.0 - 2024-10-11
 ### Added
