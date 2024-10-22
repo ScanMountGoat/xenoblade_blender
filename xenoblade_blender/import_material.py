@@ -273,13 +273,107 @@ def import_material(
             bsdf.location[0] = normal_map.location[0] + 300
             output_node.location[0] = bsdf.location[0] + 300
 
-    assign_channel(
-        assignments[1].x,
-        links,
-        texture_nodes,
-        vertex_color_nodes,
-        bsdf.inputs["Metallic"],
-    )
+    metallic_x = 0
+    metallic_y = 100
+    metallic = None
+    for layer_x in assignments[1].x_layers:
+        # Assume the XYZ layers use the same values just with different channels.
+        # TODO: Share code with normal layers?
+        match layer_x.blend_mode:
+            case xc3_model_py.shader_database.LayerBlendMode.Mix:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+            case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
+                # TODO: This should do mix(a, a*b, ratio)
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+            case xc3_model_py.shader_database.LayerBlendMode.Add:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+                mix_color.blend_type = "ADD"
+            case xc3_model_py.shader_database.LayerBlendMode.Overlay:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+                mix_color.blend_type = "OVERLAY"
+            case _:
+                mix_color = nodes.new("ShaderNodeMix")
+                mix_color.data_type = "RGBA"
+
+        mix_color.location = (metallic_x, metallic_y)
+        metallic_x += 200
+
+        # Assign the base layer.
+        if metallic is None:
+            assign_channel(
+                assignments[1].x,
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                mix_color.inputs["A"],
+            )
+
+        assign_channel(
+            layer_x.value,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_color.inputs["B"],
+        )
+
+        # TODO: Should this always assign the X channel?
+        mix_color.inputs["Factor"].default_value = 0.0
+
+        if layer_x.is_fresnel:
+            fresnel_blend = create_node_group(
+                nodes, "FresnelBlend", fresnel_blend_node_group
+            )
+            fresnel_blend.location = (mix_color.location[0] - 200, 600)
+            # TODO: normals?
+
+            assign_channel(
+                layer_x.weight,
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                fresnel_blend.inputs["Factor"],
+            )
+            links.new(fresnel_blend.outputs["Factor"], mix_color.inputs["Factor"])
+        else:
+            assign_channel(
+                layer_x.weight,
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                mix_color.inputs["Factor"],
+            )
+
+        # Connect each add group to the next.
+        if metallic is not None:
+            if "Result" in metallic.outputs:
+                links.new(metallic.outputs["Result"], mix_color.inputs["A"])
+            else:
+                links.new(metallic.outputs["Color"], mix_color.inputs["A"])
+
+        metallic = mix_color
+
+    # Place the BSDF and output after all other nodes.
+    if metallic_x > bsdf.location[0]:
+        bsdf.location[0] = metallic_x + 300
+        output_node.location[0] = bsdf.location[0] + 300
+
+    if metallic is not None:
+        if "Result" in metallic.outputs:
+            links.new(metallic.outputs["Result"], bsdf.inputs["Metallic"])
+        else:
+            links.new(metallic.outputs["Color"], bsdf.inputs["Metallic"])
+    else:
+        assign_channel(
+            assignments[1].x,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            bsdf.inputs["Metallic"],
+        )
 
     if (
         assignments[5].x is not None
@@ -334,9 +428,10 @@ def import_material(
             bsdf.inputs["Roughness"].default_value = 1.0 - value
         else:
             invert = nodes.new("ShaderNodeMath")
-            invert.location = (-200, 0)
+            invert.location = (-200, -200)
             invert.operation = "SUBTRACT"
             invert.inputs[0].default_value = 1.0
+            invert.label = "Glossiness"
             assign_channel(
                 assignments[1].y,
                 links,
