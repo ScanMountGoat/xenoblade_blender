@@ -142,28 +142,15 @@ def import_material(
         assignments[0].x_layers, assignments[0].y_layers, assignments[0].z_layers
     ):
         # Assume the XYZ layers use the same values just with different channels.
-        # TODO: Share code with normal layers?
-        match layer_x.blend_mode:
-            case xc3_model_py.shader_database.LayerBlendMode.Mix:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-            case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
-                # TODO: This should do mix(a, a*b, ratio)
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-            case xc3_model_py.shader_database.LayerBlendMode.Add:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-                mix_color.blend_type = "ADD"
-            case xc3_model_py.shader_database.LayerBlendMode.Overlay:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-                mix_color.blend_type = "OVERLAY"
-            case _:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
+        mix_color = mix_layer_values(
+            layer_x,
+            nodes,
+            links,
+            vertex_color_nodes,
+            texture_nodes,
+            (base_color_x, 400),
+        )
 
-        mix_color.location = (base_color_x, 400)
         base_color_x += 200
 
         layer_value = nodes.new("ShaderNodeCombineColor")
@@ -193,34 +180,7 @@ def import_material(
             layer_value.inputs["Blue"],
         )
 
-        # TODO: Should this always assign the X channel?
-        mix_color.inputs["Factor"].default_value = 0.0
-
-        if layer_x.is_fresnel:
-            fresnel_blend = create_node_group(
-                nodes, "FresnelBlend", fresnel_blend_node_group
-            )
-            fresnel_blend.location = (mix_color.location[0] - 200, 600)
-            # TODO: normals?
-
-            assign_channel(
-                layer_x.weight,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                fresnel_blend.inputs["Factor"],
-            )
-            links.new(fresnel_blend.outputs["Factor"], mix_color.inputs["Factor"])
-        else:
-            assign_channel(
-                layer_x.weight,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                mix_color.inputs["Factor"],
-            )
-
-        # Connect each add group to the next.
+        # Connect each layer to the next.
         if "Result" in base_color.outputs:
             links.new(base_color.outputs["Result"], mix_color.inputs["A"])
         else:
@@ -277,29 +237,14 @@ def import_material(
     metallic_y = 100
     metallic = None
     for layer_x in assignments[1].x_layers:
-        # Assume the XYZ layers use the same values just with different channels.
-        # TODO: Share code with normal layers?
-        match layer_x.blend_mode:
-            case xc3_model_py.shader_database.LayerBlendMode.Mix:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-            case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
-                # TODO: This should do mix(a, a*b, ratio)
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-            case xc3_model_py.shader_database.LayerBlendMode.Add:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-                mix_color.blend_type = "ADD"
-            case xc3_model_py.shader_database.LayerBlendMode.Overlay:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-                mix_color.blend_type = "OVERLAY"
-            case _:
-                mix_color = nodes.new("ShaderNodeMix")
-                mix_color.data_type = "RGBA"
-
-        mix_color.location = (metallic_x, metallic_y)
+        mix_metallic = mix_layer_values(
+            layer_x,
+            nodes,
+            links,
+            vertex_color_nodes,
+            texture_nodes,
+            (metallic_x, metallic_y),
+        )
         metallic_x += 200
 
         # Assign the base layer.
@@ -309,7 +254,7 @@ def import_material(
                 links,
                 texture_nodes,
                 vertex_color_nodes,
-                mix_color.inputs["A"],
+                mix_metallic.inputs["A"],
             )
 
         assign_channel(
@@ -317,44 +262,17 @@ def import_material(
             links,
             texture_nodes,
             vertex_color_nodes,
-            mix_color.inputs["B"],
+            mix_metallic.inputs["B"],
         )
 
-        # TODO: Should this always assign the X channel?
-        mix_color.inputs["Factor"].default_value = 0.0
-
-        if layer_x.is_fresnel:
-            fresnel_blend = create_node_group(
-                nodes, "FresnelBlend", fresnel_blend_node_group
-            )
-            fresnel_blend.location = (mix_color.location[0] - 200, 600)
-            # TODO: normals?
-
-            assign_channel(
-                layer_x.weight,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                fresnel_blend.inputs["Factor"],
-            )
-            links.new(fresnel_blend.outputs["Factor"], mix_color.inputs["Factor"])
-        else:
-            assign_channel(
-                layer_x.weight,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                mix_color.inputs["Factor"],
-            )
-
-        # Connect each add group to the next.
+        # Connect each layer to the next.
         if metallic is not None:
             if "Result" in metallic.outputs:
-                links.new(metallic.outputs["Result"], mix_color.inputs["A"])
+                links.new(metallic.outputs["Result"], mix_metallic.inputs["A"])
             else:
-                links.new(metallic.outputs["Color"], mix_color.inputs["A"])
+                links.new(metallic.outputs["Color"], mix_metallic.inputs["A"])
 
-        metallic = mix_color
+        metallic = mix_metallic
 
     # Place the BSDF and output after all other nodes.
     if metallic_x > bsdf.location[0]:
@@ -421,6 +339,7 @@ def import_material(
             links.new(color.outputs["Color"], bsdf.inputs["Emission Color"])
             bsdf.inputs["Emission Strength"].default_value = 1.0
 
+    # TODO: layers for glossiness?
     # Invert glossiness to get roughness.
     if assignments[1].y is not None:
         value = assignments[1].y.value()
@@ -537,6 +456,64 @@ def import_material(
                 nodes.remove(textures_uv[name])
 
     return blender_material
+
+
+def mix_layer_values(layer, nodes, links, vertex_color_nodes, texture_nodes, location):
+    match layer.blend_mode:
+        case xc3_model_py.shader_database.LayerBlendMode.Mix:
+            mix_values = nodes.new("ShaderNodeMix")
+            mix_values.data_type = "RGBA"
+        case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
+            mix_values = nodes.new("ShaderNodeMix")
+            mix_values.data_type = "RGBA"
+            mix_values.blend_type = "MULTIPLY"
+        case xc3_model_py.shader_database.LayerBlendMode.Add:
+            mix_values = nodes.new("ShaderNodeMix")
+            mix_values.data_type = "RGBA"
+            mix_values.blend_type = "ADD"
+        case xc3_model_py.shader_database.LayerBlendMode.Overlay:
+            mix_values = nodes.new("ShaderNodeMix")
+            mix_values.data_type = "RGBA"
+            mix_values.blend_type = "OVERLAY"
+        case xc3_model_py.shader_database.LayerBlendMode.AddNormal:
+            mix_values = create_node_group(nodes, "AddNormals", add_normals_node_group)
+        case _:
+            mix_values = nodes.new("ShaderNodeMix")
+            mix_values.data_type = "RGBA"
+
+    mix_values.location = location
+
+    # TODO: Should this always assign the X channel?
+    mix_values.inputs["Factor"].default_value = 0.0
+
+    if layer.is_fresnel:
+        fresnel_blend = create_node_group(
+            nodes, "FresnelBlend", fresnel_blend_node_group
+        )
+        fresnel_blend.location = (
+            location[0] - 200,
+            location[1] + 200,
+        )
+        # TODO: normals?
+
+        assign_channel(
+            layer.weight,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            fresnel_blend.inputs["Factor"],
+        )
+        links.new(fresnel_blend.outputs["Factor"], mix_values.inputs["Factor"])
+    else:
+        assign_channel(
+            layer.weight,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_values.inputs["Factor"],
+        )
+
+    return mix_values
 
 
 def toon_grad_uvs_node_group():
@@ -699,16 +676,16 @@ def assign_normal_map(
 
     final_normals = base_normals
 
-    # Assume the XY layers use the same values just with different channels.
     for layer_x, layer_y in zip(assignments[2].x_layers, assignments[2].y_layers):
-        # TODO: handle remaining blend modes.
-        if layer_x.blend_mode == xc3_model_py.shader_database.LayerBlendMode.Mix:
-            mix_normals = create_node_group(nodes, "AddNormals", add_normals_node_group)
-            mix_normals = nodes.new("ShaderNodeMix")
-            mix_normals.data_type = "VECTOR"
-        else:
-            mix_normals = create_node_group(nodes, "AddNormals", add_normals_node_group)
-        mix_normals.location = (normals_x, -800)
+        # Assume the XY layers use the same values just with different channels.
+        mix_normals = mix_layer_values(
+            layer_x,
+            nodes,
+            links,
+            vertex_color_nodes,
+            texture_nodes,
+            (normals_x, -800),
+        )
         normals_x += 200
 
         n2_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
@@ -733,16 +710,7 @@ def assign_normal_map(
             n2_normals.inputs["Y"],
         )
 
-        # TODO: Should this always assign the X channel?
-        assign_channel(
-            layer_x.weight,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_normals.inputs["Factor"],
-        )
-
-        # Connect each add group to the next.
+        # Connect each layer to the next.
         if "Normal" in final_normals.outputs:
             links.new(final_normals.outputs["Normal"], mix_normals.inputs["A"])
         else:
