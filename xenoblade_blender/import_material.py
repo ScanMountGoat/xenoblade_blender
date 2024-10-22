@@ -93,10 +93,14 @@ def import_material(
     vertex_color_nodes = (vertex_color_rgb, vertex_color)
     texture_nodes = (textures, textures_rgb, textures_scale, textures_uv)
 
+    base_color_frame = nodes.new("NodeFrame")
+    base_color_frame.label = "Base Color"
+
     # TODO: Alpha testing.
     # TODO: Select UV map for each texture.
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
+    base_color.parent = base_color_frame
     base_color.location = (-200, 200)
     assign_channel(
         assignments[0].x,
@@ -149,11 +153,13 @@ def import_material(
             vertex_color_nodes,
             texture_nodes,
             (base_color_x, 400),
+            base_color_frame,
         )
 
         base_color_x += 200
 
         layer_value = nodes.new("ShaderNodeCombineColor")
+        layer_value.parent = base_color_frame
         layer_value.location = (-200, base_color_y)
         base_color_y -= -200
         links.new(layer_value.outputs["Color"], mix_color.inputs["B"])
@@ -185,8 +191,11 @@ def import_material(
 
         base_color = mix_color
 
+    ao_frame = nodes.new("NodeFrame")
+    ao_frame.label = "Ambient Occlusion"
+
     # Single channel ambient occlusion.
-    ao_x = 0
+    ao_x = base_color_x
     ao_y = -200
     ao = None
     for layer in assignments[2].z_layers:
@@ -197,6 +206,7 @@ def import_material(
             vertex_color_nodes,
             texture_nodes,
             (ao_x, ao_y),
+            ao_frame,
         )
         ao_x += 200
 
@@ -228,6 +238,7 @@ def import_material(
         ao = mix_layer_ao
 
     mix_ao = nodes.new("ShaderNodeMix")
+    mix_ao.parent = ao_frame
     mix_ao.location = (ao_x, 400)
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
@@ -276,6 +287,12 @@ def import_material(
             bsdf.location[0] = normal_map.location[0] + 300
             output_node.location[0] = bsdf.location[0] + 300
 
+    # TODO: find a better way to avoid adding empty frames.
+    metallic_frame = None
+    if len(assignments[1].x_layers) > 0:
+        metallic_frame = nodes.new("NodeFrame")
+        metallic_frame.label = "Metallic"
+
     metallic_x = 0
     metallic_y = 100
     metallic = None
@@ -287,6 +304,7 @@ def import_material(
             vertex_color_nodes,
             texture_nodes,
             (metallic_x, metallic_y),
+            metallic_frame,
         )
         metallic_x += 200
 
@@ -311,7 +329,7 @@ def import_material(
         # Connect each layer to the next.
         if metallic is not None:
             links.new(mix_node_output(metallic), mix_metallic.inputs["A"])
-            
+
         metallic = mix_metallic
 
     # Place the BSDF and output after all other nodes.
@@ -376,6 +394,14 @@ def import_material(
             links.new(color.outputs["Color"], bsdf.inputs["Emission Color"])
             bsdf.inputs["Emission Strength"].default_value = 1.0
 
+    # TODO: find a better way to avoid adding empty frames.
+    glossiness_frame = None
+    if len(assignments[1].y_layers) > 0 or (
+        assignments[1].y is not None and assignments[1].y.value() is None
+    ):
+        glossiness_frame = nodes.new("NodeFrame")
+        glossiness_frame.label = "Glossiness"
+
     glossiness_x = 0
     glossiness_y = -200
     glossiness = None
@@ -387,6 +413,7 @@ def import_material(
             vertex_color_nodes,
             texture_nodes,
             (glossiness_x, glossiness_y),
+            glossiness_frame,
         )
         glossiness_x += 200
 
@@ -424,7 +451,7 @@ def import_material(
             invert.location = (glossiness_x, -200)
             invert.operation = "SUBTRACT"
             invert.inputs[0].default_value = 1.0
-            invert.label = "Glossiness"
+            invert.parent = glossiness_frame
 
             if glossiness is not None:
                 links.new(mix_node_output(glossiness), invert.inputs[1])
@@ -447,14 +474,19 @@ def import_material(
 
     # Toon and hair materials use toon gradient ramps.
     if mat_id in [2, 5]:
+        frame = nodes.new("NodeFrame")
+        frame.label = "Toon Gradient"
+
         x_start = final_albedo.location[0] + 200
         texture_node = nodes.new("ShaderNodeTexImage")
+        texture_node.parent = frame
         texture_node.label = "gTToonGrad"
         texture_node.location = (x_start - 300, 900)
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
         uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
+        uvs.parent = frame
         uvs.location = (x_start - 500, 900)
         links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
 
@@ -462,6 +494,7 @@ def import_material(
             links.new(normal_map.outputs["Normal"], uvs.inputs["Normal"])
 
         row_index = nodes.new("ShaderNodeValue")
+        row_index.parent = frame
         row_index.location = (x_start - 700, 900)
         row_index.label = "Toon Gradient Row"
         links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
@@ -476,6 +509,7 @@ def import_material(
         # Approximate the lighting ramp by multiplying base color.
         # This preserves compatibility with Cycles.
         mix_ramp = nodes.new("ShaderNodeMix")
+        mix_ramp.parent = frame
         mix_ramp.location = (x_start, 900)
         mix_ramp.data_type = "RGBA"
         mix_ramp.blend_type = "MULTIPLY"
@@ -548,7 +582,9 @@ def mix_node_output(node):
         return node.outputs["Color"]
 
 
-def mix_layer_values(layer, nodes, links, vertex_color_nodes, texture_nodes, location):
+def mix_layer_values(
+    layer, nodes, links, vertex_color_nodes, texture_nodes, location, parent=None
+):
     match layer.blend_mode:
         case xc3_model_py.shader_database.LayerBlendMode.Mix:
             mix_values = nodes.new("ShaderNodeMix")
@@ -571,6 +607,7 @@ def mix_layer_values(layer, nodes, links, vertex_color_nodes, texture_nodes, loc
             mix_values = nodes.new("ShaderNodeMix")
             mix_values.data_type = "RGBA"
 
+    mix_values.parent = parent
     mix_values.location = location
 
     # TODO: Should this always assign the X channel?
@@ -580,6 +617,7 @@ def mix_layer_values(layer, nodes, links, vertex_color_nodes, texture_nodes, loc
         fresnel_blend = create_node_group(
             nodes, "FresnelBlend", fresnel_blend_node_group
         )
+        fresnel_blend.parent = parent
         fresnel_blend.location = (
             location[0] - 200,
             location[1] + 200,
@@ -738,11 +776,15 @@ def assign_normal_map(
     if assignments[2].x is None and assignments[2].y is None:
         return
 
+    frame = nodes.new("NodeFrame")
+    frame.label = "Normals"
+
     normals_x = -200
     normals_y = -800
 
     base_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
     base_normals.location = (-200, normals_y)
+    base_normals.parent = frame
     normals_x += 200
     normals_y -= 200
 
@@ -775,10 +817,12 @@ def assign_normal_map(
             vertex_color_nodes,
             texture_nodes,
             (normals_x, -800),
+            frame,
         )
         normals_x += 200
 
         n2_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+        n2_normals.parent = frame
         n2_normals.inputs["X"].default_value = 0.5
         n2_normals.inputs["Y"].default_value = 0.5
         n2_normals.location = (-200, normals_y)
@@ -809,6 +853,7 @@ def assign_normal_map(
         final_normals = mix_normals
 
     remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.parent = frame
     remap_normals.location = (normals_x, -800)
     normals_x += 200
     remap_normals.operation = "MULTIPLY_ADD"
@@ -820,6 +865,7 @@ def assign_normal_map(
     remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
 
     normal_map = nodes.new("ShaderNodeNormalMap")
+    normal_map.parent = frame
     normal_map.location = (normals_x, -800)
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 

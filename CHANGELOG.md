@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for parameter layering to generated materials.
 
+### Changed
+* Organized material nodes into frames.
+
 ### Fixed
 * Fixed an issue where some materials would render as black due to incorrect blending settings.
 * Fixed an issue where generated materials for camdo models would not use sampler information.
