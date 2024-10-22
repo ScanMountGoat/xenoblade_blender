@@ -181,28 +181,74 @@ def import_material(
         )
 
         # Connect each layer to the next.
-        if "Result" in base_color.outputs:
-            links.new(base_color.outputs["Result"], mix_color.inputs["A"])
-        else:
-            links.new(base_color.outputs["Color"], mix_color.inputs["A"])
+        links.new(mix_node_output(base_color), mix_color.inputs["A"])
 
         base_color = mix_color
 
+    # Single channel ambient occlusion.
+    ao_x = 0
+    ao_y = -200
+    ao = None
+    for layer in assignments[2].z_layers:
+        mix_layer_ao = mix_layer_values(
+            layer,
+            nodes,
+            links,
+            vertex_color_nodes,
+            texture_nodes,
+            (ao_x, ao_y),
+        )
+        ao_x += 200
+
+        # Assign the base layer.
+        if ao is None:
+            assign_channel(
+                assignments[2].z,
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                mix_layer_ao.inputs["A"],
+            )
+
+        assign_channel(
+            layer.value,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_layer_ao.inputs["B"],
+        )
+
+        # Connect each layer to the next.
+        if ao is not None:
+            links.new(
+                mix_node_output(ao),
+                mix_layer_ao.inputs["A"],
+            )
+
+        ao = mix_layer_ao
+
     mix_ao = nodes.new("ShaderNodeMix")
-    mix_ao.location = (base_color_x, 400)
+    mix_ao.location = (ao_x, 400)
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
     mix_ao.inputs["Factor"].default_value = 1.0
     mix_ao.inputs["B"].default_value = (1.0, 1.0, 1.0, 1.0)
 
-    # Single channel ambient occlusion.
-    assign_channel(
-        assignments[2].z,
-        links,
-        texture_nodes,
-        vertex_color_nodes,
-        mix_ao.inputs["B"],
-    )
+    # Place the BSDF and output after all other nodes.
+    if ao_x >= bsdf.location[0]:
+        bsdf.location[0] = ao_x + 300
+        output_node.location[0] = bsdf.location[0] + 300
+
+    if ao is not None:
+        links.new(mix_node_output(ao), mix_ao.inputs["B"])
+    else:
+        assign_channel(
+            assignments[2].z,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_ao.inputs["B"],
+        )
 
     if (
         assignments[0].x is None
@@ -213,10 +259,7 @@ def import_material(
         # TODO: more accurate gamma handling
         mix_ao.inputs["A"].default_value = [c**2.2 for c in material.color]
     else:
-        if "Result" in base_color.outputs:
-            links.new(base_color.outputs["Result"], mix_ao.inputs["A"])
-        else:
-            links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
+        links.new(mix_node_output(base_color), mix_ao.inputs["A"])
 
     normal_map = assign_normal_map(
         nodes,
@@ -229,7 +272,7 @@ def import_material(
 
     # Place the BSDF and output after all other nodes.
     if normal_map is not None:
-        if normal_map.location[0] > bsdf.location[0]:
+        if normal_map.location[0] >= bsdf.location[0]:
             bsdf.location[0] = normal_map.location[0] + 300
             output_node.location[0] = bsdf.location[0] + 300
 
@@ -267,23 +310,17 @@ def import_material(
 
         # Connect each layer to the next.
         if metallic is not None:
-            if "Result" in metallic.outputs:
-                links.new(metallic.outputs["Result"], mix_metallic.inputs["A"])
-            else:
-                links.new(metallic.outputs["Color"], mix_metallic.inputs["A"])
-
+            links.new(mix_node_output(metallic), mix_metallic.inputs["A"])
+            
         metallic = mix_metallic
 
     # Place the BSDF and output after all other nodes.
-    if metallic_x > bsdf.location[0]:
+    if metallic_x >= bsdf.location[0]:
         bsdf.location[0] = metallic_x + 300
         output_node.location[0] = bsdf.location[0] + 300
 
     if metallic is not None:
-        if "Result" in metallic.outputs:
-            links.new(metallic.outputs["Result"], bsdf.inputs["Metallic"])
-        else:
-            links.new(metallic.outputs["Color"], bsdf.inputs["Metallic"])
+        links.new(mix_node_output(metallic), bsdf.inputs["Metallic"])
     else:
         assign_channel(
             assignments[1].x,
@@ -339,7 +376,44 @@ def import_material(
             links.new(color.outputs["Color"], bsdf.inputs["Emission Color"])
             bsdf.inputs["Emission Strength"].default_value = 1.0
 
-    # TODO: layers for glossiness?
+    glossiness_x = 0
+    glossiness_y = -200
+    glossiness = None
+    for layer in assignments[1].y_layers:
+        mix_glossiness = mix_layer_values(
+            layer,
+            nodes,
+            links,
+            vertex_color_nodes,
+            texture_nodes,
+            (glossiness_x, glossiness_y),
+        )
+        glossiness_x += 200
+
+        # Assign the base layer.
+        if glossiness is None:
+            assign_channel(
+                assignments[1].y,
+                links,
+                texture_nodes,
+                vertex_color_nodes,
+                mix_glossiness.inputs["A"],
+            )
+
+        assign_channel(
+            layer.value,
+            links,
+            texture_nodes,
+            vertex_color_nodes,
+            mix_glossiness.inputs["B"],
+        )
+
+        # Connect each layer to the next.
+        if glossiness is not None:
+            links.new(mix_node_output(glossiness), mix_glossiness.inputs["A"])
+
+        glossiness = mix_glossiness
+
     # Invert glossiness to get roughness.
     if assignments[1].y is not None:
         value = assignments[1].y.value()
@@ -347,18 +421,27 @@ def import_material(
             bsdf.inputs["Roughness"].default_value = 1.0 - value
         else:
             invert = nodes.new("ShaderNodeMath")
-            invert.location = (-200, -200)
+            invert.location = (glossiness_x, -200)
             invert.operation = "SUBTRACT"
             invert.inputs[0].default_value = 1.0
             invert.label = "Glossiness"
-            assign_channel(
-                assignments[1].y,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                invert.inputs[1],
-            )
+
+            if glossiness is not None:
+                links.new(mix_node_output(glossiness), invert.inputs[1])
+            else:
+                assign_channel(
+                    assignments[1].y,
+                    links,
+                    texture_nodes,
+                    vertex_color_nodes,
+                    invert.inputs[1],
+                )
             links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
+
+    # Place the BSDF and output after all other nodes.
+    if glossiness_x >= bsdf.location[0]:
+        bsdf.location[0] = glossiness_x + 300
+        output_node.location[0] = bsdf.location[0] + 300
 
     final_albedo = mix_ao
 
@@ -403,7 +486,7 @@ def import_material(
         final_albedo = mix_ramp
 
     # Place the BSDF and output after all other nodes.
-    if final_albedo.location[0] > bsdf.location[0]:
+    if final_albedo.location[0] >= bsdf.location[0]:
         bsdf.location[0] = final_albedo.location[0] + 300
         output_node.location[0] = bsdf.location[0] + 300
 
@@ -456,6 +539,13 @@ def import_material(
                 nodes.remove(textures_uv[name])
 
     return blender_material
+
+
+def mix_node_output(node):
+    if "Result" in node.outputs:
+        return node.outputs["Result"]
+    else:
+        return node.outputs["Color"]
 
 
 def mix_layer_values(layer, nodes, links, vertex_color_nodes, texture_nodes, location):
