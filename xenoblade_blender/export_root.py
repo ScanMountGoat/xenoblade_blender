@@ -597,7 +597,11 @@ def export_influences(
     # Export Weights
     # TODO: Reversing a vertex -> group lookup to a group -> vertex lookup is expensive.
     # TODO: Does Blender not expose this directly?
-    group_to_weights = {vg.index: (vg.name, []) for vg in blender_mesh.vertex_groups}
+    group_to_weights = {
+        vg.index: (vg.name, [])
+        for vg in blender_mesh.vertex_groups
+        if vg.name != "OutlineThickness"
+    }
 
     for vertex in mesh_data.vertices:
         # Blender doesn't enforce normalization, since it normalizes while animating.
@@ -611,7 +615,7 @@ def export_influences(
 
     influences = []
     for name, weights in group_to_weights.values():
-        if name != "OutlineThickness" and name not in bone_names:
+        if name not in bone_names:
             message = f"Vertex group {name} for {mesh_name} is not in original skeleton and will be skipped."
             operator.report({"WARNING"}, message)
         elif len(weights) > 0:

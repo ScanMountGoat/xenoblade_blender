@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 * Fixed an issue where some materials would render as black due to incorrect blending settings.
 * Fixed an issue where generated materials for camdo models would not use sampler information.
+* Fixed an issue where skin weights would not export correctly for meshes with outlines.
 
 ## 0.15.1 - 2024-10-18
 ### Changed
