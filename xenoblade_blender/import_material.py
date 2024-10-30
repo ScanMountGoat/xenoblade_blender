@@ -196,7 +196,7 @@ def import_material(
 
     # Single channel ambient occlusion.
     ao_x = base_color_x
-    ao_y = -200
+    ao_y = 400
     ao = None
     for layer in assignments[2].z_layers:
         mix_layer_ao = mix_layer_values(
