@@ -81,9 +81,9 @@ def import_images(
     blender_images = []
 
     if pack:
-        decoded_images = xc3_model_py.decode_images_rgbaf32(root.image_textures)
-        for i, (image, decoded) in enumerate(zip(root.image_textures, decoded_images)):
-            blender_image = import_image(image, decoded, flip, model_name, i)
+        png_images = xc3_model_py.decode_images_png(root.image_textures, not flip)
+        for i, (image, png) in enumerate(zip(root.image_textures, png_images)):
+            blender_image = import_image(image, png, model_name, i)
             blender_images.append(blender_image)
     else:
         # Unpacked textures use less memory and are faster to load.
@@ -104,7 +104,7 @@ def import_images(
     return blender_images
 
 
-def import_image(image, decoded, flip: bool, model_name: str, i: int):
+def import_image(image, png: bytes, model_name: str, i: int):
     # Use the same naming conventions as the saved PNG images and xc3_tex.
     if model_name != "":
         if image.name is not None:
@@ -116,22 +116,12 @@ def import_image(image, decoded, flip: bool, model_name: str, i: int):
 
     blender_image = bpy.data.images.new(name, image.width, image.height, alpha=True)
 
-    # TODO: why is this necessary?
-    decoded_size = image.width * image.height * 4
-    decoded = decoded[:decoded_size]
-
-    if flip:
-        # Flip vertically to match Blender.
-        decoded = decoded.reshape((image.height, image.width, 4))
-        decoded = np.flip(decoded, axis=0)
-
-    blender_image.pixels.foreach_set(decoded.reshape(-1))
+    # Loading png bytes is faster than foreach_set with a float buffer.
+    blender_image.pack(data=png, data_len=len(png))
+    blender_image.source = "FILE"
 
     # TODO: This should depend on srgb vs linear in format.
     blender_image.colorspace_settings.is_data = True
-
-    # Pack textures to avoid the prompt to save on exit.
-    blender_image.pack()
 
     return blender_image
 
@@ -155,14 +145,14 @@ def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.I
             images = [(name, textures.global_texture(name)) for name in names]
             images = [(name, i) for (name, i) in images if i is not None]
 
-            decoded_images = xc3_model_py.decode_images_rgbaf32(
-                [i for (_, i) in images]
+            png_images = xc3_model_py.decode_images_png(
+                [i for (_, i) in images], not flip
             )
 
-            for (name, image), decoded in zip(images, decoded_images):
+            for (name, image), png in zip(images, png_images):
                 # TODO: use the path as the name.
                 image.name = name
-                shader_images[name] = import_image(image, decoded, flip, "", 0)
+                shader_images[name] = import_image(image, png, "", 0)
 
     return shader_images
 

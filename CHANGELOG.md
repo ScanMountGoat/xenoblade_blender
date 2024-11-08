@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Changed
 * Improved accuracy of material assignments.
+* Optimized import times for images.
 
 ## 0.15.2 - 2024-10-25
 ### Added
