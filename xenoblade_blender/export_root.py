@@ -616,7 +616,7 @@ def export_influences(
     influences = []
     for name, weights in group_to_weights.values():
         if name not in bone_names:
-            message = f"Vertex group {name} for {mesh_name} is not in original skeleton and will be skipped."
+            message = f"Vertex group {name} for {mesh_name} is not in original wimdo bone list and will be skipped."
             operator.report({"WARNING"}, message)
         elif len(weights) > 0:
             influence = xc3_model_py.skinning.Influence(name, weights)
@@ -762,10 +762,15 @@ def get_texture_assignments(mesh_data, material, image_textures):
         image_index = image_index_to_replace(image_textures, node.image.name)
 
         if image_index is not None:
-            old_to_new_index[material.textures[texture_index].image_texture_index] = (
-                image_index,
-                node.image,
-            )
+            try:
+                index = material.textures[texture_index].image_texture_index
+                old_to_new_index[index] = (
+                    image_index,
+                    node.image,
+                )
+            except:
+                # TODO: how to handle combining materials from two models?
+                pass
 
     return old_to_new_index
 
