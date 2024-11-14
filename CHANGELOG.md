@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Improved accuracy of material assignments.
 * Optimized import times for images.
 * Improved the error message when exporting a model with vertex group names not supported by the original wimdo.
+* Improved the error message when importing a camdo model with a missing casmt file.
 
 ## 0.15.2 - 2024-10-25
 ### Added

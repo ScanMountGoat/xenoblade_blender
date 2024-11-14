@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 def get_database_path(version: str) -> str:
-    files = {"XC1": "xc1.json", "XC2": "xc2.json", "XC3": "xc3.json"}
+    files = {"XC1": "xc1.bin", "XC2": "xc2.bin", "XC3": "xc3.bin"}
     return os.path.join(os.path.dirname(__file__), files[version])
 
 
