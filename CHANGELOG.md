@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.15.3 - 2024-11-15
 ### Changed
 * Improved accuracy of material assignments.
 * Optimized import times for images.
