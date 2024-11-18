@@ -290,17 +290,9 @@ def export_mesh_inner(
     normals = export_normals(mesh_data, z_up_to_y_up, vertex_indices)
     tangents = export_tangents(mesh_data, z_up_to_y_up, vertex_indices)
 
-    # Avoid messing up vertex weights by removing outline information.
-    # This is safe since we're working on a copy of the original mesh.
-    outline_vertex_group = blender_mesh.vertex_groups.get("OutlineThickness")
-    outline_alpha = None
-    if outline_vertex_group is not None:
-        # TODO: Is there a way to do this without looping?
-        outline_alpha = np.zeros(positions.shape[0])
-        for i in range(positions.shape[0]):
-            outline_alpha[i] = outline_vertex_group.weight(i)
+    # Remove the outline vertex group before exporting weights.
+    outline_alpha = export_outline_alpha(blender_mesh, positions)
 
-        blender_mesh.vertex_groups.remove(outline_vertex_group)
 
     influences = export_influences(
         operator, blender_mesh, mesh_data, mesh_name, combined_weights.bone_names
@@ -341,23 +333,9 @@ def export_mesh_inner(
         morph_names, mesh_data, positions, normals, tangents
     )
 
-    morph_blend_target = []
-    if len(morph_targets) > 0:
-        # TODO: Handle creating attributes and ordering in xc3_model?
-        morph_blend_target = [
-            xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Position2, positions
-            ),
-            xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Normal4, normals
-            ),
-            xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.OldPosition, positions
-            ),
-            xc3_model_py.vertex.AttributeData(
-                xc3_model_py.vertex.AttributeType.Tangent2, tangents
-            ),
-        ]
+    morph_blend_target = export_morph_blend_target(
+        positions, normals, tangents, morph_targets
+    )
 
     # Give each mesh a unique vertex and index buffer for simplicity.
     vertex_buffer_index = len(root.buffers.vertex_buffers)
@@ -460,54 +438,34 @@ def export_mesh_inner(
                 speff_mesh.base_mesh_index = mesh_index
                 root.models.models[0].meshes.append(speff_mesh)
 
-    # TODO: Is there a more reliable way to check for outlines?
-    has_outlines = False
-    for modifier in blender_mesh.modifiers:
-        if modifier.type == "SOLIDIFY":
-            has_outlines = True
-            break
+    outline_buffer_index = None
 
-    # TODO: report a warning if this fails.
+    has_outlines = mesh_has_outlines(blender_mesh)
+
     if has_outlines and original_mesh_index is not None:
-        original_mesh = original_meshes[original_mesh_index]
+        outline_mesh = export_outline_mesh(
+            original_meshes,
+            original_materials,
+            original_mesh_index,
+            new_mesh,
+            mesh_index,
+        )
 
-        # Find the original outline mesh and its outline material.
-        # TODO: Find a way to generate outline meshes and materials instead.
-        original_outline_mesh = None
-        outline_material_index = None
-        for i, mesh in enumerate(original_meshes):
-            # Outlines use the same vertex data but a different material.
-            if (
-                mesh.vertex_buffer_index == original_mesh.vertex_buffer_index
-                and mesh.index_buffer_index == original_mesh.index_buffer_index
-                and original_materials[mesh.material_index].name.endswith("_outline")
-            ):
-                original_outline_mesh = mesh
-                outline_material_index = mesh.material_index
-                break
+        if outline_mesh is not None:
+            outline_buffer_index = export_outline_buffer(
+                root,
+                mesh_name,
+                mesh_data,
+                vertex_indices,
+                normals,
+                outline_alpha,
+                morph_targets,
+            )
 
-        if original_outline_mesh is not None and outline_material_index is not None:
-            outline_mesh = copy_mesh(new_mesh)
-            outline_mesh.material_index = outline_material_index
-            outline_mesh.flags1 = original_outline_mesh.flags1
-            outline_mesh.flags2 = original_outline_mesh.flags2
-            outline_mesh.base_mesh_index = mesh_index
             root.models.models[0].meshes.append(outline_mesh)
         else:
             message = f"Unable to find outline mesh for {mesh_name} in original wimdo to generate outlines"
             operator.report({"WARNING"}, message)
-
-    outline_buffer_index = None
-    if has_outlines:
-        outline_buffer_index = export_outline_buffer(
-            root,
-            mesh_name,
-            mesh_data,
-            vertex_indices,
-            normals,
-            outline_alpha,
-            morph_targets,
-        )
 
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
         attributes, morph_blend_target, morph_targets, outline_buffer_index
@@ -517,6 +475,89 @@ def export_mesh_inner(
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
+
+
+def export_outline_mesh(
+    original_meshes,
+    original_materials,
+    original_mesh_index,
+    new_mesh,
+    mesh_index,
+):
+    original_mesh = original_meshes[original_mesh_index]
+
+    # Find the original outline mesh and its outline material.
+    # TODO: Find a way to generate outline meshes and materials instead.
+    original_outline_mesh = None
+    outline_material_index = None
+    for mesh in original_meshes:
+        # Outlines use the same vertex data but a different material.
+        if (
+            mesh.vertex_buffer_index == original_mesh.vertex_buffer_index
+            and mesh.index_buffer_index == original_mesh.index_buffer_index
+            and original_materials[mesh.material_index].name.endswith("_outline")
+        ):
+            original_outline_mesh = mesh
+            outline_material_index = mesh.material_index
+            break
+
+    if original_outline_mesh is not None and outline_material_index is not None:
+        outline_mesh = copy_mesh(new_mesh)
+        outline_mesh.material_index = outline_material_index
+        outline_mesh.flags1 = original_outline_mesh.flags1
+        outline_mesh.flags2 = original_outline_mesh.flags2
+        outline_mesh.base_mesh_index = mesh_index
+        return outline_mesh
+    else:
+        return None
+
+
+def mesh_has_outlines(blender_mesh):
+    # TODO: Is there a more reliable way to check for outlines?
+    for modifier in blender_mesh.modifiers:
+        if modifier.type == "SOLIDIFY":
+            return True
+
+    return False
+
+
+def export_outline_alpha(blender_mesh, positions):
+    outline_alpha = None
+
+    # Avoid messing up vertex weights by removing outline information.
+    # This is safe since we're working on a copy of the original mesh.
+    outline_vertex_group = blender_mesh.vertex_groups.get("OutlineThickness")
+    if outline_vertex_group is not None:
+        # TODO: Is there a way to do this without looping?
+        outline_alpha = np.zeros(positions.shape[0])
+        for i in range(positions.shape[0]):
+            outline_alpha[i] = outline_vertex_group.weight(i)
+
+        blender_mesh.vertex_groups.remove(outline_vertex_group)
+
+    return outline_alpha
+
+
+def export_morph_blend_target(positions, normals, tangents, morph_targets):
+    morph_blend_target = []
+    if len(morph_targets) > 0:
+        # TODO: Handle creating attributes and ordering in xc3_model?
+        morph_blend_target = [
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Position2, positions
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Normal4, normals
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.OldPosition, positions
+            ),
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Tangent2, tangents
+            ),
+        ]
+
+    return morph_blend_target
 
 
 def export_outline_buffer(
