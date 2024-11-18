@@ -364,7 +364,7 @@ def export_mesh_inner(
     index_buffer_index = len(root.buffers.index_buffers)
 
     material_index, material_name, is_new_material = extract_material_name_info(
-        root, mesh_name, mesh_data
+        original_materials, mesh_name, mesh_data
     )
 
     # TODO: why does None not work well in game?
@@ -499,35 +499,15 @@ def export_mesh_inner(
 
     outline_buffer_index = None
     if has_outlines:
-        # xc3_model will fill in missing required attributes with default values.
-        # TODO: Raise an error if the color data is missing?
-        # TODO: How to handle the alpha for outline width?
-        outline_attributes = []
-
-        # Buffers with morphs should omit the normals to work properly in game.
-        # The normals are already provided by the morph attributes.
-        if len(morph_targets) == 0:
-            outline_attributes.append(
-                xc3_model_py.vertex.AttributeData(
-                    xc3_model_py.vertex.AttributeType.Normal, normals
-                )
-            )
-
-        for color_attribute in mesh_data.color_attributes:
-            if color_attribute.name == "OutlineVertexColor":
-                attribute = export_color_attribute(
-                    mesh_name, mesh_data, vertex_indices, color_attribute
-                )
-                # Get the outline thickness used by the solidify modifier.
-                # Use imported vertex color alpha as a default.
-                if outline_alpha is not None:
-                    attribute.data[:, 3] = outline_alpha
-
-                outline_attributes.append(attribute)
-
-        outline_buffer_index = len(root.buffers.outline_buffers)
-        outline_buffer = xc3_model_py.vertex.OutlineBuffer(outline_attributes)
-        root.buffers.outline_buffers.append(outline_buffer)
+        outline_buffer_index = export_outline_buffer(
+            root,
+            mesh_name,
+            mesh_data,
+            vertex_indices,
+            normals,
+            outline_alpha,
+            morph_targets,
+        )
 
     vertex_buffer = xc3_model_py.vertex.VertexBuffer(
         attributes, morph_blend_target, morph_targets, outline_buffer_index
@@ -537,6 +517,42 @@ def export_mesh_inner(
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
+
+
+def export_outline_buffer(
+    root, mesh_name, mesh_data, vertex_indices, normals, outline_alpha, morph_targets
+):
+    # xc3_model will fill in missing required attributes with default values.
+    # TODO: Raise an error if the color data is missing?
+    # TODO: How to handle the alpha for outline width?
+    outline_attributes = []
+
+    # Buffers with morphs should omit the normals to work properly in game.
+    # The normals are already provided by the morph attributes.
+    if len(morph_targets) == 0:
+        outline_attributes.append(
+            xc3_model_py.vertex.AttributeData(
+                xc3_model_py.vertex.AttributeType.Normal, normals
+            )
+        )
+
+    for color_attribute in mesh_data.color_attributes:
+        if color_attribute.name == "OutlineVertexColor":
+            attribute = export_color_attribute(
+                mesh_name, mesh_data, vertex_indices, color_attribute
+            )
+            # Get the outline thickness used by the solidify modifier.
+            # Use imported vertex color alpha as a default.
+            if outline_alpha is not None:
+                attribute.data[:, 3] = outline_alpha
+
+            outline_attributes.append(attribute)
+
+    outline_buffer_index = len(root.buffers.outline_buffers)
+    outline_buffer = xc3_model_py.vertex.OutlineBuffer(outline_attributes)
+    root.buffers.outline_buffers.append(outline_buffer)
+
+    return outline_buffer_index
 
 
 def apply_toon_gradient_row(mesh_data, material):
@@ -568,13 +584,14 @@ def extract_toon_gradient_row(mesh_data) -> Optional[float]:
     return None
 
 
-def extract_material_name_info(root, mesh_name, mesh_data):
+def extract_material_name_info(materials, mesh_name, mesh_data):
     # Use names as a less accurate fallback for the original material.
     blender_material_name = mesh_data.materials[0].name
     material_index, material_name = extract_index(blender_material_name)
     is_new_material = True
-    for i, material in enumerate(root.models.materials):
+    for i, material in enumerate(materials):
         if material.name == material_name:
+            # TODO: handle setting an existing name to reference a different original material?
             is_new_material = False
             if material_index is None:
                 material_index = i
@@ -584,9 +601,9 @@ def extract_material_name_info(root, mesh_name, mesh_data):
         message = f"Failed to find original material for mesh {mesh_name} with material {blender_material_name}."
         raise ExportException(message)
 
-    if material_index < 0 or material_index >= len(root.models.materials):
+    if material_index < 0 or material_index >= len(materials):
         message = f"Material index {material_index} for mesh {mesh_name}"
-        message += f" does not reference one of {len(root.models.materials)} original materials."
+        message += f" does not reference one of {len(materials)} original materials."
         raise ExportException(message)
     return material_index, material_name, is_new_material
 
@@ -841,6 +858,7 @@ def export_shape_keys(
 
 def copy_material(material):
     # TODO: does pyo3 support deep copy?
+    # TODO: Add deep copy support to xc3_model_py?
     textures = [
         xc3_model_py.material.Texture(t.image_texture_index, t.sampler_index)
         for t in material.textures
@@ -852,7 +870,7 @@ def copy_material(material):
         material.state_flags,
         material.color,
         textures,
-        material.work_values,
+        np.array(material.work_values),
         material.shader_vars,
         material.work_callbacks,
         material.alpha_test_ref,
