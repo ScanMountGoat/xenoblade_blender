@@ -10,7 +10,7 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Import character animations from .mot files
 * Decoded and embedded RGBA textures for easier use in Blender
 * Material parameters, textures, and texture channel assignments based on decompiled in game shader code
-* Export .wimdo models using an existing model as a base (WIP)
+* Export .wimdo models using an existing model as a base. See the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki/Export) for details.
 
 ## Getting Started
 * Download the latest version of the addon supported by your Blender version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases).
