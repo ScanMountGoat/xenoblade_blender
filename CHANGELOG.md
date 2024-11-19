@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Fixed
 * Fixed an issue where editing a new material would also edit the original material in some cases.
+* Fixed a compatibility issue preventing import in Blender 4.3.
 
 ## 0.15.3 - 2024-11-15
 ### Changed

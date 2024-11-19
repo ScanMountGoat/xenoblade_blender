@@ -551,7 +551,6 @@ def import_material(
 
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
-        blender_material.shadow_method = "CLIP"
 
     # Remove unused global textures.
     # TODO: is there a better way of doing this?
