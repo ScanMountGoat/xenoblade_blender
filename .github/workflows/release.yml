@@ -27,12 +27,12 @@ jobs:
         cp xc3_model_py/target/release/libxc3_model_py.so xenoblade_blender/xc3_model_py.so
         zip -r xenoblade_blender_linux_x64.zip xenoblade_blender
     - name: Upload Zip
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xenoblade_blender_linux
         path: xenoblade_blender_linux_x64.zip
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: xenoblade_blender_linux_x64.zip
@@ -57,12 +57,12 @@ jobs:
         cp xc3_model_py/target/release/xc3_model_py.dll xenoblade_blender/xc3_model_py.pyd
         Compress-Archive -path xenoblade_blender -destinationPath xenoblade_blender_win_x64.zip 
     - name: Upload Zip
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xenoblade_blender_win
         path: xenoblade_blender_win_x64.zip
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: xenoblade_blender_win_x64.zip
@@ -104,12 +104,12 @@ jobs:
         cp xc3_model_py/target/${{matrix.target}}/release/libxc3_model_py.dylib xenoblade_blender/xc3_model_py.so
         zip -r xenoblade_blender_macos_${{matrix.desc}}.zip xenoblade_blender
     - name: Upload Zip
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xenoblade_blender_macos_${{matrix.desc}}
         path: xenoblade_blender_macos_${{matrix.desc}}.zip
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: xenoblade_blender_macos_${{matrix.desc}}.zip
