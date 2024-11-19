@@ -4,7 +4,7 @@ bl_info = {
     "name": "Xenoblade Blender",
     "description": "Import and export Xenoblade models, maps, and animations",
     "author": "ScanMountGoat (SMG)",
-    "version": (0, 15, 3),
+    "version": (0, 15, 4),
     "blender": (4, 1, 0),
     "location": "File > Import-Export",
     "warning": "",
