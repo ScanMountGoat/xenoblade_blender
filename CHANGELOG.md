@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for exporting vertex groups for bones in the skeleton but not in the wimdo bone list.
+
+### Fixed
+* Fixed an issue where importing would fail for materials with invalid texture indices.
+
 ## 0.15.4 - 2024-11-19
 ### Fixed
 * Fixed an issue where editing a new material would also edit the original material in some cases.

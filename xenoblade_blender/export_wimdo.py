@@ -120,6 +120,29 @@ def export_wimdo(
     # Initialize weight buffer to share with all meshes.
     # TODO: Missing bone names?
     bone_names = root.buffers.weights.weight_buffer(16385).bone_names
+
+    # TODO: ignore groups without weights?
+    vertex_group_names = set()
+    for o in armature.children:
+        for vg in o.vertex_groups:
+            if vg.name != "OutlineThickness":
+                vertex_group_names.add(vg.name)
+
+    skinning = root.models.skinning
+    if skinning is not None:
+        for name in vertex_group_names:
+            if name not in bone_names:
+                # Bones need bounds to render in game.
+                # TODO: Is it ok to not set constraints on added bones?
+                bounds = xc3_model_py.skinning.BoneBounds(
+                    [0.0, 0.0, 0.0], [0.1, 0.1, 0.1], 0.1
+                )
+                bone = xc3_model_py.skinning.Bone(name, False, bounds, None)
+                skinning.bones.append(bone)
+
+                # The skinning bone list needs to match the weights.
+                bone_names.append(name)
+
     combined_weights = xc3_model_py.skinning.SkinWeights(
         np.array([]), np.array([]), bone_names
     )
@@ -127,7 +150,7 @@ def export_wimdo(
     image_replacements = set()
 
     # Use a consistent ordering since Blender collections don't have one.
-    sorted_objects = [o for o in armature.children]
+    sorted_objects = [o for o in armature.children if o.type == "MESH"]
     sorted_objects.sort(key=lambda o: name_sort_index(o.name))
     for object in sorted_objects:
         export_mesh(

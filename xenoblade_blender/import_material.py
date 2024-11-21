@@ -51,9 +51,15 @@ def import_material(
         sampler = None
         if texture.sampler_index < len(samplers):
             sampler = samplers[texture.sampler_index]
+        image = None
+        try:
+            image = blender_images[texture.image_texture_index]
+        except IndexError:
+            pass
+
         add_texture_nodes(
             f"s{i}",
-            blender_images[texture.image_texture_index],
+            image,
             sampler,
             str(i),
             nodes,
@@ -1130,10 +1136,11 @@ def assign_texture_channel(
         # TODO: Find a better way to handle color management.
         # TODO: Why can't we just set everything to non color?
         # TODO: This won't work if users have different color spaces installed like aces.
-        if is_data:
-            textures[name].image.colorspace_settings.name = "Non-Color"
-        else:
-            textures[name].image.colorspace_settings.name = "sRGB"
+        if textures[name].image is not None:
+            if is_data:
+                textures[name].image.colorspace_settings.name = "Non-Color"
+            else:
+                textures[name].image.colorspace_settings.name = "sRGB"
 
             # Alpha isn't part of the RGB node.
         if input_channel == "Alpha":
