@@ -70,9 +70,22 @@ def import_material(
             textures_uv,
             location_y,
         )
-    for i, (name, image) in enumerate(shader_images.items()):
+
+    # Search all used textures recursively to improve import times.
+    used_shader_names = set()
+    if material.shader is not None:
+        for dependencies in material.shader.output_dependencies.values():
+            for d in dependencies.dependencies:
+                texture = d.texture()
+                if texture is not None:
+                    used_shader_names.add(texture.name)
+
+    used_shader_images = {
+        n: i for (n, i) in shader_images.items() if n in used_shader_names
+    }
+
+    for i, (name, image) in enumerate(used_shader_images.items()):
         # Place global textures after the material textures.
-        # TODO: Don't load unused global textures?
         location_y = 300 - (i + len(material.textures)) * 300
         add_texture_nodes(
             name,
@@ -557,25 +570,6 @@ def import_material(
 
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
-
-    # Remove unused global textures.
-    # TODO: is there a better way of doing this?
-    # TODO: Create a variable for this somewhere.
-    for name in [
-        "gTResidentTex09",
-        "gTResidentTex43",
-        "gTResidentTex44",
-        "gTResidentTex45",
-        "gTResidentTex46",
-        "gTToonGrad",
-    ]:
-        node = textures_rgb.get(name)
-        if node is not None:
-            if all(len(o.links) == 0 for o in node.outputs):
-                nodes.remove(textures[name])
-                nodes.remove(textures_rgb[name])
-                nodes.remove(textures_scale[name])
-                nodes.remove(textures_uv[name])
 
     return blender_material
 

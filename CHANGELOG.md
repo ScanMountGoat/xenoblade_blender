@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where importing would fail for materials with invalid texture indices.
+* Fixed an issue where some global textures would not import for some models.
 
 ## 0.15.4 - 2024-11-19
 ### Fixed

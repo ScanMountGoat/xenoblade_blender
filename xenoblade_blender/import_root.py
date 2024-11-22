@@ -134,16 +134,9 @@ def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.I
         if folder.exists():
             # TODO: Lazy load these images instead?
             textures = xc3_model_py.monolib.ShaderTextures.from_folder(str(folder))
-            names = [
-                "gTResidentTex09",
-                "gTResidentTex43",
-                "gTResidentTex44",
-                "gTResidentTex45",
-                "gTResidentTex46",
-                "gTToonGrad",
-            ]
-            images = [(name, textures.global_texture(name)) for name in names]
-            images = [(name, i) for (name, i) in images if i is not None]
+
+            images = textures.global_textures()
+            images = [(name, i) for (name, i) in images.items() if i is not None]
 
             png_images = xc3_model_py.decode_images_png(
                 [i for (_, i) in images], not flip
@@ -153,6 +146,8 @@ def import_monolib_shader_images(path: str, flip: bool) -> Dict[str, bpy.types.I
                 # TODO: use the path as the name.
                 image.name = name
                 shader_images[name] = import_image(image, png, "", 0)
+
+            break
 
     return shader_images
 
