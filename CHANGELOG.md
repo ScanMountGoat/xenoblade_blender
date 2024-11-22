@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for exporting vertex groups for bones in the skeleton but not in the wimdo bone list.
 
+### Changed
+* Adjusted material node creation to produce fewer nodes in most cases by lazily creating UV nodes.
+
 ### Fixed
 * Fixed an issue where importing would fail for materials with invalid texture indices.
 * Fixed an issue where some global textures would not import for some models.
