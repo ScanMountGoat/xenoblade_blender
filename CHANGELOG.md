@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.16.0 - 2024-11-27
 ### Added
 * Added support for exporting vertex groups for bones in the skeleton but not in the wimdo bone list.
 
