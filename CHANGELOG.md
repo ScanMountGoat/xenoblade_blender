@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 * Adjusted material node creation to produce fewer nodes in most cases by lazily creating UV nodes.
+* Improved accuracy of material assignments.
 
 ### Fixed
 * Fixed an issue where importing would fail for materials with invalid texture indices.
