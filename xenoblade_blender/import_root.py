@@ -12,9 +12,8 @@ from bpy_extras import image_utils
 from pathlib import Path
 
 
-def get_database_path(version: str) -> str:
-    files = {"XC1": "xc1.bin", "XC2": "xc2.bin", "XC3": "xc3.bin"}
-    return os.path.join(os.path.dirname(__file__), files[version])
+def get_database_path() -> str:
+    return os.path.join(os.path.dirname(__file__), "xc_combined.bin")
 
 
 def get_image_folder(image_folder: str, filepath: str) -> str:

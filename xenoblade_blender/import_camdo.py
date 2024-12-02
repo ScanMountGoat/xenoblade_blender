@@ -6,6 +6,7 @@ import logging
 import math
 
 from .import_root import (
+    get_database_path,
     get_image_folder,
     import_armature,
     import_model_root,
@@ -73,7 +74,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
     ):
         start = time.time()
 
-        database_path = os.path.join(os.path.dirname(__file__), "xcx.bin")
+        database_path = get_database_path()
         database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         root = xc3_model_py.load_model_legacy(path, database)
 

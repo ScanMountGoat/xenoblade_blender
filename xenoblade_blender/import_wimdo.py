@@ -39,17 +39,6 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         type=bpy.types.OperatorFileListElement, options={"HIDDEN", "SKIP_SAVE"}
     )
 
-    game_version: EnumProperty(
-        name="Game Version",
-        description="The game version for the shader database",
-        items=(
-            ("XC1", "Xenoblade 1 DE", "Xenoblade Chronicles 1 Definitive Edition"),
-            ("XC2", "Xenoblade 2", "Xenoblade Chronicles 2"),
-            ("XC3", "Xenoblade 3", "Xenoblade Chronicles 3"),
-        ),
-        default="XC3",
-    )
-
     pack_images: BoolProperty(
         name="Pack Images",
         description="Pack all images into the Blender file. Increases memory usage and import times but makes the Blender file easier to share by not creating additional files",
@@ -79,7 +68,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
         logging.basicConfig(format=log_fmt, level=logging.INFO)
 
-        database_path = get_database_path(self.game_version)
+        database_path = get_database_path()
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
         # TODO: merge armatures?
