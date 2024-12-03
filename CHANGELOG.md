@@ -3,12 +3,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.16.1 - 2024-12-03
 ### Added
 * Added support for root motion to mot animation loading.
 
 ### Removed
-* Removed the "Game Version" property for wimdo and wismhd import. Shader databases are now selected automatically based on the file data.
+* Removed the "Game Version" property for wimdo and wismhd import. Shader database entries are now selected automatically based on the file data.
 
 ## 0.16.0 - 2024-11-27
 ### Added
