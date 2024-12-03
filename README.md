@@ -18,7 +18,6 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Enable the addon if it is not already enabled.
 * Extract the files from the arh and ard from your romfs dump of the game using [XbTool](https://github.com/AlexCSDev/XbTool/releases).
 * Import any of the supported file types using the new menu options under File > Import.  
-Select the game version before importing for correct material texture assignments.
 
 ## Updating
 Update the addon by reinstalling the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Windows users will need to disable the previous version of the addon, restart Blender, remove the addon, and then install the new version's zip file to properly upgrade. MacOS and Linux users can reinstall the addon without any additional steps.
