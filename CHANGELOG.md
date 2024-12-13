@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where some wimdo bones would import with incorrect transforms.
+* Fixed an issue where some bones would export with incorrect transforms for wimdo export.
+
 ## 0.16.2 - 2024-12-11
 ### Fixed
 * Fixed an issue where wimdo models would export with incorrect bone parenting information in some cases.
