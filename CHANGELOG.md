@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.16.3 - 2024-12-13
 ### Fixed
 * Fixed an issue where some wimdo bones would import with incorrect transforms.
 * Fixed an issue where some bones would export with incorrect transforms for wimdo export.
