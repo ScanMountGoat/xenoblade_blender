@@ -1,9 +1,10 @@
 from pathlib import Path
 import bpy
 import time
-import logging
 import numpy as np
 import math
+
+from xenoblade_blender.import_root import init_logging
 
 from . import xc3_model_py
 from mathutils import Matrix
@@ -31,9 +32,7 @@ class ImportIdcm(bpy.types.Operator, ImportHelper):
     )
 
     def execute(self, context: bpy.types.Context):
-        # Log any errors from Rust.
-        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-        logging.basicConfig(format=log_fmt, level=logging.INFO)
+        init_logging()
 
         folder = Path(self.filepath).parent
         for file in self.files:

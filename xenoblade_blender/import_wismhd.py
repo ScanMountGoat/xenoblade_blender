@@ -1,9 +1,6 @@
-from pathlib import Path
 import bpy
 import time
 import os
-import logging
-import math
 
 from . import xc3_model_py
 from .import_root import (
@@ -12,10 +9,10 @@ from .import_root import (
     import_map_root,
     import_images,
     import_monolib_shader_images,
+    init_logging,
 )
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, EnumProperty, BoolProperty
-from mathutils import Matrix
+from bpy.props import StringProperty, BoolProperty
 
 
 class ImportWismhd(bpy.types.Operator, ImportHelper):
@@ -51,9 +48,7 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
     )
 
     def execute(self, context: bpy.types.Context):
-        # Log any errors from Rust.
-        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-        logging.basicConfig(format=log_fmt, level=logging.INFO)
+        init_logging()
 
         database_path = get_database_path()
         image_folder = get_image_folder(self.image_folder, self.filepath)

@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Optional
 import bpy
 import numpy as np
@@ -21,6 +22,12 @@ def get_image_folder(image_folder: str, filepath: str) -> str:
         return str(Path(filepath).parent)
     else:
         return image_folder
+
+
+def init_logging():
+    # Log any errors from Rust.
+    log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
+    logging.basicConfig(format=log_fmt, level=logging.INFO)
 
 
 # https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/import_model.py#L371

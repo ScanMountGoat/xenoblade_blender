@@ -2,8 +2,6 @@ from pathlib import Path
 import bpy
 import time
 import os
-import logging
-import math
 
 from .import_root import (
     get_database_path,
@@ -11,13 +9,13 @@ from .import_root import (
     import_armature,
     import_model_root,
     import_images,
+    init_logging,
 )
 
 from . import xc3_model_py
 
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty, BoolProperty, CollectionProperty
-from mathutils import Matrix
 
 
 class ImportCamdo(bpy.types.Operator, ImportHelper):
@@ -51,9 +49,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
     )
 
     def execute(self, context: bpy.types.Context):
-        # Log any errors from Rust.
-        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-        logging.basicConfig(format=log_fmt, level=logging.INFO)
+        init_logging()
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
 

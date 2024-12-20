@@ -1,11 +1,11 @@
-from typing import Tuple
 import bpy
 import time
-import logging
 import numpy as np
 from pathlib import Path
 import re
 import os
+
+from xenoblade_blender.import_root import init_logging
 
 from .export_root import (
     ExportException,
@@ -60,9 +60,7 @@ class ExportWimdo(bpy.types.Operator, ExportHelper):
     )
 
     def execute(self, context: bpy.types.Context):
-        # Log any errors from Rust.
-        log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-        logging.basicConfig(format=log_fmt, level=logging.INFO)
+        init_logging()
 
         try:
             export_wimdo(
