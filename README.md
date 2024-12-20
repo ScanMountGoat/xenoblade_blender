@@ -8,6 +8,7 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Import characters, objects, enemies, and weapon models from .wimdo and .camdo files
 * Import maps from .wismhd files
 * Import character animations from .mot files
+* Import collision meshes from .wiidcm or .idcm files
 * Decoded and embedded RGBA textures for easier use in Blender
 * Material parameters, textures, and texture channel assignments based on decompiled in game shader code
 * Export .wimdo models using an existing model as a base. See the [wiki](https://github.com/ScanMountGoat/xenoblade_blender/wiki/Export) for details.
