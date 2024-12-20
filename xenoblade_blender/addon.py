@@ -5,6 +5,7 @@ from . import import_wimdo
 from . import import_wismhd
 from . import import_camdo
 from . import export_wimdo
+from . import import_idcm
 
 
 def menu_import_mot(self, context):
@@ -32,12 +33,18 @@ def menu_import_camdo(self, context):
     self.layout.operator(import_camdo.ImportCamdo.bl_idname, text=text)
 
 
+def menu_import_idcm(self, context):
+    text = "Xenoblade Collisions (.idcm/.wiidcm)"
+    self.layout.operator(import_idcm.ImportIdcm.bl_idname, text=text)
+
+
 classes = [
     import_mot.ImportMot,
     import_wimdo.ImportWimdo,
     import_wismhd.ImportWismhd,
     import_camdo.ImportCamdo,
     export_wimdo.ExportWimdo,
+    import_idcm.ImportIdcm,
 ]
 
 
@@ -49,6 +56,7 @@ def register():
     bpy.types.TOPBAR_MT_file_import.append(menu_import_wimdo)
     bpy.types.TOPBAR_MT_file_import.append(menu_import_wismhd)
     bpy.types.TOPBAR_MT_file_import.append(menu_import_camdo)
+    bpy.types.TOPBAR_MT_file_import.append(menu_import_idcm)
 
     bpy.types.TOPBAR_MT_file_export.append(menu_export_wimdo)
 
@@ -61,5 +69,6 @@ def unregister():
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_wimdo)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_wismhd)
     bpy.types.TOPBAR_MT_file_import.remove(menu_import_camdo)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_import_idcm)
 
     bpy.types.TOPBAR_MT_file_export.remove(menu_export_wimdo)

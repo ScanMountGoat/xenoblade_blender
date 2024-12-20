@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for importing collisions from .wiidcm or .idcm files.
+
 ### Fixed
 * Fixed an issue where some wismhd maps would import with incorrect texture assignments.
 
