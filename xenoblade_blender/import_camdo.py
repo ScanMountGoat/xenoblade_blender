@@ -47,6 +47,12 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         name="Image Folder",
         description="The folder for the imported images. Defaults to the file's parent folder if not set",
     )
+    
+    randomize_material_names: BoolProperty(
+        name="Randomize Material Names",
+        description="Toggle whether to randomize material names to avoid collisions",
+        default=False,
+    )
 
     def execute(self, context: bpy.types.Context):
         init_logging()
@@ -101,6 +107,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
             import_all_meshes=True,
             import_outlines=True,
             flip_uvs=False,
+            randomize_material_names=self.randomize_material_names,
         )
 
         end = time.time()

@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 import bpy
+import uuid
 
 from . import xc3_model_py
 
@@ -11,7 +12,12 @@ def import_material(
     shader_images: Dict[str, bpy.types.Image],
     image_textures,
     samplers,
+    randomize_name: bool = False,
 ):
+    
+    if randomize_name:
+        name = f"{name}_{uuid.uuid4().hex[:8]}"  # Append random ID to the name
+    
     blender_material = bpy.data.materials.new(name)
 
     # Add some custom properties to make debugging easier.
