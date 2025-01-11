@@ -598,7 +598,7 @@ def apply_toon_gradient_row(mesh_data, material):
 
 
 def extract_mesh_index(mesh_name, original_meshes, material_index):
-    mesh_index, _ = extract_index(mesh_name)
+    _, mesh_index = extract_index_name(mesh_name)
     if mesh_index is None:
         for i, mesh in enumerate(original_meshes):
             if mesh.material_index == material_index:
@@ -618,7 +618,7 @@ def extract_toon_gradient_row(mesh_data) -> Optional[float]:
 def extract_material_name_info(materials, mesh_name, mesh_data):
     # Use names as a less accurate fallback for the original material.
     blender_material_name = mesh_data.materials[0].name
-    material_index, material_name = extract_index(blender_material_name)
+    material_name, material_index = extract_index_name(blender_material_name)
     is_new_material = True
     for i, material in enumerate(materials):
         if material.name == material_name:
