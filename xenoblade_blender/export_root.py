@@ -64,17 +64,7 @@ def parse_int(name: str) -> Optional[int]:
 
     return value
 
-
-def extract_index(name: str) -> Tuple[Optional[int], str]:
-    name_parts = name.split(".", 1)
-
-    prefix = parse_int(name_parts[0])
-    name = name_parts[1] if len(name_parts) == 2 else name
-
-    return prefix, name
-
-
-def extract_image_name_index(name: str) -> Tuple[str, Optional[int]]:
+def extract_index_name(name: str) -> Tuple[str, Optional[int]]:
     # Extract image_name, index from model_name.index.image_name
     # Use >= to ignore any additional parts like file extension.
     name_parts = name.split(".")
@@ -836,7 +826,7 @@ def get_texture_assignments(mesh_data, material, image_textures):
 def image_index_to_replace(images, image_name: str) -> Optional[int]:
     # Find the original image to replace.
     # TODO: handle new images without an index?
-    image_name, image_index = extract_image_name_index(image_name)
+    image_name, image_index = extract_index_name(image_name)
     if image_index is None:
         for i, image in enumerate(images):
             if image.name == image_name:

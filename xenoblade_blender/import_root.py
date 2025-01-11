@@ -260,7 +260,6 @@ def import_model_root(
     import_all_meshes: bool,
     import_outlines: bool,
     flip_uvs: bool,
-    randomize_material_names: bool = False,
 ):
     base_lods = None
     if root.models.lod_data is not None:
@@ -283,7 +282,6 @@ def import_model_root(
                     shader_images,
                     root.image_textures,
                     root.models.samplers,
-                    randomize_name=randomize_material_names,
                 )
 
             if not import_all_meshes:

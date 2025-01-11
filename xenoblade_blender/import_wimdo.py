@@ -60,12 +60,6 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         description="Import data required to render and export outline meshes",
         default=True,
     )
-    
-    randomize_material_names: BoolProperty(
-        name="Randomize Material Names",
-        description="Toggle whether to randomize material names to avoid collisions",
-        default=False,
-    )
 
     def execute(self, context: bpy.types.Context):
         init_logging()
@@ -125,7 +119,6 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
             import_all_meshes,
             import_outlines,
             flip_uvs=True,
-            randomize_material_names=self.randomize_material_names,
         )
 
         # Store the path to make exporting easier later.
