@@ -64,17 +64,7 @@ def parse_int(name: str) -> Optional[int]:
 
     return value
 
-
-def extract_index(name: str) -> Tuple[Optional[int], str]:
-    name_parts = name.split(".", 1)
-
-    prefix = parse_int(name_parts[0])
-    name = name_parts[1] if len(name_parts) == 2 else name
-
-    return prefix, name
-
-
-def extract_image_name_index(name: str) -> Tuple[str, Optional[int]]:
+def extract_index_name(name: str) -> Tuple[str, Optional[int]]:
     # Extract image_name, index from model_name.index.image_name
     # Use >= to ignore any additional parts like file extension.
     name_parts = name.split(".")
@@ -608,7 +598,7 @@ def apply_toon_gradient_row(mesh_data, material):
 
 
 def extract_mesh_index(mesh_name, original_meshes, material_index):
-    mesh_index, _ = extract_index(mesh_name)
+    _, mesh_index = extract_index_name(mesh_name)
     if mesh_index is None:
         for i, mesh in enumerate(original_meshes):
             if mesh.material_index == material_index:
@@ -628,7 +618,7 @@ def extract_toon_gradient_row(mesh_data) -> Optional[float]:
 def extract_material_name_info(materials, mesh_name, mesh_data):
     # Use names as a less accurate fallback for the original material.
     blender_material_name = mesh_data.materials[0].name
-    material_index, material_name = extract_index(blender_material_name)
+    material_name, material_index = extract_index_name(blender_material_name)
     is_new_material = True
     for i, material in enumerate(materials):
         if material.name == material_name:
@@ -836,7 +826,7 @@ def get_texture_assignments(mesh_data, material, image_textures):
 def image_index_to_replace(images, image_name: str) -> Optional[int]:
     # Find the original image to replace.
     # TODO: handle new images without an index?
-    image_name, image_index = extract_image_name_index(image_name)
+    image_name, image_index = extract_index_name(image_name)
     if image_index is None:
         for i, image in enumerate(images):
             if image.name == image_name:
