@@ -254,6 +254,7 @@ def import_map_root(
 def import_model_root(
     operator,
     root,
+    model_name,
     blender_images: list[bpy.types.Image],
     shader_images: Dict[str, bpy.types.Image],
     root_obj,
@@ -271,7 +272,7 @@ def import_model_root(
             # Many materials are for meshes that won't be loaded.
             # Lazy load materials to improve import times.
             material = root.models.materials[mesh.material_index]
-            material_name = f"{mesh.material_index}.{material.name}"
+            material_name = f"{model_name}.{mesh.material_index}.{material.name}"
 
             blender_material = bpy.data.materials.get(material_name)
             if blender_material is None:

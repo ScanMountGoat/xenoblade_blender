@@ -80,9 +80,10 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         start = time.time()
 
         model_name = os.path.basename(path)
+        name = model_name.replace(".camdo", "")
         blender_images = import_images(
             root,
-            model_name.replace(".camdo", ""),
+            name,
             pack_images,
             image_folder,
             flip=False,
@@ -95,6 +96,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         import_model_root(
             self,
             root,
+            name,
             blender_images,
             shader_images,
             armature,
