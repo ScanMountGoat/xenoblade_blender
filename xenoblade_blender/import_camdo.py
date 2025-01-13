@@ -51,13 +51,18 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
     def execute(self, context: bpy.types.Context):
         init_logging()
 
+        database_path = get_database_path()
+        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
         # TODO: merge armatures?
         folder = Path(self.filepath).parent
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
-            self.import_camdo(context, abs_path, self.pack_images, image_folder)
+            self.import_camdo(
+                context, abs_path, database, self.pack_images, image_folder
+            )
 
         return {"FINISHED"}
 
@@ -65,13 +70,12 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         self,
         context: bpy.types.Context,
         path: str,
+        database: xc3_model_py.shader_database.ShaderDatabase,
         pack_images: bool,
         image_folder: str,
     ):
         start = time.time()
 
-        database_path = get_database_path()
-        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         root = xc3_model_py.load_model_legacy(path, database)
 
         end = time.time()

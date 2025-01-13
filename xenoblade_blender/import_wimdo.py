@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Dict
 import bpy
 import time
 import os
@@ -65,6 +66,10 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         init_logging()
 
         database_path = get_database_path()
+        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+
+        shader_images = import_monolib_shader_images(self.filepath, flip=True)
+
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
         # TODO: merge armatures?
@@ -74,7 +79,8 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
             self.import_wimdo(
                 context,
                 abs_path,
-                database_path,
+                database,
+                shader_images,
                 self.pack_images,
                 image_folder,
                 self.import_all_meshes,
@@ -87,7 +93,8 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         self,
         context: bpy.types.Context,
         path: str,
-        database_path: str,
+        database: xc3_model_py.shader_database.ShaderDatabase,
+        shader_images: Dict[str, bpy.types.Image],
         pack_images: bool,
         image_folder: str,
         import_all_meshes: bool,
@@ -95,10 +102,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
     ):
         start = time.time()
 
-        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
         root = xc3_model_py.load_model(path, database)
-
-        shader_images = import_monolib_shader_images(path, flip=True)
 
         end = time.time()
         print(f"Load Root: {end - start}")
