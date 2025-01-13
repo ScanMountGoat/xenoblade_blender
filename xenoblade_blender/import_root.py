@@ -109,7 +109,6 @@ def merge_armatures(operator, context, armatures):
 
     # Merge each bone instead of finding the armature with more bones.
     # This is necessary for some split models to animate correctly.
-    # TODO: is it better to define this in xc3_model_py?
     for armature in armatures:
         for bone in armature.data.edit_bones:
             print(bone.name)

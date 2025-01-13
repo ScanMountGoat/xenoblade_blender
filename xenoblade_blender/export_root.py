@@ -19,10 +19,10 @@ def export_skeleton(armature: bpy.types.Object):
         name = bone.name
         if bone.parent:
             matrix = get_bone_transform(bone.parent.matrix.inverted() @ bone.matrix)
-            transform = np.array(matrix.transposed())
+            transform = np.array(matrix.transposed(), dtype=np.float32)
         else:
             matrix = get_root_bone_transform(bone)
-            transform = np.array(matrix.transposed())
+            transform = np.array(matrix.transposed(), dtype=np.float32)
 
         # TODO: Find a way to make this not O(N^2)?
         parent_index = None
@@ -274,7 +274,7 @@ def export_mesh_inner(
         message += " which exceeds the per mesh limit of 65535."
         raise ExportException(message)
 
-    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"), dtype=np.float32)
 
     positions = export_positions(mesh_data, z_up_to_y_up)
     vertex_indices = export_vertex_indices(mesh_data)
@@ -843,7 +843,7 @@ def export_shape_keys(
     normals: np.ndarray,
     tangents: np.ndarray,
 ):
-    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"))
+    z_up_to_y_up = np.array(Matrix.Rotation(math.radians(90), 3, "X"), dtype=np.float32)
 
     morph_targets = []
     if mesh_data.shape_keys is not None:
@@ -901,7 +901,7 @@ def copy_material(material):
         material.state_flags,
         material.color,
         textures,
-        np.array(material.work_values),
+        np.array(material.work_values, dtype=np.float32),
         material.shader_vars,
         material.work_callbacks,
         material.alpha_test_ref,

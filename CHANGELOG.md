@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 * Changed imported material names to use the model name as a prefix to avoid name conflicts across imports.
 
+### Fixed
+* Fixed an issue where some wimdo models would import with empty or incomplete armatures.
+
 ## 0.17.0 - 2024-12-20
 ### Added
 * Added support for importing collisions from .wiidcm or .idcm files.
