@@ -10,6 +10,7 @@ from .import_root import (
     import_model_root,
     import_images,
     init_logging,
+    merge_armatures,
 )
 
 from . import xc3_model_py
@@ -48,6 +49,12 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         description="The folder for the imported images. Defaults to the file's parent folder if not set",
     )
 
+    merge_armatures: BoolProperty(
+        name="Merge Armatures",
+        description="Merge bones from all imported armatures and the selected armature.",
+        default=False,
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
@@ -56,13 +63,18 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
-        # TODO: merge armatures?
+        armatures = []
+
         folder = Path(self.filepath).parent
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
-            self.import_camdo(
+            armature = self.import_camdo(
                 context, abs_path, database, self.pack_images, image_folder
             )
+            armatures.append(armature)
+
+        if self.merge_armatures:
+            merge_armatures(self, context, armatures)
 
         return {"FINISHED"}
 
@@ -73,7 +85,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
         database: xc3_model_py.shader_database.ShaderDatabase,
         pack_images: bool,
         image_folder: str,
-    ):
+    ) -> bpy.types.Object:
         start = time.time()
 
         root = xc3_model_py.load_model_legacy(path, database)
@@ -85,6 +97,7 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
 
         model_name = os.path.basename(path)
         name = model_name.replace(".camdo", "")
+
         blender_images = import_images(
             root,
             name,
@@ -111,3 +124,5 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
 
         end = time.time()
         print(f"Import Blender Scene: {end - start}")
+
+        return armature

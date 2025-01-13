@@ -12,6 +12,7 @@ from .import_root import (
     import_images,
     import_monolib_shader_images,
     init_logging,
+    merge_armatures,
 )
 
 from . import xc3_model_py
@@ -62,6 +63,12 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         default=True,
     )
 
+    merge_armatures: BoolProperty(
+        name="Merge Armatures",
+        description="Merge bones from all imported armatures and the selected armature. Leave this unchecked for editing individual models for export.",
+        default=False,
+    )
+
     def execute(self, context: bpy.types.Context):
         init_logging()
 
@@ -72,11 +79,12 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
-        # TODO: merge armatures?
+        armatures = []
+
         folder = Path(self.filepath).parent
         for file in self.files:
             abs_path = str(folder.joinpath(file.name))
-            self.import_wimdo(
+            armature = self.import_wimdo(
                 context,
                 abs_path,
                 database,
@@ -86,6 +94,10 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
                 self.import_all_meshes,
                 self.import_outlines,
             )
+            armatures.append(armature)
+
+        if self.merge_armatures:
+            merge_armatures(self, context, armatures)
 
         return {"FINISHED"}
 
@@ -99,7 +111,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
         image_folder: str,
         import_all_meshes: bool,
         import_outlines: bool,
-    ):
+    ) -> bpy.types.Object:
         start = time.time()
 
         root = xc3_model_py.load_model(path, database)
@@ -111,8 +123,11 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
         model_name = os.path.basename(path)
         name = model_name.replace(".wimdo", "")
+
         blender_images = import_images(root, name, pack_images, image_folder, flip=True)
+
         armature = import_armature(self, context, root, model_name)
+
         import_model_root(
             self,
             root,
@@ -130,3 +145,5 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
         end = time.time()
         print(f"Import Blender Scene: {end - start}")
+
+        return armature

@@ -39,6 +39,7 @@ def import_armature(operator, context, root, name: str):
     armature.rotation_mode = "QUATERNION"
     armature.show_in_front = True
 
+    previous_active = context.view_layer.objects.active
     context.view_layer.objects.active = armature
     bpy.ops.object.mode_set(mode="EDIT", toggle=False)
 
@@ -77,8 +78,66 @@ def import_armature(operator, context, root, name: str):
         operator.report({"WARNING"}, message)
 
     bpy.ops.object.mode_set(mode="OBJECT")
+    context.view_layer.objects.active = previous_active
 
     return armature
+
+
+def merge_armatures(operator, context, armatures):
+    combined_armature = None
+    if context.object is not None and isinstance(
+        context.object.data, bpy.types.Armature
+    ):
+        # Merge to the selected armature if present.
+        combined_armature = context.object
+    elif len(armatures) > 1:
+        # Merge the supplied armatures if none are selected.
+        combined_armature = armatures[0]
+
+    if combined_armature is None:
+        message = (
+            "Skipping armature merging. No armature selected or importing single file."
+        )
+        operator.report({"WARNING"}, message)
+        return
+
+    previous_active = context.view_layer.objects.active
+    context.view_layer.objects.active = combined_armature
+    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
+
+    combined_bones = combined_armature.data.edit_bones
+
+    # Merge each bone instead of finding the armature with more bones.
+    # This is necessary for some split models to animate correctly.
+    # TODO: is it better to define this in xc3_model_py?
+    for armature in armatures:
+        for bone in armature.data.edit_bones:
+            print(bone.name)
+            if bone.name not in combined_bones:
+                # Create a copy of the bone.
+                # This works since bone.matrix is relative to the parent.
+                new_bone = combined_bones.new(name=bone.name)
+                new_bone.head = [0, 0, 0]
+                new_bone.tail = [0, 1, 0]
+                new_bone.matrix = bone.matrix
+
+        # Update parenting once all new bones are added.
+        for bone in armature.data.edit_bones:
+            if bone.parent is not None:
+                combined_bones.get(bone.name).parent = combined_bones.get(
+                    bone.parent.name
+                )
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    context.view_layer.objects.active = previous_active
+
+    # Apply the armature to all models.
+    for armature in armatures:
+        for o in armature.children:
+            o.parent = combined_armature
+            for modifier in o.modifiers:
+                if modifier.type == "ARMATURE":
+                    modifier.object = combined_armature
 
 
 def import_images(
