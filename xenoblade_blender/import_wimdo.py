@@ -107,9 +107,7 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
         model_name = os.path.basename(path)
         name = model_name.replace(".wimdo", "")
-        blender_images = import_images(
-            root, name, pack_images, image_folder, flip=True
-        )
+        blender_images = import_images(root, name, pack_images, image_folder, flip=True)
         armature = import_armature(self, context, root, model_name)
         import_model_root(
             self,
