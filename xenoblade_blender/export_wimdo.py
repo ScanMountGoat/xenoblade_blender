@@ -142,7 +142,7 @@ def export_wimdo(
                 bone_names.append(name)
 
     combined_weights = xc3_model_py.skinning.SkinWeights(
-        np.array([]), np.array([]), bone_names
+        np.zeros((0, 4), dtype=np.uint8), np.zeros((0, 4), dtype=np.float32), bone_names
     )
 
     image_replacements = set()

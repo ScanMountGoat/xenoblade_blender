@@ -66,14 +66,17 @@ def parse_int(name: str) -> Optional[int]:
 
 
 def extract_name_index(name: str) -> Tuple[str, Optional[int]]:
-    # Extract image_name, index from model_name.index.image_name
+    # Extract name and index from different naming conventions.
     # Use >= to ignore any additional parts like file extension.
     name_parts = name.split(".")
     if len(name_parts) >= 3:
+        # model_name.index.name
         return name_parts[2], parse_int(name_parts[1])
-    elif len(name_parts) >= 2:
-        return name_parts[1], None
-    elif len(name_parts) >= 1:
+    elif len(name_parts) == 2:
+        # index.name
+        return name_parts[1], parse_int(name_parts[0])
+    elif len(name_parts) == 1:
+        # name
         return name, None
     else:
         return "", None
@@ -461,7 +464,9 @@ def export_mesh_inner(
         attributes, morph_blend_target, morph_targets, outline_buffer_index
     )
     primitive_type = xc3_model_py.vertex.PrimitiveType.TriangleList
-    index_buffer = xc3_model_py.vertex.IndexBuffer(vertex_indices, primitive_type)
+    index_buffer = xc3_model_py.vertex.IndexBuffer(
+        vertex_indices.astype(np.uint16), primitive_type
+    )
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
@@ -519,7 +524,7 @@ def export_outline_alpha(blender_mesh, positions):
     outline_vertex_group = blender_mesh.vertex_groups.get("OutlineThickness")
     if outline_vertex_group is not None:
         # TODO: Is there a way to do this without looping?
-        outline_alpha = np.zeros(positions.shape[0])
+        outline_alpha = np.zeros(positions.shape[0], dtype=np.float32)
         for i in range(positions.shape[0]):
             outline_alpha[i] = outline_vertex_group.weight(i)
 
@@ -636,6 +641,7 @@ def extract_material_name_info(materials, mesh_name, mesh_data):
         message = f"Material index {material_index} for mesh {mesh_name}"
         message += f" does not reference one of {len(materials)} original materials."
         raise ExportException(message)
+
     return material_index, material_name, is_new_material
 
 
@@ -674,7 +680,7 @@ def export_influences(
 
 
 def export_positions(mesh_data, z_up_to_y_up):
-    positions = np.zeros(len(mesh_data.vertices) * 3)
+    positions = np.zeros(len(mesh_data.vertices) * 3, dtype=np.float32)
     mesh_data.vertices.foreach_get("co", positions)
     positions = positions.reshape((-1, 3)) @ z_up_to_y_up
     return positions
@@ -732,13 +738,13 @@ def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute
 
         # TODO: error for unsupported data_type.
     if color_attribute.domain == "POINT":
-        colors = np.zeros(len(mesh_data.vertices) * 4)
+        colors = np.zeros(len(mesh_data.vertices) * 4, dtype=np.float32)
         color_attribute.data.foreach_get("color", colors)
     elif color_attribute.domain == "CORNER":
-        loop_colors = np.zeros(len(mesh_data.loops) * 4)
+        loop_colors = np.zeros(len(mesh_data.loops) * 4, dtype=np.float32)
         color_attribute.data.foreach_get("color", loop_colors)
         # Convert per loop data to per vertex data.
-        colors = np.zeros((len(mesh_data.vertices), 4))
+        colors = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
         colors[vertex_indices] = loop_colors.reshape((-1, 4))
     else:
         message = f"Unsupported color attribute domain {color_attribute.domain}"
@@ -861,7 +867,7 @@ def export_shape_keys(
             if morph_controller_index is None:
                 continue
 
-            morph_positions = np.zeros(len(mesh_data.vertices) * 3)
+            morph_positions = np.zeros(len(mesh_data.vertices) * 3, dtype=np.float32)
             shape_key.points.foreach_get("co", morph_positions)
             morph_positions = morph_positions.reshape((-1, 3)) @ z_up_to_y_up
 
@@ -880,7 +886,7 @@ def export_shape_keys(
                 position_deltas[vertex_indices],
                 normals[vertex_indices],
                 tangents[vertex_indices],
-                vertex_indices,
+                vertex_indices.astype(np.uint32),
             )
             morph_targets.append(target)
 
