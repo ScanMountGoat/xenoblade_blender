@@ -52,12 +52,7 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
     if armature.animation_data is None:
         armature.animation_data_create()
 
-    # TODO: Skeleton export isn't accurate for some reason?
-    # TODO: How to handle merged skeletons?
-    # skeleton = export_skeleton(armature)
-    wimdo_path = armature.get("original_wimdo", "")
-    root = xc3_model_py.load_model(wimdo_path, None)
-    skeleton = root.skeleton
+    skeleton = export_skeleton(armature)
 
     # Animations expect the in game ordering for bones.
     bone_names = {bone.name for bone in skeleton.bones}

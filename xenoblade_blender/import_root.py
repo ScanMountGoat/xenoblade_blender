@@ -63,15 +63,9 @@ def import_armature(operator, context, root, name: str):
 
         # TODO: Adjust length without causing twisting in animations like bl000101.
         for bone in armature.data.edit_bones:
-            # if len(bone.children) > 0:
-            #     bone.length = (bone.head - bone.children[0].head).length
-            # elif bone.parent:
-            #     bone.length = bone.parent.length
+            # Prevent Blender from removing any bones.
             bone.length = 0.1
 
-            # Prevent Blender from removing any bones.
-            if bone.length < 0.01:
-                bone.length = 0.01
     elif root.buffers.weights is not None:
         message = "Unable to load skeleton for model with skin weights."
         message += " The .arc or .chr file is missing or does not contain bone data."
@@ -110,21 +104,23 @@ def merge_armatures(operator, context, armatures):
     # Merge each bone instead of finding the armature with more bones.
     # This is necessary for some split models to animate correctly.
     for armature in armatures:
-        for bone in armature.data.edit_bones:
+        for bone in armature.data.bones:
             if bone.name not in combined_bones:
                 # Create a copy of the bone.
                 # This works since bone.matrix is relative to the parent.
                 new_bone = combined_bones.new(name=bone.name)
                 new_bone.head = [0, 0, 0]
                 new_bone.tail = [0, 1, 0]
-                new_bone.matrix = bone.matrix
+                new_bone.matrix = bone.matrix_local
 
         # Update parenting once all new bones are added.
-        for bone in armature.data.edit_bones:
+        for bone in armature.data.bones:
             if bone.parent is not None:
-                combined_bones.get(bone.name).parent = combined_bones.get(
-                    bone.parent.name
-                )
+                combined_bone = combined_bones.get(bone.name)
+                combined_bone.parent = combined_bones.get(bone.parent.name)
+
+                # Prevent Blender from removing any bones.
+                combined_bone.length = 0.1
 
     bpy.ops.object.mode_set(mode="OBJECT")
     context.view_layer.objects.active = previous_active

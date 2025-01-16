@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Optimized import times for animations.
+
+### Fixed
+* Fixed an issue where merging armatures would not always correctly merge all bones.
+
 ## 0.18.0 - 2025-01-14
 ### Added
 * Added an option to merge wimdo and camdo armatures on import. Leave this unchecked for editing and exporting models.

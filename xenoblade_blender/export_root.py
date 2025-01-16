@@ -54,7 +54,7 @@ def get_bone_transform(m: Matrix) -> Matrix:
     # https://en.wikipedia.org/wiki/Matrix_similarity
     p = Matrix([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
     # Perform the transformation m in Blender's basis and convert back to Xenoblade.
-    return (p @ m @ p.inverted()).transposed()
+    return p @ m @ p.inverted()
 
 
 def parse_int(name: str) -> Optional[int]:
