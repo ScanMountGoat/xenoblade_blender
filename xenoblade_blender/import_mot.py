@@ -1,7 +1,6 @@
-from typing import Optional
 import bpy
 import time
-import math
+import numpy as np
 
 from xenoblade_blender.import_root import init_logging
 
@@ -10,7 +9,6 @@ from .export_root import export_skeleton
 
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty
-from mathutils import Matrix
 
 
 class ImportMot(bpy.types.Operator, ImportHelper):
@@ -54,29 +52,31 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
     if armature.animation_data is None:
         armature.animation_data_create()
 
-    skeleton = export_skeleton(armature)
+    # TODO: Skeleton export isn't accurate for some reason?
+    # TODO: How to handle merged skeletons?
+    # skeleton = export_skeleton(armature)
+    wimdo_path = armature.get("original_wimdo", "")
+    root = xc3_model_py.load_model(wimdo_path, None)
+    skeleton = root.skeleton
 
-    # TODO: Will this order always match the xc3_model skeleton order?
-    # TODO: Will bones always appear after their parents?
-    bone_names = [bone.name for bone in skeleton.bones]
+    # Animations expect the in game ordering for bones.
+    bone_names = {bone.name for bone in skeleton.bones}
+
     for i, bone in enumerate(skeleton.bones):
         if bone.parent_index is not None and bone.parent_index > i:
             print(f"invalid index {bone.parent_index} > {i}")
-    hash_to_name = {xc3_model_py.animation.murmur3(name): name for name in bone_names}
 
     # TODO: Is this the best way to load all animations?
     # TODO: Optimize this.
     for animation in animations:
-        action = import_animation(
-            armature, skeleton, bone_names, hash_to_name, animation
-        )
+        action = import_animation(armature, skeleton, bone_names, animation)
         armature.animation_data.action = action
 
     end = time.time()
     print(f"Import Blender Animation: {end - start}")
 
 
-def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
+def import_animation(armature, skeleton, bone_names, animation):
     action = bpy.data.actions.new(animation.name)
     if animation.frame_count > 0:
         action.frame_end = float(animation.frame_count) - 1.0
@@ -85,86 +85,45 @@ def import_animation(armature, skeleton, bone_names, hash_to_name, animation):
     for bone in armature.pose.bones:
         bone.matrix_basis.identity()
 
-    # Assume each bone appears in only one track.
-    animated_bones = {
-        get_bone_name(t, bone_names, hash_to_name) for t in animation.tracks
-    }
+    fcurves = animation.fcurves(skeleton)
+    locations = fcurves.translation
+    rotations_xyzw = fcurves.rotation
+    scales = fcurves.scale
 
-    # Collect keyframes for the appropriate bones.
-    positions = {name: [] for name in animated_bones}
-    rotations_wxyz = {name: [] for name in animated_bones}
-    scales = {name: [] for name in animated_bones}
+    for name, values in locations.items():
+        if name in bone_names:
+            set_fcurves_component(action, name, "location", values[:, 0], 0)
+            set_fcurves_component(action, name, "location", values[:, 1], 1)
+            set_fcurves_component(action, name, "location", values[:, 2], 2)
 
-    for frame in range(animation.frame_count):
-        # Use xc3_model_py to efficiently handle different anim types.
-        # Transforms need to be relative to the parent bone to animate properly.
-        transforms = animation.local_space_transforms(skeleton, frame)
+    for name, values in rotations_xyzw.items():
+        if name in bone_names:
+            # Blender uses wxyz instead of xyzw.
+            set_fcurves_component(action, name, "rotation_quaternion", values[:, 3], 0)
+            set_fcurves_component(action, name, "rotation_quaternion", values[:, 0], 1)
+            set_fcurves_component(action, name, "rotation_quaternion", values[:, 1], 2)
+            set_fcurves_component(action, name, "rotation_quaternion", values[:, 2], 3)
 
-        for name, transform in zip(bone_names, transforms):
-            if name not in animated_bones:
-                continue
+    for name, values in scales.items():
+        if name in bone_names:
+            set_fcurves_component(action, name, "scale", values[:, 0], 0)
+            set_fcurves_component(action, name, "scale", values[:, 1], 1)
+            set_fcurves_component(action, name, "scale", values[:, 2], 2)
 
-            pose_bone = armature.pose.bones.get(name)
-            matrix = Matrix(transform).transposed()
-            if pose_bone.parent is not None:
-                pose_bone.matrix = pose_bone.parent.matrix @ blender_transform(matrix)
-            else:
-                y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
-                x_major_to_y_major = Matrix.Rotation(math.radians(-90), 4, "Z")
-                pose_bone.matrix = y_up_to_z_up @ matrix @ x_major_to_y_major
-
-            t, r, s = pose_bone.matrix_basis.decompose()
-            positions[name].append(t)
-            rotations_wxyz[name].append(r)
-            scales[name].append(s)
-
-    for name in animated_bones:
-        if name is None:
-            continue
-
-        # TODO: Use actual cubic keyframes instead of baking at each frame?
-        set_fcurves(action, name, "location", positions[name], 3)
-        set_fcurves(action, name, "rotation_quaternion", rotations_wxyz[name], 4)
-        set_fcurves(action, name, "scale", scales[name], 3)
     return action
 
 
-def blender_transform(m):
-    # In game, the bone's x-axis points from parent to child.
-    # In Blender, the bone's y-axis points from parent to child.
-    # https://en.wikipedia.org/wiki/Matrix_similarity
-    p = Matrix([[0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    # Perform the transformation m in Ultimate's basis and convert back to Blender.
-    return p @ m @ p.inverted()
+def set_fcurves_component(
+    action, bone_name: str, value_name: str, values: np.ndarray, i: int
+):
+    # Values can be quickly set in the form [frame, value, frame, value, ...]
+    # Assume one value at each frame index for now.
+    keyframe_points = np.zeros((values.size, 2), dtype=np.float32)
+    keyframe_points[:, 0] = np.arange(values.size)
+    keyframe_points[:, 1] = values
 
-
-def get_bone_name(track, bone_names: list[str], hash_to_name) -> Optional[str]:
-    bone_index = track.bone_index()
-    bone_hash = track.bone_hash()
-    bone_name = track.bone_name()
-    # TODO: Handle indexing errors.
-    if bone_index is not None:
-        # TODO: Does the armature preserve insertion order?
-        return bone_names[bone_index]
-    elif bone_hash is not None:
-        if bone_hash in hash_to_name:
-            return hash_to_name[bone_hash]
-    elif bone_name is not None:
-        return bone_name
-
-    return None
-
-
-def set_fcurves(action, bone_name: str, value_name: str, values, component_count):
-    for i in range(component_count):
-        # Values can be quickly set in the form [frame, value, frame, value, ...]
-        # Assume one value at each frame index for now.
-        keyframe_points = [
-            val for pair in enumerate(v[i] for v in values) for val in pair
-        ]
-
-        # Each coordinate of each value has its own fcurve.
-        data_path = f'pose.bones["{bone_name}"].{value_name}'
-        fcurve = action.fcurves.new(data_path, index=i, action_group=bone_name)
-        fcurve.keyframe_points.add(count=len(values))
-        fcurve.keyframe_points.foreach_set("co", keyframe_points)
+    # Each coordinate of each value has its own fcurve.
+    data_path = f'pose.bones["{bone_name}"].{value_name}'
+    fcurve = action.fcurves.new(data_path, index=i, action_group=bone_name)
+    fcurve.keyframe_points.add(count=values.size)
+    fcurve.keyframe_points.foreach_set("co", keyframe_points.reshape(-1))

@@ -38,6 +38,7 @@ def export_skeleton(armature: bpy.types.Object):
     return xc3_model_py.Skeleton(bones)
 
 
+# https://github.com/ssbucarlos/smash-ultimate-blender/blob/ba0c4998ca94190bb601857923054224ea5fb468/source/model/export_model.py#L1461
 def get_root_bone_transform(bone: bpy.types.EditBone) -> Matrix:
     bone.transform(Matrix.Rotation(math.radians(-90), 4, "X"))
     bone.transform(Matrix.Rotation(math.radians(90), 4, "Z"))
@@ -47,11 +48,12 @@ def get_root_bone_transform(bone: bpy.types.EditBone) -> Matrix:
     return unreoriented_matrix
 
 
+# https://github.com/ssbucarlos/smash-ultimate-blender/blob/ba0c4998ca94190bb601857923054224ea5fb468/source/model/export_model.py#L1482
 def get_bone_transform(m: Matrix) -> Matrix:
     # This is the inverse of the get_blender_transform permutation matrix.
     # https://en.wikipedia.org/wiki/Matrix_similarity
     p = Matrix([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    # Perform the transformation m in Blender's basis and convert back to Ultimate.
+    # Perform the transformation m in Blender's basis and convert back to Xenoblade.
     return (p @ m @ p.inverted()).transposed()
 
 

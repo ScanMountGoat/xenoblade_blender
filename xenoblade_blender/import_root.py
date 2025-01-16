@@ -111,7 +111,6 @@ def merge_armatures(operator, context, armatures):
     # This is necessary for some split models to animate correctly.
     for armature in armatures:
         for bone in armature.data.edit_bones:
-            print(bone.name)
             if bone.name not in combined_bones:
                 # Create a copy of the bone.
                 # This works since bone.matrix is relative to the parent.
