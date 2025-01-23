@@ -80,7 +80,7 @@ def import_animation(armature, skeleton, bone_names, animation):
     for bone in armature.pose.bones:
         bone.matrix_basis.identity()
 
-    fcurves = animation.fcurves(skeleton)
+    fcurves = animation.fcurves(skeleton, use_blender_coordinates=True)
     locations = fcurves.translation
     rotations_xyzw = fcurves.rotation
     scales = fcurves.scale

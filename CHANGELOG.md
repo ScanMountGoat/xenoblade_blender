@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Changed
+* Optimized texture file sizes for wimdo model exports in some cases.
+
+### Fixed
+* Fixed an issue where some wimdo model textures would export with invalid low resolution data.
+
 ## 0.18.1 - 2025-01-16
 ### Changed
 * Optimized import times for animations.
