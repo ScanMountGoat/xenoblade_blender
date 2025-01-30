@@ -19,10 +19,8 @@ def export_skeleton(armature: bpy.types.Object):
         name = bone.name
         if bone.parent:
             matrix = get_bone_transform(bone.parent.matrix.inverted() @ bone.matrix)
-            transform = np.array(matrix.transposed(), dtype=np.float32)
         else:
             matrix = get_root_bone_transform(bone)
-            transform = np.array(matrix.transposed(), dtype=np.float32)
 
         # TODO: Find a way to make this not O(N^2)?
         parent_index = None
@@ -31,6 +29,10 @@ def export_skeleton(armature: bpy.types.Object):
                 if other == bone.parent:
                     parent_index = i
                     break
+
+        translation, rotation, scale = matrix.decompose()
+        rotation = [rotation.x, rotation.y, rotation.z, rotation.w]
+        transform = xc3_model_py.Transform(translation, rotation, scale)
         bones.append(xc3_model_py.Bone(name, transform, parent_index))
 
     bpy.ops.object.mode_set(mode="OBJECT")
