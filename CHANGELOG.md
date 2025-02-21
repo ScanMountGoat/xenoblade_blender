@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.18.3 - 2025-02-21
 ### Changed
 * Changed generated materials to not connect toon ramp nodes if gradient texture is missing to avoid dark models.
 
