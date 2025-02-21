@@ -82,6 +82,9 @@ class ImportWismhd(bpy.types.Operator, ImportHelper):
         end = time.time()
         print(f"Load {len(roots)} Roots: {end - start}")
 
+        if len(shader_images) == 0:
+            self.report({"WARNING"}, "Unable to find monolib/shader textures")
+
         start = time.time()
 
         model_name = os.path.basename(path)

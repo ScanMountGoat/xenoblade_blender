@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Changed generated materials to not connect toon ramp nodes if gradient texture is missing to avoid dark models.
+
 ### Fixed
 * Fixed an issue where animations would incorrectly apply scale in some cases.
 * Fixed an issue where animations would import with incorrect root motion.

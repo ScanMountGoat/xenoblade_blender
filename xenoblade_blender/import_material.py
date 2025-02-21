@@ -551,7 +551,10 @@ def import_material(
         links.new(texture_node.outputs["Color"], mix_ramp.inputs["A"])
         links.new(mix_ao.outputs["Result"], mix_ramp.inputs["B"])
 
-        final_albedo = mix_ramp
+        if texture_node.image is not None:
+            # Don't connect the toon nodes if the gradient texture is missing.
+            # This avoids black material rendering.
+            final_albedo = mix_ramp
 
     # Place the BSDF and output after all other nodes.
     if final_albedo.location[0] >= bsdf.location[0]:
