@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Fixed
 * Fixed an issue where animations would incorrectly apply scale in some cases.
+* Fixed an issue where animations would import with incorrect root motion.
 
 ## 0.18.2 - 2025-01-23
 ### Changed
