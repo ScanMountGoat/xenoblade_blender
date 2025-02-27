@@ -704,6 +704,9 @@ def export_normals(mesh_data, z_up_to_y_up, vertex_indices):
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
     normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
+    # Some shaders use the 4th component for normal map intensity.
+    # TODO: Add proper import/export handling of the 4th component.
+    normals[:, 3] = 1.0
     return normals
 
 
