@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where some wimdo models would export with invalid vertex normals.
+* Fixed an issue where wimdo export would not correctly preserve additional vertex data for some models.
 
 ## 0.18.4 - 2025-02-25
 ### Fixed
