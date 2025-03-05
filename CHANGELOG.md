@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Fixed an issue where some wimdo models would export with invalid vertex normals.
 * Fixed an issue where wimdo export would not correctly preserve additional vertex data for some models.
 * Fixed an issue where wimdo import and export would use the incorrect texture sampler in some cases.
+* Fixed an issue where small textures for wimdo exports would load invalid mipmap data in game in some cases.
 
 ## 0.18.4 - 2025-02-25
 ### Fixed
