@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 0.18.6 - 2025-03-05
+### Fixed
+* Fixed an issue where some wimdo and wismhd models would fail to import.
+
 ## 0.18.5 - 2025-03-05
 ### Changed
 * Updated provided shader database file to include Xenoblade 3 update models.
