@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.18.7 - 2025-03-13
 ### Fixed
 * Fixed an issue where skeletons would import with missing bones or unparented bones in some cases.
 
