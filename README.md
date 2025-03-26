@@ -21,7 +21,10 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Import any of the supported file types using the new menu options under File > Import.  
 
 ## Updating
-Update the addon by reinstalling the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). Windows users will need to disable the previous version of the addon, restart Blender, remove the addon, and then install the new version's zip file to properly upgrade. MacOS and Linux users can reinstall the addon without any additional steps.
+Update the addon by reinstalling the latest version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases). MacOS and Linux users can update without any additional steps.
+
+> [!IMPORTANT]
+> Windows users need to disable the addon, restart Blender, remove the addon, and install the new version to update.
 
 ## Building
 Clone the repository with `git clone https://github.com/ScanMountGoat/xenoblade_blender --recursive`. 
