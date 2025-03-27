@@ -77,8 +77,9 @@ class ImportWimdo(bpy.types.Operator, ImportHelper):
 
         shader_images = import_monolib_shader_images(self.filepath, flip=True)
 
-        if len(shader_images) == 0:
+        if shader_images is None:
             self.report({"WARNING"}, "Unable to find monolib/shader textures")
+            shader_images = {}
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
