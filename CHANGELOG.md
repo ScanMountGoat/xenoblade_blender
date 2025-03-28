@@ -3,6 +3,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 0.19.0 - 2025-03-28
+### Added
+* Added support for importing Xenoblade Chronicles X Definitive Edition wimdo models.
+* Added support for importing animations with the `.anm` or `.motstm_data` extensions.
+
+### Changed
+* Improved accuracy of material assignments.
+* Adjusted importing to only warn about missing `monolib/shader` folder if the folder does not exist.
+
 ## 0.18.7 - 2025-03-13
 ### Fixed
 * Fixed an issue where skeletons would import with missing bones or unparented bones in some cases.
