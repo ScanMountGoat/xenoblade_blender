@@ -1,7 +1,11 @@
 from typing import Dict, Optional
 import bpy
+import typing
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from ..xc3_model_py.xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
 
 
 def import_material(
@@ -11,7 +15,7 @@ def import_material(
     shader_images: Dict[str, bpy.types.Image],
     image_textures,
     samplers,
-):
+) -> bpy.types.Material:
     blender_material = bpy.data.materials.new(name)
 
     # Add some custom properties to make debugging easier.
@@ -40,108 +44,67 @@ def import_material(
     mat_id = assignments.mat_id()
     assignments = assignments.assignments
 
-    textures = {}
-    textures_rgb = {}
-    textures_scale = {}
-    textures_uv = {}
+    # TODO: cache and reuse nodes
 
+    material_textures = {}
     for i, texture in enumerate(material.textures):
-        location_y = 300 - i * 300
+        name = f"s{i}"
+
+        node = nodes.new("ShaderNodeTexImage")
+        node.label = name
+
+        try:
+            node.image = blender_images[texture.image_texture_index]
+        except IndexError:
+            pass
+
         # TODO: xenoblade x samplers?
         sampler = None
         if texture.sampler_index < len(samplers):
             sampler = samplers[texture.sampler_index]
-        image = None
-        try:
-            image = blender_images[texture.image_texture_index]
-        except IndexError:
-            pass
 
-        add_texture_nodes(
-            f"s{i}",
-            image,
-            sampler,
-            str(i),
-            nodes,
-            links,
-            textures,
-            textures_rgb,
-            location_y,
-        )
+        if sampler is not None:
+            # TODO: Check if U and V have the same address mode.
+            match sampler.address_mode_u:
+                case xc3_model_py.AddressMode.ClampToEdge:
+                    node.extension = "CLIP"
+                case xc3_model_py.AddressMode.Repeat:
+                    node.extension = "REPEAT"
+                case xc3_model_py.AddressMode.MirrorRepeat:
+                    node.extension = "MIRROR"
 
-    # Search all used textures recursively to improve import times.
-    used_shader_names = set()
-    if material.shader is not None:
-        for dependencies in material.shader.output_dependencies.values():
-            for d in dependencies.dependencies:
-                texture = d.texture()
-                if texture is not None:
-                    used_shader_names.add(texture.name)
-
-    used_shader_images = {
-        n: i for (n, i) in shader_images.items() if n in used_shader_names
-    }
-
-    for i, (name, image) in enumerate(used_shader_images.items()):
-        # Place global textures after the material textures.
-        location_y = 300 - (i + len(material.textures)) * 300
-        add_texture_nodes(
-            name,
-            image,
-            None,
-            name,
-            nodes,
-            links,
-            textures,
-            textures_rgb,
-            location_y,
-        )
-
-    vertex_color = nodes.new("ShaderNodeVertexColor")
-    vertex_color.location = (-710, 500)
-    vertex_color.layer_name = "VertexColor"
-
-    vertex_color_rgb = nodes.new("ShaderNodeSeparateColor")
-    vertex_color_rgb.location = (-500, 500)
-    links.new(vertex_color.outputs["Color"], vertex_color_rgb.inputs["Color"])
-
-    vertex_color_nodes = (vertex_color_rgb, vertex_color)
-    texture_nodes = (textures, textures_rgb, textures_scale, textures_uv)
-
-    base_color_frame = nodes.new("NodeFrame")
-    base_color_frame.label = "Base Color"
+        material_textures[name] = node
 
     # TODO: Alpha testing.
     # TODO: Select UV map for each texture.
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
-    base_color.parent = base_color_frame
     base_color.location = (-200, 200)
-    assign_channel(
+    assign_output(
         assignments[0].x,
         nodes,
         links,
-        texture_nodes,
-        vertex_color_nodes,
         base_color.inputs["Red"],
+        material_textures,
+        shader_images,
         is_data=False,
     )
-    assign_channel(
+    assign_output(
         assignments[0].y,
         nodes,
         links,
-        texture_nodes,
-        vertex_color_nodes,
         base_color.inputs["Green"],
+        material_textures,
+        shader_images,
         is_data=False,
     )
-    assign_channel(
+    assign_output(
         assignments[0].z,
         nodes,
         links,
-        texture_nodes,
-        vertex_color_nodes,
         base_color.inputs["Blue"],
+        material_textures,
+        shader_images,
         is_data=False,
     )
 
@@ -149,232 +112,52 @@ def import_material(
         xc3_model_py.material.BlendMode.Disabled,
         xc3_model_py.material.BlendMode.Disabled2,
     ]:
-        assign_channel(
+        assign_output(
             assignments[0].w,
             nodes,
             links,
-            texture_nodes,
-            vertex_color_nodes,
             bsdf.inputs["Alpha"],
-            is_data=False,
+            material_textures,
+            shader_images,
+            is_data=True,
         )
-
-    base_color_x = 0
-    base_color_y = 400
-    for layer_x, layer_y, layer_z in zip(
-        assignments[0].x_layers, assignments[0].y_layers, assignments[0].z_layers
-    ):
-        # Assume the XYZ layers use the same values just with different channels.
-        mix_color = mix_layer_values(
-            layer_x,
-            nodes,
-            links,
-            vertex_color_nodes,
-            texture_nodes,
-            (base_color_x, 400),
-            base_color_frame,
-        )
-
-        base_color_x += 200
-
-        layer_value = nodes.new("ShaderNodeCombineColor")
-        layer_value.parent = base_color_frame
-        layer_value.location = (-200, base_color_y)
-        base_color_y -= -200
-        links.new(layer_value.outputs["Color"], mix_color.inputs["B"])
-
-        assign_channel(
-            layer_x.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            layer_value.inputs["Red"],
-        )
-        assign_channel(
-            layer_y.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            layer_value.inputs["Green"],
-        )
-        assign_channel(
-            layer_z.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            layer_value.inputs["Blue"],
-        )
-
-        # Connect each layer to the next.
-        links.new(mix_node_output(base_color), mix_color.inputs["A"])
-
-        base_color = mix_color
-
-    ao_frame = nodes.new("NodeFrame")
-    ao_frame.label = "Ambient Occlusion"
-
-    # Single channel ambient occlusion.
-    ao_x = base_color_x
-    ao_y = 400
-    ao = None
-    for layer in assignments[2].z_layers:
-        mix_layer_ao = mix_layer_values(
-            layer,
-            nodes,
-            links,
-            vertex_color_nodes,
-            texture_nodes,
-            (ao_x, ao_y),
-            ao_frame,
-        )
-        ao_x += 200
-
-        # Assign the base layer.
-        if ao is None:
-            assign_channel(
-                assignments[2].z,
-                nodes,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                mix_layer_ao.inputs["A"],
-            )
-
-        assign_channel(
-            layer.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_layer_ao.inputs["B"],
-        )
-
-        # Connect each layer to the next.
-        if ao is not None:
-            links.new(
-                mix_node_output(ao),
-                mix_layer_ao.inputs["A"],
-            )
-
-        ao = mix_layer_ao
 
     mix_ao = nodes.new("ShaderNodeMix")
-    mix_ao.parent = ao_frame
-    mix_ao.location = (ao_x, 400)
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
-    mix_ao.inputs["Factor"].default_value = 1.0
+    links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
     mix_ao.inputs["B"].default_value = (1.0, 1.0, 1.0, 1.0)
+    mix_ao.inputs["Factor"].default_value = 1.0
 
-    # Place the BSDF and output after all other nodes.
-    if ao_x >= bsdf.location[0]:
-        bsdf.location[0] = ao_x + 300
-        output_node.location[0] = bsdf.location[0] + 300
-
-    if ao is not None:
-        links.new(mix_node_output(ao), mix_ao.inputs["B"])
-    else:
-        assign_channel(
-            assignments[2].z,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_ao.inputs["B"],
-        )
-
-    if (
-        assignments[0].x is None
-        and assignments[0].y is None
-        and assignments[0].z is None
-    ):
-        # TODO: multiply by gMatCol instead?
-        # TODO: more accurate gamma handling
-        mix_ao.inputs["A"].default_value = [c**2.2 for c in material.color]
-    else:
-        links.new(mix_node_output(base_color), mix_ao.inputs["A"])
+    # Single channel ambient occlusion.
+    assign_output(
+        assignments[2].z,
+        nodes,
+        links,
+        mix_ao.inputs["B"],
+        material_textures,
+        shader_images,
+        is_data=True,
+    )
 
     normal_map = assign_normal_map(
         nodes,
         links,
         bsdf,
         assignments,
-        texture_nodes,
-        vertex_color_nodes,
+        material_textures,
+        shader_images,
     )
 
-    # Place the BSDF and output after all other nodes.
-    if normal_map is not None:
-        if normal_map.location[0] >= bsdf.location[0]:
-            bsdf.location[0] = normal_map.location[0] + 300
-            output_node.location[0] = bsdf.location[0] + 300
-
-    # TODO: find a better way to avoid adding empty frames.
-    metallic_frame = None
-    if len(assignments[1].x_layers) > 0:
-        metallic_frame = nodes.new("NodeFrame")
-        metallic_frame.label = "Metallic"
-
-    metallic_x = 0
-    metallic_y = 100
-    metallic = None
-    for layer_x in assignments[1].x_layers:
-        mix_metallic = mix_layer_values(
-            layer_x,
-            nodes,
-            links,
-            vertex_color_nodes,
-            texture_nodes,
-            (metallic_x, metallic_y),
-            metallic_frame,
-        )
-        metallic_x += 200
-
-        # Assign the base layer.
-        if metallic is None:
-            assign_channel(
-                assignments[1].x,
-                nodes,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                mix_metallic.inputs["A"],
-            )
-
-        assign_channel(
-            layer_x.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_metallic.inputs["B"],
-        )
-
-        # Connect each layer to the next.
-        if metallic is not None:
-            links.new(mix_node_output(metallic), mix_metallic.inputs["A"])
-
-        metallic = mix_metallic
-
-    # Place the BSDF and output after all other nodes.
-    if metallic_x >= bsdf.location[0]:
-        bsdf.location[0] = metallic_x + 300
-        output_node.location[0] = bsdf.location[0] + 300
-
-    if metallic is not None:
-        links.new(mix_node_output(metallic), bsdf.inputs["Metallic"])
-    else:
-        assign_channel(
-            assignments[1].x,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            bsdf.inputs["Metallic"],
-        )
+    assign_output(
+        assignments[1].x,
+        nodes,
+        links,
+        bsdf.inputs["Metallic"],
+        material_textures,
+        shader_images,
+        is_data=True,
+    )
 
     if (
         assignments[5].x is not None
@@ -388,31 +171,31 @@ def import_material(
             color.inputs["Green"].default_value = 1.0
             color.inputs["Blue"].default_value = 1.0
 
-        assign_channel(
+        assign_output(
             assignments[5].x,
             nodes,
             links,
-            texture_nodes,
-            vertex_color_nodes,
             color.inputs["Red"],
+            material_textures,
+            shader_images,
             is_data=False,
         )
-        assign_channel(
+        assign_output(
             assignments[5].y,
             nodes,
             links,
-            texture_nodes,
-            vertex_color_nodes,
             color.inputs["Green"],
+            material_textures,
+            shader_images,
             is_data=False,
         )
-        assign_channel(
+        assign_output(
             assignments[5].z,
             nodes,
             links,
-            texture_nodes,
-            vertex_color_nodes,
             color.inputs["Blue"],
+            material_textures,
+            shader_images,
             is_data=False,
         )
 
@@ -425,84 +208,20 @@ def import_material(
             links.new(color.outputs["Color"], bsdf.inputs["Emission Color"])
             bsdf.inputs["Emission Strength"].default_value = 1.0
 
-    # TODO: find a better way to avoid adding empty frames.
-    glossiness_frame = None
-    if len(assignments[1].y_layers) > 0 or (
-        assignments[1].y is not None and assignments[1].y.value() is None
-    ):
-        glossiness_frame = nodes.new("NodeFrame")
-        glossiness_frame.label = "Glossiness"
-
-    glossiness_x = 0
-    glossiness_y = -200
-    glossiness = None
-    for layer in assignments[1].y_layers:
-        mix_glossiness = mix_layer_values(
-            layer,
-            nodes,
-            links,
-            vertex_color_nodes,
-            texture_nodes,
-            (glossiness_x, glossiness_y),
-            glossiness_frame,
-        )
-        glossiness_x += 200
-
-        # Assign the base layer.
-        if glossiness is None:
-            assign_channel(
-                assignments[1].y,
-                nodes,
-                links,
-                texture_nodes,
-                vertex_color_nodes,
-                mix_glossiness.inputs["A"],
-            )
-
-        assign_channel(
-            layer.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_glossiness.inputs["B"],
-        )
-
-        # Connect each layer to the next.
-        if glossiness is not None:
-            links.new(mix_node_output(glossiness), mix_glossiness.inputs["A"])
-
-        glossiness = mix_glossiness
-
     # Invert glossiness to get roughness.
-    if assignments[1].y is not None:
-        value = assignments[1].y.value()
-        if value is not None:
-            bsdf.inputs["Roughness"].default_value = 1.0 - value
-        else:
-            invert = nodes.new("ShaderNodeMath")
-            invert.location = (glossiness_x, -200)
-            invert.operation = "SUBTRACT"
-            invert.inputs[0].default_value = 1.0
-            invert.parent = glossiness_frame
-
-            if glossiness is not None:
-                links.new(mix_node_output(glossiness), invert.inputs[1])
-            else:
-                assign_channel(
-                    assignments[1].y,
-                    nodes,
-                    links,
-                    texture_nodes,
-                    vertex_color_nodes,
-                    invert.inputs[1],
-                )
-            links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
-
-    # Place the BSDF and output after all other nodes.
-    if glossiness_x >= bsdf.location[0]:
-        bsdf.location[0] = glossiness_x + 300
-        output_node.location[0] = bsdf.location[0] + 300
+    invert = nodes.new("ShaderNodeMath")
+    invert.operation = "SUBTRACT"
+    invert.inputs[0].default_value = 1.0
+    assign_output(
+        assignments[1].y,
+        nodes,
+        links,
+        invert.inputs[1],
+        material_textures,
+        shader_images,
+        is_data=True,
+    )
+    links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
     final_albedo = mix_ao
 
@@ -556,11 +275,6 @@ def import_material(
             # This avoids black material rendering.
             final_albedo = mix_ramp
 
-    # Place the BSDF and output after all other nodes.
-    if final_albedo.location[0] >= bsdf.location[0]:
-        bsdf.location[0] = final_albedo.location[0] + 300
-        output_node.location[0] = bsdf.location[0] + 300
-
     if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
         transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
@@ -581,86 +295,19 @@ def import_material(
         name = f"s{texture.texture_index}"
         channel = ["Red", "Green", "Blue", "Alpha"][texture.channel_index]
         if channel == "Alpha":
-            input = textures[name].outputs["Alpha"]
+            input = material_textures[name].outputs["Alpha"]
         else:
-            input = textures_rgb[name].outputs[channel]
+            rgb_node = nodes.new("ShaderNodeSeparateColor")
+            links.new(
+                material_textures[name].outputs["Color"], rgb_node.inputs["Color"]
+            )
+            input = rgb_node.outputs[channel]
         links.new(input, bsdf.inputs["Alpha"])
 
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
 
     return blender_material
-
-
-def mix_node_output(node):
-    if "Result" in node.outputs:
-        return node.outputs["Result"]
-    else:
-        return node.outputs["Color"]
-
-
-def mix_layer_values(
-    layer, nodes, links, vertex_color_nodes, texture_nodes, location, parent=None
-):
-    match layer.blend_mode:
-        case xc3_model_py.shader_database.LayerBlendMode.Mix:
-            mix_values = nodes.new("ShaderNodeMix")
-            mix_values.data_type = "RGBA"
-        case xc3_model_py.shader_database.LayerBlendMode.MixRatio:
-            mix_values = nodes.new("ShaderNodeMix")
-            mix_values.data_type = "RGBA"
-            mix_values.blend_type = "MULTIPLY"
-        case xc3_model_py.shader_database.LayerBlendMode.Add:
-            mix_values = nodes.new("ShaderNodeMix")
-            mix_values.data_type = "RGBA"
-            mix_values.blend_type = "ADD"
-        case xc3_model_py.shader_database.LayerBlendMode.Overlay:
-            mix_values = nodes.new("ShaderNodeMix")
-            mix_values.data_type = "RGBA"
-            mix_values.blend_type = "OVERLAY"
-        case xc3_model_py.shader_database.LayerBlendMode.AddNormal:
-            mix_values = create_node_group(nodes, "AddNormals", add_normals_node_group)
-        case _:
-            mix_values = nodes.new("ShaderNodeMix")
-            mix_values.data_type = "RGBA"
-
-    mix_values.parent = parent
-    mix_values.location = location
-
-    # TODO: Should this always assign the X channel?
-    mix_values.inputs["Factor"].default_value = 0.0
-
-    if layer.is_fresnel:
-        fresnel_blend = create_node_group(
-            nodes, "FresnelBlend", fresnel_blend_node_group
-        )
-        fresnel_blend.parent = parent
-        fresnel_blend.location = (
-            location[0] - 200,
-            location[1] + 200,
-        )
-        # TODO: normals?
-
-        assign_channel(
-            layer.weight,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            fresnel_blend.inputs["Factor"],
-        )
-        links.new(fresnel_blend.outputs["Factor"], mix_values.inputs["Factor"])
-    else:
-        assign_channel(
-            layer.weight,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            mix_values.inputs["Factor"],
-        )
-
-    return mix_values
 
 
 def toon_grad_uvs_node_group():
@@ -726,41 +373,6 @@ def toon_grad_uvs_node_group():
     return node_tree
 
 
-def add_texture_nodes(
-    name,
-    image,
-    sampler,
-    label,
-    nodes,
-    links,
-    textures,
-    textures_rgb,
-    location_y,
-):
-    texture_node = nodes.new("ShaderNodeTexImage")
-    texture_node.label = label
-    texture_node.width = 330
-    texture_node.location = (-900, location_y)
-    texture_node.image = image
-
-    # TODO: Check if U and V have the same address mode.
-    if sampler is not None:
-        match sampler.address_mode_u:
-            case xc3_model_py.AddressMode.ClampToEdge:
-                texture_node.extension = "CLIP"
-            case xc3_model_py.AddressMode.Repeat:
-                texture_node.extension = "REPEAT"
-            case xc3_model_py.AddressMode.MirrorRepeat:
-                texture_node.extension = "MIRROR"
-
-    textures[name] = texture_node
-
-    texture_rgb_node = nodes.new("ShaderNodeSeparateColor")
-    texture_rgb_node.location = (-500, location_y)
-    textures_rgb[name] = texture_rgb_node
-    links.new(texture_node.outputs["Color"], texture_rgb_node.inputs["Color"])
-
-
 def create_node_group(nodes, name: str, create_node_tree):
     # Cache the node group creation.
     node_tree = bpy.data.node_groups.get(name)
@@ -773,95 +385,46 @@ def create_node_group(nodes, name: str, create_node_tree):
 
 
 def assign_normal_map(
-    nodes, links, bsdf, assignments, texture_nodes, vertex_color_nodes
+    nodes,
+    links,
+    bsdf,
+    assignments,
+    material_textures: Dict[str, bpy.types.Node],
+    shader_images: Dict[str, bpy.types.Image],
 ):
-    if assignments[2].x is None and assignments[2].y is None:
-        return
-
     frame = nodes.new("NodeFrame")
     frame.label = "Normals"
 
-    normals_x = -200
-    normals_y = -800
+    normals_xy = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    normals_xy.parent = frame
 
-    base_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
-    base_normals.location = (-200, normals_y)
-    base_normals.parent = frame
-    normals_x += 200
-    normals_y -= 200
+    normals_xy.inputs["X"].default_value = 0.5
+    normals_xy.inputs["Y"].default_value = 0.5
 
-    base_normals.inputs["X"].default_value = 0.5
-    base_normals.inputs["Y"].default_value = 0.5
-
-    assign_channel(
+    # TODO: Correctly handle xy components for blending.
+    assign_output(
         assignments[2].x,
         nodes,
         links,
-        texture_nodes,
-        vertex_color_nodes,
-        base_normals.inputs["X"],
+        normals_xy.inputs["X"],
+        material_textures,
+        shader_images,
+        is_data=True,
     )
-    assign_channel(
+    assign_output(
         assignments[2].y,
         nodes,
         links,
-        texture_nodes,
-        vertex_color_nodes,
-        base_normals.inputs["Y"],
+        normals_xy.inputs["Y"],
+        material_textures,
+        shader_images,
+        is_data=True,
     )
 
-    final_normals = base_normals
-
-    for layer_x, layer_y in zip(assignments[2].x_layers, assignments[2].y_layers):
-        # Assume the XY layers use the same values just with different channels.
-        mix_normals = mix_layer_values(
-            layer_x,
-            nodes,
-            links,
-            vertex_color_nodes,
-            texture_nodes,
-            (normals_x, -800),
-            frame,
-        )
-        normals_x += 200
-
-        n2_normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
-        n2_normals.parent = frame
-        n2_normals.inputs["X"].default_value = 0.5
-        n2_normals.inputs["Y"].default_value = 0.5
-        n2_normals.location = (-200, normals_y)
-        normals_y -= -200
-        links.new(n2_normals.outputs["Normal"], mix_normals.inputs["B"])
-
-        assign_channel(
-            layer_x.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            n2_normals.inputs["X"],
-        )
-        assign_channel(
-            layer_y.value,
-            nodes,
-            links,
-            texture_nodes,
-            vertex_color_nodes,
-            n2_normals.inputs["Y"],
-        )
-
-        # Connect each layer to the next.
-        if "Normal" in final_normals.outputs:
-            links.new(final_normals.outputs["Normal"], mix_normals.inputs["A"])
-        else:
-            links.new(final_normals.outputs["Result"], mix_normals.inputs["A"])
-
-        final_normals = mix_normals
+    final_normals = normals_xy
 
     remap_normals = nodes.new("ShaderNodeVectorMath")
     remap_normals.parent = frame
-    remap_normals.location = (normals_x, -800)
-    normals_x += 200
     remap_normals.operation = "MULTIPLY_ADD"
     if "Normal" in final_normals.outputs:
         links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
@@ -872,7 +435,6 @@ def assign_normal_map(
 
     normal_map = nodes.new("ShaderNodeNormalMap")
     normal_map.parent = frame
-    normal_map.location = (normals_x, -800)
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
@@ -1039,7 +601,7 @@ def fresnel_blend_node_group():
     node_tree = bpy.data.node_groups.new("FresnelBlend", "ShaderNodeTree")
 
     node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Factor"
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
     )
 
     nodes = node_tree.nodes
@@ -1048,7 +610,7 @@ def fresnel_blend_node_group():
     input_node = nodes.new("NodeGroupInput")
     input_node.location = (-600, 0)
     node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Value"
     )
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketVector", name="Normal"
@@ -1061,7 +623,7 @@ def fresnel_blend_node_group():
     multiply = nodes.new("ShaderNodeMath")
     multiply.location = (-400, -200)
     multiply.operation = "MULTIPLY"
-    links.new(input_node.outputs["Factor"], multiply.inputs[0])
+    links.new(input_node.outputs["Value"], multiply.inputs[0])
     multiply.inputs[1].default_value = 5.0
 
     pow_5 = nodes.new("ShaderNodeMath")
@@ -1072,127 +634,389 @@ def fresnel_blend_node_group():
 
     output_node = nodes.new("NodeGroupOutput")
     output_node.location = (0, 0)
-    links.new(pow_5.outputs["Value"], output_node.inputs["Factor"])
+    links.new(pow_5.outputs["Value"], output_node.inputs["Value"])
 
     return node_tree
 
 
-def assign_channel(
-    channel_assignment,
+def assign_output(
+    assignment: xc3_model_py.material.Assignment,
     nodes,
     links,
-    texture_nodes,
-    vertex_color_nodes,
     output,
-    is_data=True,
+    material_textures: Dict[str, bpy.types.Node],
+    shader_images: Dict[str, bpy.types.Image],
+    is_data: bool,
 ):
-    vertex_color_rgb, vertex_color = vertex_color_nodes
-
     # Assign one output channel.
-    if channel_assignment is not None:
-        texture_assignment = channel_assignment.texture()
-        value = channel_assignment.value()
-        attribute = channel_assignment.attribute()
+    value = assignment.value()
+    func = assignment.func()
 
-        # Values or attributes are assigned directly in shaders and should take priority.
-        if value is not None:
+    if func is not None:
+        match func.op:
+            case xc3_model_py.shader_database.Operation.Mix:
+                assign_mix_rgba(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "MIX",
+                )
+            case xc3_model_py.shader_database.Operation.Mul:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "MULTIPLY",
+                )
+            case xc3_model_py.shader_database.Operation.Div:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "DIVIDE",
+                )
+            case xc3_model_py.shader_database.Operation.Add:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "ADD",
+                )
+            case xc3_model_py.shader_database.Operation.Sub:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "SUBTRACT",
+                )
+            case xc3_model_py.shader_database.Operation.Fma:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "MULTIPLY_ADD",
+                )
+            case xc3_model_py.shader_database.Operation.MulRatio:
+                mix_values = nodes.new("ShaderNodeMix")
+                mix_values.data_type = "RGBA"
+                mix_values.blend_type = "MULTIPLY"
+
+                links.new(mix_values.outputs["Result"], output)
+                assign_output(
+                    func.args[0],
+                    nodes,
+                    links,
+                    mix_values.inputs["A"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+                assign_output(
+                    func.args[1],
+                    nodes,
+                    links,
+                    mix_values.inputs["B"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+                assign_output(
+                    func.args[2],
+                    nodes,
+                    links,
+                    mix_values.inputs["Factor"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+            case xc3_model_py.shader_database.Operation.AddNormal:
+                mix_values = create_node_group(
+                    nodes, "AddNormals", add_normals_node_group
+                )
+            case xc3_model_py.shader_database.Operation.Overlay:
+                assign_mix_rgba(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "OVERLAY",
+                )
+            case xc3_model_py.shader_database.Operation.Overlay2:
+                assign_mix_rgba(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "OVERLAY",
+                )
+            case xc3_model_py.shader_database.Operation.OverlayRatio:
+                assign_mix_rgba(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "OVERLAY",
+                )
+            case xc3_model_py.shader_database.Operation.Power:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "POWER",
+                )
+            case xc3_model_py.shader_database.Operation.Min:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "MINIMUM",
+                )
+            case xc3_model_py.shader_database.Operation.Max:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "MAXIMUM",
+                )
+            case xc3_model_py.shader_database.Operation.Clamp:
+                pass
+            case xc3_model_py.shader_database.Operation.Abs:
+                assign_math(
+                    func,
+                    nodes,
+                    links,
+                    output,
+                    material_textures,
+                    shader_images,
+                    is_data,
+                    "ABSOLUTE",
+                )
+            case xc3_model_py.shader_database.Operation.Fresnel:
+                node = create_node_group(
+                    nodes, "FresnelBlend", fresnel_blend_node_group
+                )
+
+                # TODO: normals?
+
+                assign_output(
+                    func.args[0],
+                    nodes,
+                    links,
+                    node.inputs["Value"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+                links.new(node.outputs["Value"], output)
+            case _:
+                mix_values = nodes.new("ShaderNodeMix")
+                mix_values.data_type = "RGBA"
+    elif value is not None:
+        texture = value.texture()
+        f = value.float()
+        attribute = value.attribute()
+
+        if f is not None:
+            # This may be a single value or RGBA socket.
             try:
-                output.default_value = value
+                output.default_value = f
             except:
-                output.default_value = (value, value, value, 1.0)
+                output.default_value = (f, f, f, 1.0)
         elif attribute is not None:
-            # TODO: Handle other attributes.
-            if attribute.name == "vColor":
-                channel_index = attribute.channel_index
-                input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
-
-                # Alpha isn't part of the RGB node.
-                if input_channel == "Alpha":
-                    input = vertex_color.outputs["Alpha"]
-                else:
-                    input = vertex_color_rgb.outputs[input_channel]
-
-                links.new(input, output)
-        elif texture_assignment is not None:
-            assign_texture_channel(
-                texture_assignment, nodes, links, texture_nodes, output, is_data
+            pass
+        elif texture is not None:
+            assign_texture(
+                texture, nodes, links, output, material_textures, shader_images, is_data
             )
 
 
-def assign_texture_channel(
-    texture_assignment,
+def assign_mix_rgba(
+    func,
     nodes,
     links,
-    texture_nodes,
     output,
-    is_data=True,
+    material_textures,
+    shader_images,
+    is_data,
+    blend_type: str,
 ):
-    # TODO: lazy load global textures?
-    textures, textures_rgb, textures_scale, textures_uv = texture_nodes
+    mix_values = nodes.new("ShaderNodeMix")
+    mix_values.data_type = "RGBA"
+    mix_values.blend_type = blend_type
 
-    channel_index = "xyzw".index(texture_assignment.channels)
-    input_channel = ["Red", "Green", "Blue", "Alpha"][channel_index]
+    links.new(mix_values.outputs["Result"], output)
 
-    name = texture_assignment.name
+    assign_output(
+        func.args[0],
+        nodes,
+        links,
+        mix_values.inputs["A"],
+        material_textures,
+        shader_images,
+        is_data,
+    )
+    assign_output(
+        func.args[1],
+        nodes,
+        links,
+        mix_values.inputs["B"],
+        material_textures,
+        shader_images,
+        is_data,
+    )
+    if len(func.args) == 3:
+        assign_output(
+            func.args[2],
+            nodes,
+            links,
+            mix_values.inputs["Factor"],
+            material_textures,
+            shader_images,
+            is_data,
+        )
 
-    if name not in textures:
-        # TODO: Better error checking.
-        print(f"Unable to assign texture {name}")
-        return
 
-    texture_node = textures[name]
+def assign_texture(
+    texture: xc3_model_py.material.TextureAssignment,
+    nodes,
+    links,
+    output,
+    material_textures,
+    shader_images,
+    is_data,
+):
+    if texture.name in shader_images:
+        # TODO: cache global texture nodes
+        node = nodes.new("ShaderNodeTexImage")
+        node.label = texture.name
+        node.image = shader_images[texture.name]
+    elif texture.name in material_textures:
+        node = material_textures[texture.name]
+
     # TODO: Find a better way to handle color management.
     # TODO: Why can't we just set everything to non color?
     # TODO: This won't work if users have different color spaces installed like aces.
-    if texture_node.image is not None:
+    if node.image is not None:
         if is_data:
-            texture_node.image.colorspace_settings.name = "Non-Color"
+            node.image.colorspace_settings.name = "Non-Color"
         else:
-            texture_node.image.colorspace_settings.name = "sRGB"
+            node.image.colorspace_settings.name = "sRGB"
 
     # Alpha isn't part of the RGB node.
-    if input_channel == "Alpha":
-        input = texture_node.outputs["Alpha"]
+    # TODO: cache split rgb texture nodes
+    channel = channel_name(texture.channel)
+    if channel == "Alpha":
+        links.new(node.outputs["Alpha"], output)
     else:
-        input = textures_rgb[name].outputs[input_channel]
+        rgb_node = nodes.new("ShaderNodeSeparateColor")
+        links.new(node.outputs["Color"], rgb_node.inputs["Color"])
+        links.new(rgb_node.outputs[channel], output)
 
-    links.new(input, output)
-
+    uv = nodes.new("ShaderNodeUVMap")
     for i in range(9):
-        if texture_assignment.texcoord_name == f"vTex{i}":
-            if name not in textures_uv:
-                uv = nodes.new("ShaderNodeUVMap")
-                uv.location = (texture_node.location[0] - 200, texture_node.location[1])
-                textures_uv[name] = uv
-
-                links.new(uv.outputs["UV"], texture_node.inputs["Vector"])
-
-            textures_uv[name].uv_map = f"TexCoord{i}"
+        if texture.texcoord_name == f"vTex{i}":
+            uv.uv_map = f"TexCoord{i}"
+            break
 
     # TODO: Create a node group for the mat2x4 transform (two dot products).
-    if texture_assignment.texcoord_transforms is not None:
-        transform_u, transform_v = texture_assignment.texcoord_transforms
-        if name not in textures_scale:
-            # TODO: Use the full mat2x4 transform.
-            scale = nodes.new("ShaderNodeVectorMath")
-            scale.location = (texture_node.location[0] - 200, texture_node.location[1])
-            scale.operation = "MULTIPLY"
-            scale.inputs[1].default_value = (1.0, 1.0, 1.0)
-            textures_scale[name] = scale
-
-            if name not in textures_uv:
-                textures_uv[name] = nodes.new("ShaderNodeUVMap")
-
-            textures_uv[name].location = (
-                texture_node.location[0] - 400,
-                texture_node.location[1],
-            )
-
-            links.new(textures_uv[name].outputs["UV"], scale.inputs["Vector"])
-            links.new(scale.outputs["Vector"], texture_node.inputs["Vector"])
-
-        textures_scale[name].inputs[1].default_value = (
+    if texture.texcoord_transforms is not None:
+        transform_u, transform_v = texture.texcoord_transforms
+        # TODO: Use the full mat2x4 transform.
+        scale = nodes.new("ShaderNodeVectorMath")
+        scale.operation = "MULTIPLY"
+        scale.inputs[1].default_value = (
             transform_u[0],
             transform_v[1],
             1.0,
         )
+
+        links.new(uv.outputs["UV"], scale.inputs["Vector"])
+        links.new(scale.outputs["Vector"], node.inputs["Vector"])
+    else:
+        links.new(uv.outputs["UV"], node.inputs["Vector"])
+
+
+def assign_math(
+    func,
+    nodes,
+    links,
+    output,
+    # TODO: group into some sort of class?
+    material_textures: Dict[str, bpy.types.Node],
+    shader_images: Dict[str, bpy.types.Image],
+    is_data: bool,
+    op: str,
+):
+    node = nodes.new("ShaderNodeMath")
+    node.operation = op
+
+    links.new(node.outputs["Value"], output)
+    for i in range(len(func.args)):
+        assign_output(
+            func.args[i],
+            nodes,
+            links,
+            node.inputs[i],
+            material_textures,
+            shader_images,
+            is_data,
+        )
+
+
+def channel_name(channel: Optional[str]) -> str:
+    match channel:
+        case "x":
+            return "Red"
+        case "y":
+            return "Green"
+        case "z":
+            return "Blue"
+        case "w":
+            return "Alpha"
+
+    return ""
