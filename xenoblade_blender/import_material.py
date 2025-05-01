@@ -2,6 +2,8 @@ from typing import Dict, Optional
 import bpy
 import typing
 
+from xenoblade_blender.node_layout import layout_nodes
+
 if typing.TYPE_CHECKING:
     from ..xc3_model_py.xc3_model_py import xc3_model_py
 else:
@@ -30,10 +32,8 @@ def import_material(
     nodes.clear()
 
     bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.location = (200, 0)
 
     output_node = nodes.new("ShaderNodeOutputMaterial")
-    output_node.location = (500, 0)
 
     links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
@@ -235,28 +235,18 @@ def import_material(
 
     # Toon and hair materials use toon gradient ramps.
     if mat_id in [2, 5]:
-        frame = nodes.new("NodeFrame")
-        frame.label = "Toon Gradient"
-
-        x_start = final_albedo.location[0] + 200
         texture_node = nodes.new("ShaderNodeTexImage")
-        texture_node.parent = frame
         texture_node.label = "gTToonGrad"
-        texture_node.location = (x_start - 300, 900)
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
         uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
-        uvs.parent = frame
-        uvs.location = (x_start - 500, 900)
         links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
 
         if normal_map is not None:
             links.new(normal_map.outputs["Normal"], uvs.inputs["Normal"])
 
         row_index = nodes.new("ShaderNodeValue")
-        row_index.parent = frame
-        row_index.location = (x_start - 700, 900)
         row_index.label = "Toon Gradient Row"
         links.new(row_index.outputs["Value"], uvs.inputs["Row Index"])
 
@@ -270,8 +260,6 @@ def import_material(
         # Approximate the lighting ramp by multiplying base color.
         # This preserves compatibility with Cycles.
         mix_ramp = nodes.new("ShaderNodeMix")
-        mix_ramp.parent = frame
-        mix_ramp.location = (x_start, 900)
         mix_ramp.data_type = "RGBA"
         mix_ramp.blend_type = "MULTIPLY"
         mix_ramp.inputs["Factor"].default_value = 1.0
@@ -286,7 +274,6 @@ def import_material(
     if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
         transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
-        transparent_bsdf.location = (300, 100)
         links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
         links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
     else:
@@ -315,6 +302,8 @@ def import_material(
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
 
+    layout_nodes(output_node)
+
     return blender_material
 
 
@@ -329,7 +318,6 @@ def toon_grad_uvs_node_group():
     links = node_tree.links
 
     input_node = nodes.new("NodeGroupInput")
-    input_node.location = (-1000, 0)
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Row Index"
     )
@@ -338,45 +326,40 @@ def toon_grad_uvs_node_group():
     )
 
     uv = nodes.new("ShaderNodeCombineXYZ")
-    uv.location = (-200, 150)
 
     # Using the actual lighting requires shader to RGB.
     # Use view based "lighting" to still support cycles.
     invert_facing = nodes.new("ShaderNodeMath")
-    invert_facing.location = (-400, 150)
     invert_facing.operation = "SUBTRACT"
     invert_facing.inputs[0].default_value = 1.0
     links.new(invert_facing.outputs["Value"], uv.inputs["X"])
 
     layer_weight = nodes.new("ShaderNodeLayerWeight")
-    layer_weight.location = (-600, 150)
     layer_weight.inputs["Blend"].default_value = 0.5
     links.new(layer_weight.outputs["Facing"], invert_facing.inputs[1])
     links.new(input_node.outputs["Normal"], layer_weight.inputs["Normal"])
 
     flip_uvs = nodes.new("ShaderNodeMath")
-    flip_uvs.location = (-400, 0)
     flip_uvs.label = "Flip UVs"
     flip_uvs.operation = "SUBTRACT"
     flip_uvs.inputs[0].default_value = 1.0
     links.new(flip_uvs.outputs["Value"], uv.inputs["Y"])
 
     div = nodes.new("ShaderNodeMath")
-    div.location = (-600, 0)
     div.operation = "DIVIDE"
     div.inputs[1].default_value = 256.0
     links.new(div.outputs["Value"], flip_uvs.inputs[1])
 
     add = nodes.new("ShaderNodeMath")
-    add.location = (-800, 0)
     add.operation = "ADD"
     add.inputs[1].default_value = 0.5
     links.new(input_node.outputs["Row Index"], add.inputs[0])
     links.new(add.outputs["Value"], div.inputs[0])
 
     output_node = nodes.new("NodeGroupOutput")
-    output_node.location = (0, 0)
     links.new(uv.outputs["Vector"], output_node.inputs["Vector"])
+
+    layout_nodes(output_node)
 
     return node_tree
 
@@ -402,11 +385,7 @@ def assign_normal_map(
     material_textures: Dict[str, bpy.types.Node],
     shader_images: Dict[str, bpy.types.Image],
 ):
-    frame = nodes.new("NodeFrame")
-    frame.label = "Normals"
-
     normals_xy = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
-    normals_xy.parent = frame
 
     normals_xy.inputs["X"].default_value = 0.5
     normals_xy.inputs["Y"].default_value = 0.5
@@ -436,7 +415,6 @@ def assign_normal_map(
     final_normals = normals_xy
 
     remap_normals = nodes.new("ShaderNodeVectorMath")
-    remap_normals.parent = frame
     remap_normals.operation = "MULTIPLY_ADD"
     if "Normal" in final_normals.outputs:
         links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
@@ -446,7 +424,6 @@ def assign_normal_map(
     remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
 
     normal_map = nodes.new("ShaderNodeNormalMap")
-    normal_map.parent = frame
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
@@ -465,7 +442,6 @@ def normals_xy_node_group():
     links = node_tree.links
 
     input_node = nodes.new("NodeGroupInput")
-    input_node.location = (-1400, 0)
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="X"
     )
@@ -474,51 +450,45 @@ def normals_xy_node_group():
     )
 
     remap_x = nodes.new("ShaderNodeMath")
-    remap_x.location = (-1200, 100)
     remap_x.operation = "MULTIPLY_ADD"
     links.new(input_node.outputs["X"], remap_x.inputs[0])
     remap_x.inputs[1].default_value = 2.0
     remap_x.inputs[2].default_value = -1.0
 
     remap_y = nodes.new("ShaderNodeMath")
-    remap_y.location = (-1200, -100)
     remap_y.operation = "MULTIPLY_ADD"
     links.new(input_node.outputs["Y"], remap_y.inputs[0])
     remap_y.inputs[1].default_value = 2.0
     remap_y.inputs[2].default_value = -1.0
 
     normal_xy = nodes.new("ShaderNodeCombineXYZ")
-    normal_xy.location = (-1000, 0)
     links.new(remap_x.outputs["Value"], normal_xy.inputs["X"])
     links.new(remap_y.outputs["Value"], normal_xy.inputs["Y"])
     normal_xy.inputs["Z"].default_value = 0.0
 
     length2 = nodes.new("ShaderNodeVectorMath")
-    length2.location = (-800, 0)
     length2.operation = "DOT_PRODUCT"
     links.new(normal_xy.outputs["Vector"], length2.inputs[0])
     links.new(normal_xy.outputs["Vector"], length2.inputs[1])
 
     one_minus_length = nodes.new("ShaderNodeMath")
-    one_minus_length.location = (-600, 0)
     one_minus_length.operation = "SUBTRACT"
     one_minus_length.inputs[0].default_value = 1.0
     links.new(length2.outputs["Value"], one_minus_length.inputs[1])
 
     length = nodes.new("ShaderNodeMath")
-    length.location = (-400, 0)
     length.operation = "SQRT"
     links.new(one_minus_length.outputs["Value"], length.inputs[0])
 
     normal_xyz = nodes.new("ShaderNodeCombineXYZ")
-    normal_xyz.location = (-200, 0)
     links.new(remap_x.outputs["Value"], normal_xyz.inputs["X"])
     links.new(remap_y.outputs["Value"], normal_xyz.inputs["Y"])
     links.new(length.outputs["Value"], normal_xyz.inputs["Z"])
 
     output_node = nodes.new("NodeGroupOutput")
-    output_node.location = (0, 0)
     links.new(normal_xyz.outputs["Vector"], output_node.inputs["Normal"])
+
+    layout_nodes(output_node)
 
     return node_tree
 
@@ -534,7 +504,6 @@ def add_normals_node_group():
     links = node_tree.links
 
     input_node = nodes.new("NodeGroupInput")
-    input_node.location = (-1700, 0)
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
     )
@@ -546,65 +515,56 @@ def add_normals_node_group():
     )
 
     t = nodes.new("ShaderNodeVectorMath")
-    t.location = (-1500, 0)
     t.operation = "ADD"
     t.inputs[1].default_value = (0.0, 0.0, 1.0)
     links.new(input_node.outputs["A"], t.inputs[0])
 
     u = nodes.new("ShaderNodeVectorMath")
-    u.location = (-1500, -200)
     u.operation = "MULTIPLY"
     u.inputs[1].default_value = (-1.0, -1.0, 1.0)
     links.new(input_node.outputs["B"], u.inputs[0])
 
     dot_t_u = nodes.new("ShaderNodeVectorMath")
-    dot_t_u.location = (-1200, 0)
     dot_t_u.operation = "DOT_PRODUCT"
     links.new(t.outputs["Vector"], dot_t_u.inputs[0])
     links.new(u.outputs["Vector"], dot_t_u.inputs[1])
 
     t_xyz = nodes.new("ShaderNodeSeparateXYZ")
-    t_xyz.location = (-1200, -200)
     links.new(t.outputs["Vector"], t_xyz.inputs["Vector"])
 
     multiply_t = nodes.new("ShaderNodeVectorMath")
-    multiply_t.location = (-1000, 0)
     multiply_t.operation = "MULTIPLY"
     links.new(dot_t_u.outputs["Value"], multiply_t.inputs[0])
     links.new(t.outputs["Vector"], multiply_t.inputs[1])
 
     multiply_u = nodes.new("ShaderNodeVectorMath")
-    multiply_u.location = (-1000, -200)
     multiply_u.operation = "MULTIPLY"
     links.new(u.outputs["Vector"], multiply_u.inputs[0])
     links.new(t_xyz.outputs["Z"], multiply_u.inputs[1])
 
     r = nodes.new("ShaderNodeVectorMath")
-    r.location = (-800, -200)
     r.operation = "SUBTRACT"
     links.new(multiply_t.outputs["Vector"], r.inputs[0])
     links.new(multiply_u.outputs["Vector"], r.inputs[1])
 
     normalize_r = nodes.new("ShaderNodeVectorMath")
-    normalize_r.location = (-600, -200)
     normalize_r.operation = "NORMALIZE"
     links.new(r.outputs["Vector"], normalize_r.inputs[0])
 
     mix = nodes.new("ShaderNodeMix")
-    mix.location = (-400, 0)
     mix.data_type = "VECTOR"
     links.new(input_node.outputs["Factor"], mix.inputs["Factor"])
     links.new(input_node.outputs["A"], mix.inputs["A"])
     links.new(normalize_r.outputs["Vector"], mix.inputs["B"])
 
     normalize_result = nodes.new("ShaderNodeVectorMath")
-    normalize_result.location = (-200, 0)
     normalize_result.operation = "NORMALIZE"
     links.new(mix.outputs["Result"], normalize_result.inputs["Vector"])
 
     output_node = nodes.new("NodeGroupOutput")
-    output_node.location = (0, 0)
     links.new(normalize_result.outputs["Vector"], output_node.inputs["Normal"])
+
+    layout_nodes(output_node)
 
     return node_tree
 
@@ -620,7 +580,6 @@ def fresnel_blend_node_group():
     links = node_tree.links
 
     input_node = nodes.new("NodeGroupInput")
-    input_node.location = (-600, 0)
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Value"
     )
@@ -629,24 +588,22 @@ def fresnel_blend_node_group():
     )
 
     layer_weight = nodes.new("ShaderNodeLayerWeight")
-    layer_weight.location = (-400, 0)
     links.new(input_node.outputs["Normal"], layer_weight.inputs["Normal"])
 
     multiply = nodes.new("ShaderNodeMath")
-    multiply.location = (-400, -200)
     multiply.operation = "MULTIPLY"
     links.new(input_node.outputs["Value"], multiply.inputs[0])
     multiply.inputs[1].default_value = 5.0
 
     pow_5 = nodes.new("ShaderNodeMath")
-    pow_5.location = (-200, 0)
     pow_5.operation = "POWER"
     links.new(layer_weight.outputs["Facing"], pow_5.inputs[0])
     links.new(multiply.outputs["Value"], pow_5.inputs[1])
 
     output_node = nodes.new("NodeGroupOutput")
-    output_node.location = (0, 0)
     links.new(pow_5.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node)
 
     return node_tree
 
