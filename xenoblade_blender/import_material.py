@@ -632,85 +632,60 @@ def assign_output(
     value = assignment.value()
     func = assignment.func()
 
+    mix_rgba_node = lambda ty: assign_mix_rgba(
+        func,
+        assignments,
+        nodes,
+        links,
+        output,
+        material_textures,
+        shader_images,
+        is_data,
+        ty,
+    )
+
+    math_node = lambda ty: assign_math(
+        func,
+        assignments,
+        nodes,
+        links,
+        output,
+        material_textures,
+        shader_images,
+        is_data,
+        ty,
+    )
+
+    assign_index = lambda i, output: assign_output(
+        i,
+        assignments,
+        nodes,
+        links,
+        output,
+        material_textures,
+        shader_images,
+        is_data,
+    )
+
     if func is not None:
         match func.op:
             case xc3_model_py.shader_database.Operation.Mix:
-                node = assign_mix_rgba(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "MIX",
-                )
+                node = mix_rgba_node("MIX")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Mul:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "MULTIPLY",
-                )
+                node = math_node("MULTIPLY")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Div:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "DIVIDE",
-                )
+                node = math_node("DIVIDE")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Add:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "ADD",
-                )
+                node = math_node("ADD")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Sub:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "SUBTRACT",
-                )
+                node = math_node("SUBTRACT")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Fma:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "MULTIPLY_ADD",
-                )
+                node = math_node("MULTIPLY_ADD")
                 node.name = name
             case xc3_model_py.shader_database.Operation.MulRatio:
                 mix_values = nodes.new("ShaderNodeMix")
@@ -720,131 +695,34 @@ def assign_output(
                 mix_values.name = name
 
                 links.new(mix_values.outputs["Result"], output)
-                assign_output(
-                    func.args[0],
-                    assignments,
-                    nodes,
-                    links,
-                    mix_values.inputs["A"],
-                    material_textures,
-                    shader_images,
-                    is_data,
-                )
-                assign_output(
-                    func.args[1],
-                    assignments,
-                    nodes,
-                    links,
-                    mix_values.inputs["B"],
-                    material_textures,
-                    shader_images,
-                    is_data,
-                )
-                assign_output(
-                    func.args[2],
-                    assignments,
-                    nodes,
-                    links,
-                    mix_values.inputs["Factor"],
-                    material_textures,
-                    shader_images,
-                    is_data,
-                )
+                assign_index(func.args[0], mix_values.inputs["A"])
+                assign_index(func.args[1], mix_values.inputs["B"])
+                assign_index(func.args[2], mix_values.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.AddNormal:
                 mix_values = create_node_group(
                     nodes, "AddNormals", add_normals_node_group
                 )
                 mix_values.name = name
             case xc3_model_py.shader_database.Operation.Overlay:
-                node = assign_mix_rgba(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "OVERLAY",
-                )
+                node = mix_rgba_node("OVERLAY")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Overlay2:
-                node = assign_mix_rgba(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "OVERLAY",
-                )
+                node = mix_rgba_node("OVERLAY")
                 node.name = name
             case xc3_model_py.shader_database.Operation.OverlayRatio:
-                node = assign_mix_rgba(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "OVERLAY",
-                )
+                node = mix_rgba_node("OVERLAY")
             case xc3_model_py.shader_database.Operation.Power:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "POWER",
-                )
+                node = math_node("POWER")
             case xc3_model_py.shader_database.Operation.Min:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "MINIMUM",
-                )
+                node = math_node("MINIMUM")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Max:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "MAXIMUM",
-                )
+                node = math_node("MAXIMUM")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Clamp:
                 pass
             case xc3_model_py.shader_database.Operation.Abs:
-                node = assign_math(
-                    func,
-                    assignments,
-                    nodes,
-                    links,
-                    output,
-                    material_textures,
-                    shader_images,
-                    is_data,
-                    "ABSOLUTE",
-                )
+                node = math_node("ABSOLUTE")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Fresnel:
                 node = create_node_group(
@@ -853,16 +731,7 @@ def assign_output(
                 node.name = name
                 # TODO: normals?
 
-                assign_output(
-                    func.args[0],
-                    assignments,
-                    nodes,
-                    links,
-                    node.inputs["Value"],
-                    material_textures,
-                    shader_images,
-                    is_data,
-                )
+                assign_index(func.args[0], node.inputs["Value"])
                 links.new(node.outputs["Value"], output)
             case _:
                 mix_values = nodes.new("ShaderNodeMix")

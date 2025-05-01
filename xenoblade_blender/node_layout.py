@@ -12,11 +12,11 @@ def layout_nodes(root: bpy.types.Node):
     margin_x = 100
     margin_y = 20
 
-    # TODO: This doesn't start at 0?
     location_x = 0
     for i, nodes in enumerate(layers):
-        layer_max_width = max(node_dimensions(n)[0] for n in nodes)
-        location_x -= layer_max_width + margin_x
+        if i > 0:
+            layer_max_width = max(node_dimensions(n)[0] for n in nodes)
+            location_x -= layer_max_width + margin_x
 
         location_y = 0
         for n in nodes:
