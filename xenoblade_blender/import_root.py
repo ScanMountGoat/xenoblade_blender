@@ -188,7 +188,9 @@ def import_image(image, png: bytes, model_name: str, i: int):
     return blender_image
 
 
-def import_monolib_shader_images(path: str, flip: bool) -> Optional[Dict[str, bpy.types.Image]]:
+def import_monolib_shader_images(
+    path: str, flip: bool
+) -> Optional[Dict[str, bpy.types.Image]]:
     # Assume the path is in a game dump.
     for parent in Path(path).parents:
         folder = parent.joinpath("monolib").joinpath("shader")

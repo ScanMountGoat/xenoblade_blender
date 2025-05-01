@@ -390,41 +390,27 @@ def assign_normal_map(
     normals_xy.inputs["X"].default_value = 0.5
     normals_xy.inputs["Y"].default_value = 0.5
 
-    # TODO: Correctly handle xy components for blending.
-    assign_output(
+    remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.operation = "MULTIPLY_ADD"
+    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
+    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
+
+    assign_normal_output(
         x_assignment,
-        assignments,
-        nodes,
-        links,
-        normals_xy.inputs["X"],
-        material_textures,
-        shader_images,
-        is_data=True,
-    )
-    assign_output(
         y_assignment,
         assignments,
         nodes,
         links,
-        normals_xy.inputs["Y"],
+        remap_normals.inputs[0],
         material_textures,
         shader_images,
         is_data=True,
     )
 
-    final_normals = normals_xy
-
-    remap_normals = nodes.new("ShaderNodeVectorMath")
-    remap_normals.operation = "MULTIPLY_ADD"
-    if "Normal" in final_normals.outputs:
-        links.new(final_normals.outputs["Normal"], remap_normals.inputs[0])
-    else:
-        links.new(final_normals.outputs["Result"], remap_normals.inputs[0])
-    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
-    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
-
     normal_map = nodes.new("ShaderNodeNormalMap")
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
+
+    # TODO: normal intensity
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
 
@@ -739,23 +725,239 @@ def assign_output(
 
                 mix_values.name = name
     elif value is not None:
-        texture = value.texture()
-        f = value.float()
-        attribute = value.attribute()
+        assign_value(
+            value, nodes, links, output, material_textures, shader_images, is_data, name
+        )
 
-        if f is not None:
-            # This may be a single value or RGBA socket.
-            try:
-                output.default_value = f
-            except:
-                output.default_value = (f, f, f, 1.0)
-        elif attribute is not None:
-            pass
-        elif texture is not None:
-            node = assign_texture(
-                texture, nodes, links, output, material_textures, shader_images, is_data
-            )
-            node.name = name
+
+def assign_value(
+    value,
+    nodes,
+    links,
+    output,
+    material_textures,
+    shader_images,
+    is_data,
+    name,
+):
+    texture = value.texture()
+    f = value.float()
+    attribute = value.attribute()
+
+    if f is not None:
+        # This may be a single value or RGBA socket.
+        try:
+            output.default_value = f
+        except:
+            output.default_value = (f, f, f, 1.0)
+    elif attribute is not None:
+        pass
+    elif texture is not None:
+        node = assign_texture(
+            texture, nodes, links, output, material_textures, shader_images, is_data
+        )
+        node.name = name
+
+
+def assign_normal_output(
+    assignment_index_x: int,
+    assignment_index_y: int,
+    assignments: list[xc3_model_py.material.Assignment],
+    nodes,
+    links,
+    output,
+    material_textures: Dict[str, bpy.types.Node],
+    shader_images: Dict[str, bpy.types.Image],
+    is_data: bool,
+):
+    # TODO: Cache node creation to avoid creating too many nodes.
+    # These names are unique to this material node tree.
+    name = f"Assignment[{assignment_index_x}]"
+
+    # Assign two output channels.
+    if assignment_index_x >= len(assignments) or assignment_index_y >= len(assignments):
+        return
+
+    assignment_x = assignments[assignment_index_x]
+    value_x = assignment_x.value()
+    func_x = assignment_x.func()
+
+    assignment_y = assignments[assignment_index_y]
+    value_y = assignment_y.value()
+    func_y = assignment_y.func()
+
+    math_node = lambda ty: assign_normal_math(
+        func_x,
+        func_y,
+        assignments,
+        nodes,
+        links,
+        output,
+        material_textures,
+        shader_images,
+        is_data,
+        ty,
+    )
+
+    # Assume x and y exprs have the same operations just with different arguments.
+    if func_x is not None and func_y is not None:
+        match func_x.op:
+            case xc3_model_py.shader_database.Operation.Mix:
+                node = nodes.new("ShaderNodeMix")
+                node.data_type = "VECTOR"
+
+                assign_normal_output(
+                    func_x.args[0],
+                    func_y.args[0],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["A"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+                assign_normal_output(
+                    func_x.args[1],
+                    func_y.args[1],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["B"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+
+                # Assume the ratio is the same for x and y.
+                assign_output(
+                    func_x.args[2],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["Factor"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Mul:
+                node = math_node("MULTIPLY")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Div:
+                node = math_node("DIVIDE")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Add:
+                node = math_node("ADD")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Sub:
+                node = math_node("SUBTRACT")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Fma:
+                node = math_node("MULTIPLY_ADD")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.MulRatio:
+                # TODO: How to handle this op with vectors?
+                pass
+            case xc3_model_py.shader_database.Operation.AddNormal:
+                node = create_node_group(nodes, "AddNormals", add_normals_node_group)
+
+                assign_normal_output(
+                    func_x.args[0],
+                    func_y.args[0],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["A"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+                assign_normal_output(
+                    func_x.args[1],
+                    func_y.args[1],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["B"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+
+                # Assume the ratio is the same for x and y.
+                assign_output(
+                    func_x.args[2],
+                    assignments,
+                    nodes,
+                    links,
+                    node.inputs["Factor"],
+                    material_textures,
+                    shader_images,
+                    is_data,
+                )
+
+                links.new(node.outputs["Normal"], output)
+
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Overlay:
+                # TODO: How to handle this op with vectors?
+                pass
+            case xc3_model_py.shader_database.Operation.Overlay2:
+                # TODO: How to handle this op with vectors?
+                pass
+            case xc3_model_py.shader_database.Operation.OverlayRatio:
+                # TODO: How to handle this op with vectors?
+                pass
+            case xc3_model_py.shader_database.Operation.Power:
+                node = math_node("POWER")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Min:
+                node = math_node("MINIMUM")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Max:
+                node = math_node("MAXIMUM")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Clamp:
+                pass
+            case xc3_model_py.shader_database.Operation.Abs:
+                node = math_node("ABSOLUTE")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Fresnel:
+                # TODO: How to handle this op with vectors?
+                pass
+            case _:
+                mix_values = nodes.new("ShaderNodeMix")
+                mix_values.data_type = "RGBA"
+
+                mix_values.name = name
+    elif value_x is not None and value_y is not None:
+        node = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+
+        # TODO: These should have unique names?
+        assign_value(
+            value_x,
+            nodes,
+            links,
+            node.inputs["X"],
+            material_textures,
+            shader_images,
+            is_data,
+            name,
+        )
+        assign_value(
+            value_y,
+            nodes,
+            links,
+            node.inputs["Y"],
+            material_textures,
+            shader_images,
+            is_data,
+            name,
+        )
+
+        links.new(node.outputs["Normal"], output)
 
 
 def assign_mix_rgba(
@@ -902,6 +1104,39 @@ def assign_math(
     for i in range(len(func.args)):
         assign_output(
             func.args[i],
+            assignments,
+            nodes,
+            links,
+            node.inputs[i],
+            material_textures,
+            shader_images,
+            is_data,
+        )
+
+    return node
+
+
+def assign_normal_math(
+    func_x,
+    func_y,
+    assignments: list[xc3_model_py.material.Assignment],
+    nodes,
+    links,
+    output,
+    # TODO: group into some sort of class?
+    material_textures: Dict[str, bpy.types.Node],
+    shader_images: Dict[str, bpy.types.Image],
+    is_data: bool,
+    op: str,
+) -> bpy.types.Node:
+    node = nodes.new("ShaderNodeMath")
+    node.operation = op
+
+    links.new(node.outputs["Value"], output)
+    for i in range(len(func_x.args)):
+        assign_normal_output(
+            func_x.args[i],
+            func_y.args[i],
             assignments,
             nodes,
             links,
