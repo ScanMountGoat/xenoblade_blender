@@ -182,6 +182,9 @@ def import_image(image, png: bytes, model_name: str, i: int):
     # TODO: This should depend on srgb vs linear in format.
     blender_image.colorspace_settings.is_data = True
 
+    # Necessary for 0 alpha to not set RGB to black.
+    blender_image.alpha_mode = "CHANNEL_PACKED"
+
     return blender_image
 
 
