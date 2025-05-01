@@ -984,7 +984,7 @@ def assign_texture(
         links.new(node.outputs["Color"], rgb_node.inputs["Color"])
         links.new(rgb_node.outputs[channel], output)
 
-    uv_name = texture.texcoord_name
+    uv_name = texture.texcoord_name or ""
     uv = nodes.get(uv_name)
     if uv is None:
         uv = nodes.new("ShaderNodeUVMap")
