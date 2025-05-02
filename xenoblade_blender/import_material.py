@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import bpy
 import typing
 
@@ -43,35 +43,7 @@ def import_material(
     output_assignments = material.output_assignments(image_textures)
     mat_id = output_assignments.mat_id()
 
-    material_textures = {}
-    for i, texture in enumerate(material.textures):
-        name = f"s{i}"
-
-        node = nodes.new("ShaderNodeTexImage")
-        node.name = name
-        node.label = name
-
-        try:
-            node.image = blender_images[texture.image_texture_index]
-        except IndexError:
-            pass
-
-        # TODO: xenoblade x samplers?
-        sampler = None
-        if texture.sampler_index < len(samplers):
-            sampler = samplers[texture.sampler_index]
-
-        if sampler is not None:
-            # TODO: Check if U and V have the same address mode.
-            match sampler.address_mode_u:
-                case xc3_model_py.AddressMode.ClampToEdge:
-                    node.extension = "CLIP"
-                case xc3_model_py.AddressMode.Repeat:
-                    node.extension = "REPEAT"
-                case xc3_model_py.AddressMode.MirrorRepeat:
-                    node.extension = "MIRROR"
-
-        material_textures[name] = node
+    material_textures = material_images_samplers(material, blender_images, samplers)
 
     # TODO: Alpha testing.
     # TODO: Select UV map for each texture.
@@ -289,15 +261,17 @@ def import_material(
         texture = material.alpha_test
         name = f"s{texture.texture_index}"
         channel = ["Red", "Green", "Blue", "Alpha"][texture.channel_index]
+
+        node = nodes.get(name)
+        if node is None:
+            node = import_texture(name, nodes, material_textures, shader_images)
+
         if channel == "Alpha":
-            input = material_textures[name].outputs["Alpha"]
+            links.new(node.outputs["Alpha"], bsdf.inputs["Alpha"])
         else:
             rgb_node = nodes.new("ShaderNodeSeparateColor")
-            links.new(
-                material_textures[name].outputs["Color"], rgb_node.inputs["Color"]
-            )
-            input = rgb_node.outputs[channel]
-        links.new(input, bsdf.inputs["Alpha"])
+            links.new(node.outputs["Color"], rgb_node.inputs["Color"])
+            links.new(rgb_node.outputs[channel], bsdf.inputs["Alpha"])
 
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
@@ -305,6 +279,28 @@ def import_material(
     layout_nodes(output_node)
 
     return blender_material
+
+
+def material_images_samplers(material, blender_images, samplers):
+    material_textures = {}
+
+    for i, texture in enumerate(material.textures):
+        name = f"s{i}"
+
+        image = None
+        try:
+            image = blender_images[texture.image_texture_index]
+        except IndexError:
+            pass
+
+        # TODO: xenoblade x samplers?
+        sampler = None
+        if texture.sampler_index < len(samplers):
+            sampler = samplers[texture.sampler_index]
+
+        material_textures[name] = (image, sampler)
+
+    return material_textures
 
 
 def toon_grad_uvs_node_group():
@@ -382,14 +378,9 @@ def assign_normal_map(
     x_assignment,
     y_assignment,
     assignments: list[xc3_model_py.material.Assignment],
-    material_textures: Dict[str, bpy.types.Node],
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
     shader_images: Dict[str, bpy.types.Image],
 ):
-    normals_xy = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
-
-    normals_xy.inputs["X"].default_value = 0.5
-    normals_xy.inputs["Y"].default_value = 0.5
-
     remap_normals = nodes.new("ShaderNodeVectorMath")
     remap_normals.operation = "MULTIPLY_ADD"
     remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
@@ -600,7 +591,7 @@ def assign_output(
     nodes,
     links,
     output,
-    material_textures: Dict[str, bpy.types.Node],
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
     shader_images: Dict[str, bpy.types.Image],
     is_data: bool,
 ):
@@ -726,19 +717,12 @@ def assign_output(
                 mix_values.name = name
     elif value is not None:
         assign_value(
-            value, nodes, links, output, material_textures, shader_images, is_data, name
+            value, nodes, links, output, material_textures, shader_images, is_data
         )
 
 
 def assign_value(
-    value,
-    nodes,
-    links,
-    output,
-    material_textures,
-    shader_images,
-    is_data,
-    name,
+    value, nodes, links, output, material_textures, shader_images, is_data
 ):
     texture = value.texture()
     f = value.float()
@@ -753,10 +737,9 @@ def assign_value(
     elif attribute is not None:
         pass
     elif texture is not None:
-        node = assign_texture(
+        assign_texture(
             texture, nodes, links, output, material_textures, shader_images, is_data
         )
-        node.name = name
 
 
 def assign_normal_output(
@@ -766,13 +749,16 @@ def assign_normal_output(
     nodes,
     links,
     output,
-    material_textures: Dict[str, bpy.types.Node],
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
     shader_images: Dict[str, bpy.types.Image],
     is_data: bool,
 ):
-    # TODO: Cache node creation to avoid creating too many nodes.
+    # Cache node creation to avoid creating too many nodes.
     # These names are unique to this material node tree.
     name = f"Assignment[{assignment_index_x}]"
+    if node := nodes.get(name):
+        links.new(node.outputs[0], output)
+        return
 
     # Assign two output channels.
     if assignment_index_x >= len(assignments) or assignment_index_y >= len(assignments):
@@ -805,6 +791,7 @@ def assign_normal_output(
             case xc3_model_py.shader_database.Operation.Mix:
                 node = nodes.new("ShaderNodeMix")
                 node.data_type = "VECTOR"
+                node.name = name
 
                 assign_normal_output(
                     func_x.args[0],
@@ -840,8 +827,6 @@ def assign_normal_output(
                     shader_images,
                     is_data,
                 )
-
-                node.name = name
             case xc3_model_py.shader_database.Operation.Mul:
                 node = math_node("MULTIPLY")
                 node.name = name
@@ -862,6 +847,7 @@ def assign_normal_output(
                 pass
             case xc3_model_py.shader_database.Operation.AddNormal:
                 node = create_node_group(nodes, "AddNormals", add_normals_node_group)
+                node.name = name
 
                 assign_normal_output(
                     func_x.args[0],
@@ -900,7 +886,6 @@ def assign_normal_output(
 
                 links.new(node.outputs["Normal"], output)
 
-                node.name = name
             case xc3_model_py.shader_database.Operation.Overlay:
                 # TODO: How to handle this op with vectors?
                 pass
@@ -934,8 +919,8 @@ def assign_normal_output(
                 mix_values.name = name
     elif value_x is not None and value_y is not None:
         node = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+        node.name = name
 
-        # TODO: These should have unique names?
         assign_value(
             value_x,
             nodes,
@@ -944,7 +929,6 @@ def assign_normal_output(
             material_textures,
             shader_images,
             is_data,
-            name,
         )
         assign_value(
             value_y,
@@ -954,7 +938,6 @@ def assign_normal_output(
             material_textures,
             shader_images,
             is_data,
-            name,
         )
 
         links.new(node.outputs["Normal"], output)
@@ -1021,15 +1004,10 @@ def assign_texture(
     shader_images,
     is_data,
 ):
-    if texture.name in shader_images:
-        node = nodes.new("ShaderNodeTexImage")
-        node.label = texture.name
-        node.image = shader_images[texture.name]
-    elif texture.name in material_textures:
-        node = material_textures[texture.name]
-    else:
-        node = nodes.new("ShaderNodeTexImage")
-        node.label = texture.name
+    # Load only the textures that are actually used.
+    node = nodes.get(texture.name)
+    if node is None:
+        node = import_texture(texture.name, nodes, material_textures, shader_images)
 
     # TODO: Find a better way to handle color management.
     # TODO: Why can't we just set everything to non color?
@@ -1068,20 +1046,52 @@ def assign_texture(
     # TODO: Create a node group for the mat2x4 transform (two dot products).
     if texture.texcoord_transforms is not None:
         transform_u, transform_v = texture.texcoord_transforms
-        # TODO: Use the full mat2x4 transform.
-        scale = nodes.new("ShaderNodeVectorMath")
-        scale.operation = "MULTIPLY"
-        scale.inputs[1].default_value = (
-            transform_u[0],
-            transform_v[1],
-            1.0,
-        )
+        name = f"{uv_name}_{transform_u}_{transform_v}"
+        scale = nodes.get(name)
+        if scale is None:
+            # TODO: Use the full mat2x4 transform.
+            scale = nodes.new("ShaderNodeVectorMath")
+            scale.name = name
+            scale.operation = "MULTIPLY"
+            scale.inputs[1].default_value = (
+                transform_u[0],
+                transform_v[1],
+                1.0,
+            )
+            links.new(uv.outputs["UV"], scale.inputs["Vector"])
 
-        links.new(uv.outputs["UV"], scale.inputs["Vector"])
         links.new(scale.outputs["Vector"], node.inputs["Vector"])
     else:
         links.new(uv.outputs["UV"], node.inputs["Vector"])
 
+    return node
+
+
+def import_texture(
+    name: str,
+    nodes,
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
+    shader_images: Dict[str, bpy.types.Image],
+):
+    node = nodes.new("ShaderNodeTexImage")
+    node.name = name
+    node.label = name
+
+    if name in shader_images:
+        node.image = shader_images[name]
+    elif name in material_textures:
+        image, sampler = material_textures[name]
+        node.image = image
+
+        if sampler is not None:
+            # TODO: Check if U and V have the same address mode.
+            match sampler.address_mode_u:
+                case xc3_model_py.AddressMode.ClampToEdge:
+                    node.extension = "CLIP"
+                case xc3_model_py.AddressMode.Repeat:
+                    node.extension = "REPEAT"
+                case xc3_model_py.AddressMode.MirrorRepeat:
+                    node.extension = "MIRROR"
     return node
 
 
@@ -1092,7 +1102,7 @@ def assign_math(
     links,
     output,
     # TODO: group into some sort of class?
-    material_textures: Dict[str, bpy.types.Node],
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
     shader_images: Dict[str, bpy.types.Image],
     is_data: bool,
     op: str,
@@ -1124,7 +1134,7 @@ def assign_normal_math(
     links,
     output,
     # TODO: group into some sort of class?
-    material_textures: Dict[str, bpy.types.Node],
+    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
     shader_images: Dict[str, bpy.types.Image],
     is_data: bool,
     op: str,
