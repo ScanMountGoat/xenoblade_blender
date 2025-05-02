@@ -957,6 +957,7 @@ def assign_mix_rgba(
     mix_values = nodes.new("ShaderNodeMix")
     mix_values.data_type = "RGBA"
     mix_values.blend_type = blend_type
+    mix_values.inputs["Factor"].default_value = 1.0
 
     links.new(mix_values.outputs["Result"], output)
 
