@@ -43,10 +43,10 @@ def import_material(
     output_assignments = material.output_assignments(image_textures)
     mat_id = output_assignments.mat_id()
 
-    material_textures = material_images_samplers(material, blender_images, samplers)
+    textures = material_images_samplers(material, blender_images, samplers)
+    for name, image in shader_images.items():
+        textures[name] = (image, None)
 
-    # TODO: Alpha testing.
-    # TODO: Select UV map for each texture.
     # Assume the color texture isn't used as non color data.
     base_color = nodes.new("ShaderNodeCombineColor")
     assign_output(
@@ -55,8 +55,7 @@ def import_material(
         nodes,
         links,
         base_color.inputs["Red"],
-        material_textures,
-        shader_images,
+        textures,
         is_data=False,
     )
     assign_output(
@@ -65,8 +64,7 @@ def import_material(
         nodes,
         links,
         base_color.inputs["Green"],
-        material_textures,
-        shader_images,
+        textures,
         is_data=False,
     )
     assign_output(
@@ -75,8 +73,7 @@ def import_material(
         nodes,
         links,
         base_color.inputs["Blue"],
-        material_textures,
-        shader_images,
+        textures,
         is_data=False,
     )
 
@@ -90,8 +87,7 @@ def import_material(
             nodes,
             links,
             bsdf.inputs["Alpha"],
-            material_textures,
-            shader_images,
+            textures,
             is_data=True,
         )
 
@@ -109,8 +105,7 @@ def import_material(
         nodes,
         links,
         mix_ao.inputs["B"],
-        material_textures,
-        shader_images,
+        textures,
         is_data=True,
     )
 
@@ -121,8 +116,7 @@ def import_material(
         output_assignments.output_assignments[2].x,
         output_assignments.output_assignments[2].y,
         output_assignments.assignments,
-        material_textures,
-        shader_images,
+        textures,
     )
 
     assign_output(
@@ -131,8 +125,7 @@ def import_material(
         nodes,
         links,
         bsdf.inputs["Metallic"],
-        material_textures,
-        shader_images,
+        textures,
         is_data=True,
     )
 
@@ -153,8 +146,7 @@ def import_material(
             nodes,
             links,
             color.inputs["Red"],
-            material_textures,
-            shader_images,
+            textures,
             is_data=False,
         )
         assign_output(
@@ -163,8 +155,7 @@ def import_material(
             nodes,
             links,
             color.inputs["Green"],
-            material_textures,
-            shader_images,
+            textures,
             is_data=False,
         )
         assign_output(
@@ -173,8 +164,7 @@ def import_material(
             nodes,
             links,
             color.inputs["Blue"],
-            material_textures,
-            shader_images,
+            textures,
             is_data=False,
         )
 
@@ -197,8 +187,7 @@ def import_material(
         nodes,
         links,
         invert.inputs[1],
-        material_textures,
-        shader_images,
+        textures,
         is_data=True,
     )
     links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
@@ -264,7 +253,7 @@ def import_material(
 
         node = nodes.get(name)
         if node is None:
-            node = import_texture(name, nodes, material_textures, shader_images)
+            node = import_texture(name, nodes, textures)
 
         if channel == "Alpha":
             links.new(node.outputs["Alpha"], bsdf.inputs["Alpha"])
@@ -378,8 +367,9 @@ def assign_normal_map(
     x_assignment,
     y_assignment,
     assignments: list[xc3_model_py.material.Assignment],
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
 ):
     remap_normals = nodes.new("ShaderNodeVectorMath")
     remap_normals.operation = "MULTIPLY_ADD"
@@ -393,8 +383,7 @@ def assign_normal_map(
         nodes,
         links,
         remap_normals.inputs[0],
-        material_textures,
-        shader_images,
+        textures,
         is_data=True,
     )
 
@@ -591,8 +580,9 @@ def assign_output(
     nodes,
     links,
     output,
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
     is_data: bool,
 ):
     # Cache node creation to avoid creating too many nodes.
@@ -615,8 +605,7 @@ def assign_output(
         nodes,
         links,
         output,
-        material_textures,
-        shader_images,
+        textures,
         is_data,
         ty,
     )
@@ -627,8 +616,7 @@ def assign_output(
         nodes,
         links,
         output,
-        material_textures,
-        shader_images,
+        textures,
         is_data,
         ty,
     )
@@ -639,8 +627,7 @@ def assign_output(
         nodes,
         links,
         output,
-        material_textures,
-        shader_images,
+        textures,
         is_data,
     )
 
@@ -711,19 +698,13 @@ def assign_output(
                 assign_index(func.args[0], node.inputs["Value"])
                 links.new(node.outputs["Value"], output)
             case _:
-                mix_values = nodes.new("ShaderNodeMix")
-                mix_values.data_type = "RGBA"
-
-                mix_values.name = name
+                # TODO: This case shouldn't happen?
+                pass
     elif value is not None:
-        assign_value(
-            value, nodes, links, output, material_textures, shader_images, is_data
-        )
+        assign_value(value, nodes, links, output, textures, is_data)
 
 
-def assign_value(
-    value, nodes, links, output, material_textures, shader_images, is_data
-):
+def assign_value(value, nodes, links, output, textures, is_data):
     texture = value.texture()
     f = value.float()
     attribute = value.attribute()
@@ -737,9 +718,7 @@ def assign_value(
     elif attribute is not None:
         pass
     elif texture is not None:
-        assign_texture(
-            texture, nodes, links, output, material_textures, shader_images, is_data
-        )
+        assign_texture(texture, nodes, links, output, textures, is_data)
 
 
 def assign_normal_output(
@@ -749,8 +728,9 @@ def assign_normal_output(
     nodes,
     links,
     output,
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
     is_data: bool,
 ):
     # Cache node creation to avoid creating too many nodes.
@@ -779,8 +759,7 @@ def assign_normal_output(
         nodes,
         links,
         output,
-        material_textures,
-        shader_images,
+        textures,
         is_data,
         ty,
     )
@@ -800,8 +779,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["A"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
                 assign_normal_output(
@@ -811,8 +789,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["B"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
 
@@ -823,8 +800,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["Factor"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
             case xc3_model_py.shader_database.Operation.Mul:
@@ -856,8 +832,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["A"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
                 assign_normal_output(
@@ -867,8 +842,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["B"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
 
@@ -879,8 +853,7 @@ def assign_normal_output(
                     nodes,
                     links,
                     node.inputs["Factor"],
-                    material_textures,
-                    shader_images,
+                    textures,
                     is_data,
                 )
 
@@ -926,8 +899,7 @@ def assign_normal_output(
             nodes,
             links,
             node.inputs["X"],
-            material_textures,
-            shader_images,
+            textures,
             is_data,
         )
         assign_value(
@@ -935,8 +907,7 @@ def assign_normal_output(
             nodes,
             links,
             node.inputs["Y"],
-            material_textures,
-            shader_images,
+            textures,
             is_data,
         )
 
@@ -949,8 +920,7 @@ def assign_mix_rgba(
     nodes,
     links,
     output,
-    material_textures,
-    shader_images,
+    textures,
     is_data,
     blend_type: str,
 ):
@@ -967,8 +937,7 @@ def assign_mix_rgba(
         nodes,
         links,
         mix_values.inputs["A"],
-        material_textures,
-        shader_images,
+        textures,
         is_data,
     )
     assign_output(
@@ -977,8 +946,7 @@ def assign_mix_rgba(
         nodes,
         links,
         mix_values.inputs["B"],
-        material_textures,
-        shader_images,
+        textures,
         is_data,
     )
     if len(func.args) == 3:
@@ -988,8 +956,7 @@ def assign_mix_rgba(
             nodes,
             links,
             mix_values.inputs["Factor"],
-            material_textures,
-            shader_images,
+            textures,
             is_data,
         )
 
@@ -1001,14 +968,13 @@ def assign_texture(
     nodes,
     links,
     output,
-    material_textures,
-    shader_images,
+    textures,
     is_data,
 ):
     # Load only the textures that are actually used.
     node = nodes.get(texture.name)
     if node is None:
-        node = import_texture(texture.name, nodes, material_textures, shader_images)
+        node = import_texture(texture.name, nodes, textures)
 
     # TODO: Find a better way to handle color management.
     # TODO: Why can't we just set everything to non color?
@@ -1071,17 +1037,16 @@ def assign_texture(
 def import_texture(
     name: str,
     nodes,
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
 ):
     node = nodes.new("ShaderNodeTexImage")
     node.name = name
     node.label = name
 
-    if name in shader_images:
-        node.image = shader_images[name]
-    elif name in material_textures:
-        image, sampler = material_textures[name]
+    if name in textures:
+        image, sampler = textures[name]
         node.image = image
 
         if sampler is not None:
@@ -1093,6 +1058,7 @@ def import_texture(
                     node.extension = "REPEAT"
                 case xc3_model_py.AddressMode.MirrorRepeat:
                     node.extension = "MIRROR"
+
     return node
 
 
@@ -1102,9 +1068,9 @@ def assign_math(
     nodes,
     links,
     output,
-    # TODO: group into some sort of class?
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
     is_data: bool,
     op: str,
 ) -> bpy.types.Node:
@@ -1112,15 +1078,14 @@ def assign_math(
     node.operation = op
 
     links.new(node.outputs["Value"], output)
-    for i in range(len(func.args)):
+    for arg, input in zip(func.args, node.inputs):
         assign_output(
-            func.args[i],
+            arg,
             assignments,
             nodes,
             links,
-            node.inputs[i],
-            material_textures,
-            shader_images,
+            input,
+            textures,
             is_data,
         )
 
@@ -1134,9 +1099,9 @@ def assign_normal_math(
     nodes,
     links,
     output,
-    # TODO: group into some sort of class?
-    material_textures: Dict[str, Tuple[bpy.types.Image, xc3_model_py.Sampler]],
-    shader_images: Dict[str, bpy.types.Image],
+    textures: Dict[
+        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
+    ],
     is_data: bool,
     op: str,
 ) -> bpy.types.Node:
@@ -1144,16 +1109,15 @@ def assign_normal_math(
     node.operation = op
 
     links.new(node.outputs["Value"], output)
-    for i in range(len(func_x.args)):
+    for arg_x, arg_y, input in zip(func_x.args, func_y.args, node.inputs):
         assign_normal_output(
-            func_x.args[i],
-            func_y.args[i],
+            arg_x,
+            arg_y,
             assignments,
             nodes,
             links,
-            node.inputs[i],
-            material_textures,
-            shader_images,
+            input,
+            textures,
             is_data,
         )
 
