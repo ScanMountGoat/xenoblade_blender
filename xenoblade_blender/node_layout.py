@@ -68,6 +68,7 @@ def node_dimensions(node: bpy.types.Node) -> Tuple[float, float]:
         "ShaderNodeGroup": (140.0, 118.0),
         "ShaderNodeNormalMap": (150.0, 146.0),
         "ShaderNodeValue": (140.0, 79.0),
+        "ShaderNodeAttribute": (140.0, 170.0),
     }
 
     return default_dimensions.get(node.bl_idname, (140.0, 100.0))

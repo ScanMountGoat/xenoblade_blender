@@ -115,6 +115,7 @@ def import_material(
         bsdf,
         output_assignments.output_assignments[2].x,
         output_assignments.output_assignments[2].y,
+        output_assignments.normal_intensity,
         output_assignments.assignments,
         textures,
     )
@@ -364,8 +365,9 @@ def assign_normal_map(
     nodes,
     links,
     bsdf,
-    x_assignment,
-    y_assignment,
+    x_assignment: int,
+    y_assignment: int,
+    intensity_assignment: Optional[int],
     assignments: list[xc3_model_py.material.Assignment],
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
@@ -390,7 +392,16 @@ def assign_normal_map(
     normal_map = nodes.new("ShaderNodeNormalMap")
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
 
-    # TODO: normal intensity
+    if intensity_assignment is not None:
+        assign_output(
+            intensity_assignment,
+            assignments,
+            nodes,
+            links,
+            normal_map.inputs["Strength"],
+            textures,
+            is_data=True,
+        )
 
     links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
 
@@ -704,7 +715,14 @@ def assign_output(
         assign_value(value, nodes, links, output, textures, is_data)
 
 
-def assign_value(value, nodes, links, output, textures, is_data):
+def assign_value(
+    value: xc3_model_py.material.AssignmentValue,
+    nodes,
+    links,
+    output,
+    textures,
+    is_data,
+):
     texture = value.texture()
     f = value.float()
     attribute = value.attribute()
@@ -716,9 +734,45 @@ def assign_value(value, nodes, links, output, textures, is_data):
         except:
             output.default_value = (f, f, f, 1.0)
     elif attribute is not None:
-        pass
+        assign_attribute(attribute, nodes, links, output)
     elif texture is not None:
         assign_texture(texture, nodes, links, output, textures, is_data)
+
+
+def assign_attribute(attribute, nodes, links, output):
+    node = nodes.get(attribute.name)
+    if node is None:
+        node = nodes.new("ShaderNodeAttribute")
+        node.name = attribute.name
+
+        if attribute.name == "vPos":
+            node.attribute_name = "position"
+        elif attribute.name == "vNormal":
+            # TODO: Create an attribute that stores the w component?
+            pass
+        elif attribute.name == "vColor":
+            node.attribute_name = "VertexColor"
+        elif attribute.name == "vBlend":
+            node.attribute_name = "Blend"
+        else:
+            for i in range(9):
+                if attribute.name == f"vTex{i}":
+                    node.attribute_name = f"TexCoord{i}"
+                    break
+
+        channel = channel_name(attribute.channel)
+        if channel == "Alpha":
+            links.new(node.outputs["Alpha"], output)
+        else:
+            # Avoid creating more than one separate RGB for each node.
+            rgb_name = f"{attribute.name}.rgb"
+            rgb_node = nodes.get(rgb_name)
+            if rgb_node is None:
+                rgb_node = nodes.new("ShaderNodeSeparateColor")
+                rgb_node.name = rgb_name
+
+            links.new(node.outputs["Color"], rgb_node.inputs["Color"])
+            links.new(rgb_node.outputs[channel], output)
 
 
 def assign_normal_output(
