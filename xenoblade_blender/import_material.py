@@ -748,8 +748,7 @@ def assign_attribute(attribute, nodes, links, output):
         if attribute.name == "vPos":
             node.attribute_name = "position"
         elif attribute.name == "vNormal":
-            # TODO: Create an attribute that stores the w component?
-            pass
+            node.attribute_name = "VertexNormal"
         elif attribute.name == "vColor":
             node.attribute_name = "VertexColor"
         elif attribute.name == "vBlend":

@@ -473,16 +473,22 @@ def import_mesh(
             xc3_model_py.vertex.AttributeType.Normal2,
         ]:
             # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1, :3]
-            normals = normalize(data)
+            data = attribute.data[min_index : max_index + 1]
+            normals = normalize(data[:, :3])
             blender_mesh.normals_split_custom_set_from_vertices(normals)
+
+            # Store the data to use with shader nodes.
+            import_colors(blender_mesh, data, "VertexNormal")
 
     for attribute in vertex_buffer.morph_blend_target:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal4:
             # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1, :3]
-            normals = normalize(data)
+            data = attribute.data[min_index : max_index + 1]
+            normals = normalize(data[:, :3])
             blender_mesh.normals_split_custom_set_from_vertices(normals)
+
+            # Store the data to use with shader nodes.
+            import_colors(blender_mesh, data, "VertexNormal")
 
     blender_mesh.validate()
 
