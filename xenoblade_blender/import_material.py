@@ -374,6 +374,9 @@ def assign_normal_map(
     ],
 ):
     normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    normals.inputs["X"].default_value = 0.5
+    normals.inputs["Y"].default_value = 0.5
+
     assign_output(
         x_assignment,
         assignments,
@@ -383,13 +386,6 @@ def assign_normal_map(
         textures,
         is_data=True,
     )
-
-    remap_normals = nodes.new("ShaderNodeVectorMath")
-    remap_normals.operation = "MULTIPLY_ADD"
-    links.new(normals.outputs["Normal"], remap_normals.inputs[0])
-    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
-    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
-
     assign_output(
         y_assignment,
         assignments,
@@ -399,6 +395,12 @@ def assign_normal_map(
         textures,
         is_data=True,
     )
+
+    remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.operation = "MULTIPLY_ADD"
+    links.new(normals.outputs["Normal"], remap_normals.inputs[0])
+    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
+    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
 
     normal_map = nodes.new("ShaderNodeNormalMap")
     links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
@@ -512,10 +514,14 @@ def add_normals_node_group():
     )
 
     normal_a = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    normal_a.inputs["X"].default_value = 0.5
+    normal_a.inputs["Y"].default_value = 0.5
     links.new(input_node.outputs["A.x"], normal_a.inputs["X"])
     links.new(input_node.outputs["A.y"], normal_a.inputs["Y"])
 
     normal_b = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    normal_b.inputs["X"].default_value = 0.5
+    normal_b.inputs["Y"].default_value = 0.5
     links.new(input_node.outputs["B.x"], normal_b.inputs["X"])
     links.new(input_node.outputs["B.y"], normal_b.inputs["Y"])
 
@@ -839,19 +845,19 @@ def assign_attribute(attribute, nodes, links, output):
                     node.attribute_name = f"TexCoord{i}"
                     break
 
-        channel = channel_name(attribute.channel)
-        if channel == "Alpha":
-            links.new(node.outputs["Alpha"], output)
-        else:
-            # Avoid creating more than one separate RGB for each node.
-            rgb_name = f"{attribute.name}.rgb"
-            rgb_node = nodes.get(rgb_name)
-            if rgb_node is None:
-                rgb_node = nodes.new("ShaderNodeSeparateColor")
-                rgb_node.name = rgb_name
+    channel = channel_name(attribute.channel)
+    if channel == "Alpha":
+        links.new(node.outputs["Alpha"], output)
+    else:
+        # Avoid creating more than one separate RGB for each node.
+        rgb_name = f"{attribute.name}.rgb"
+        rgb_node = nodes.get(rgb_name)
+        if rgb_node is None:
+            rgb_node = nodes.new("ShaderNodeSeparateColor")
+            rgb_node.name = rgb_name
 
-            links.new(node.outputs["Color"], rgb_node.inputs["Color"])
-            links.new(rgb_node.outputs[channel], output)
+        links.new(node.outputs["Color"], rgb_node.inputs["Color"])
+        links.new(rgb_node.outputs[channel], output)
 
 
 def assign_mix_rgba(
@@ -958,7 +964,6 @@ def assign_texture(
                 textures,
                 is_data=True,
             )
-            # TODO: Why does this not work?
             assign_output(
                 texture.texcoords[1],
                 assignments,
