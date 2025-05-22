@@ -32,11 +32,8 @@ def assign_node_layers(
     layer: int,
     node_layer: dict[str, int],
 ):
-    if layer >= len(layers):
-        layers.append([])
-
     # Assign each node to only one layer.
-    # Assign to the max layer to make edges go from left to right.
+    # Assign to the deepest layer to make edges go from left to right.
     if previous_layer := node_layer.get(node.name):
         if layer <= previous_layer:
             return
@@ -45,11 +42,15 @@ def assign_node_layers(
 
     node_layer[node.name] = layer
 
+    if layer >= len(layers):
+        layers.append([])
+
     layers[layer].append(node)
 
     for input in node.inputs:
-        for link in input.links:
-            assign_node_layers(link.from_node, layers, layer + 1, node_layer)
+        if input.is_linked:
+            for link in input.links:
+                assign_node_layers(link.from_node, layers, layer + 1, node_layer)
 
 
 def node_dimensions(node: bpy.types.Node) -> Tuple[float, float]:
