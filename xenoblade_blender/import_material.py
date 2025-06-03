@@ -630,6 +630,60 @@ def fresnel_blend_node_group():
     return node_tree
 
 
+def tex_matrix_node_group():
+    node_tree = bpy.data.node_groups.new("TexMatrix", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Result"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="U"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="V"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="A"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="B"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="C"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="D"
+    )
+
+    # dot(vec4(u, v, 0, 1), vec4(a, b, c, d)) == dot(vec3(u, v, 1), vec3(a, b, d))
+    uv = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["U"], uv.inputs["X"])
+    links.new(input_node.outputs["V"], uv.inputs["Y"])
+    uv.inputs["Z"].default_value = 1.0
+
+    abd = nodes.new("ShaderNodeCombineXYZ")
+    links.new(input_node.outputs["A"], abd.inputs["X"])
+    links.new(input_node.outputs["B"], abd.inputs["Y"])
+    links.new(input_node.outputs["D"], abd.inputs["Z"])
+
+    dot_uv = nodes.new("ShaderNodeVectorMath")
+    dot_uv.operation = "DOT_PRODUCT"
+    links.new(uv.outputs["Vector"], dot_uv.inputs[0])
+    links.new(abd.outputs["Vector"], dot_uv.inputs[1])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(dot_uv.outputs["Value"], output_node.inputs["Result"])
+
+    layout_nodes(output_node)
+
+    return node_tree
+
+
 def assign_output(
     assignment_index: Optional[int],
     assignments: list[xc3_model_py.material.Assignment],
@@ -693,6 +747,8 @@ def assign_output(
 
     if func is not None:
         match func.op:
+            case xc3_model_py.shader_database.Operation.Unk:
+                pass
             case xc3_model_py.shader_database.Operation.Mix:
                 node = mix_rgba_node("MIX")
                 node.name = name
@@ -782,7 +838,19 @@ def assign_output(
                 node = math_node("ABSOLUTE")
                 node.name = name
             case xc3_model_py.shader_database.Operation.TexMatrix:
-                pass
+                # TODO: dot(vec4(arg0, arg1, 0, 1), vec4(arg2, arg3, arg4, arg5))
+                # TODO: dot(vec3(arg0, arg1, 1), vec4(arg2, arg3, arg5))
+                # TODO: Make a node group for this?
+                node = create_node_group(nodes, "TexMatrix", tex_matrix_node_group)
+                node.name = name
+
+                links.new(node.outputs["Result"], output)
+                assign_index(func.args[0], node.inputs["U"])
+                assign_index(func.args[1], node.inputs["V"])
+                assign_index(func.args[2], node.inputs["A"])
+                assign_index(func.args[3], node.inputs["B"])
+                assign_index(func.args[4], node.inputs["C"])
+                assign_index(func.args[5], node.inputs["D"])
             case xc3_model_py.shader_database.Operation.TexParallaxX:
                 pass
             case xc3_model_py.shader_database.Operation.TexParallaxY:
@@ -792,6 +860,36 @@ def assign_output(
             case xc3_model_py.shader_database.Operation.ReflectY:
                 pass
             case xc3_model_py.shader_database.Operation.ReflectZ:
+                pass
+            case xc3_model_py.shader_database.Operation.Floor:
+                node = math_node("FLOOR")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Select:
+                node = mix_rgba_node("MIX")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Equal:
+                node = math_node("COMPARE")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.NotEqual:
+                # TODO: Invert compare.
+                pass
+            case xc3_model_py.shader_database.Operation.Less:
+                node = math_node("LESS_THAN")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Greater:
+                node = math_node("GREATER_THAN")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.LessEqual:
+                node = math_node("LESS_THAN")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.GreaterEqual:
+                node = math_node("GREATER_THAN")
+                node.name = name
+            case xc3_model_py.shader_database.Operation.Dot4:
+                pass
+            case xc3_model_py.shader_database.Operation.NormalMapX:
+                pass
+            case xc3_model_py.shader_database.Operation.NormalMapY:
                 pass
             case _:
                 # TODO: This case shouldn't happen?
