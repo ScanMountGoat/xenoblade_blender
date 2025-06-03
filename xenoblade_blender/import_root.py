@@ -27,7 +27,7 @@ def get_image_folder(image_folder: str, filepath: str) -> str:
 def init_logging():
     # Log any errors from Rust.
     log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-    logging.basicConfig(format=log_fmt, level=logging.INFO)
+    logging.basicConfig(format=log_fmt, level=logging.ERROR)
 
 
 # https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/import_model.py#L371
