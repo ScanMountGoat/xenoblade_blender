@@ -421,7 +421,8 @@ def assign_output(
     if func is not None:
         match func.op:
             case xc3_model_py.shader_database.Operation.Unk:
-                pass
+                # Set defaults to match xc3_wgpu and make debugging easier.
+                assign_float(output, 0.0)
             case xc3_model_py.shader_database.Operation.Mix:
                 node = mix_rgba_node("MIX")
                 node.name = name
@@ -595,7 +596,8 @@ def assign_output(
                 assign_index(func.args[1], node.inputs["Y"])
             case _:
                 # TODO: This case shouldn't happen?
-                pass
+                # Set defaults to match xc3_wgpu and make debugging easier.
+                assign_float(output, 0.0)
     elif value is not None:
         assign_value(value, assignments, nodes, links, output, textures, is_data)
 
@@ -614,15 +616,19 @@ def assign_value(
     attribute = value.attribute()
 
     if f is not None:
-        # This may be a single value or RGBA socket.
-        try:
-            output.default_value = f
-        except:
-            output.default_value = (f, f, f, 1.0)
+        assign_float(output, f)
     elif attribute is not None:
         assign_attribute(attribute, nodes, links, output)
     elif texture is not None:
         assign_texture(texture, assignments, nodes, links, output, textures, is_data)
+
+
+def assign_float(output, f):
+    # This may be a float, RGBA, or XYZ socket.
+    try:
+        output.default_value = f
+    except:
+        output.default_value = [f] * len(output.default_value)
 
 
 def assign_attribute(attribute, nodes, links, output):
@@ -676,6 +682,10 @@ def assign_mix_rgba(
     mix_values.inputs["Factor"].default_value = 1.0
 
     links.new(mix_values.outputs["Result"], output)
+
+    # Set defaults to match xc3_wgpu and make debugging easier.
+    for input in mix_values.inputs:
+        assign_float(input, 0.0)
 
     assign_output(
         func.args[0],
@@ -821,6 +831,10 @@ def assign_math(
 ) -> bpy.types.Node:
     node = nodes.new("ShaderNodeMath")
     node.operation = op
+
+    # Set defaults to match xc3_wgpu and make debugging easier.
+    for input in node.inputs:
+        assign_float(input, 0.0)
 
     links.new(node.outputs["Value"], output)
     for arg, input in zip(func.args, node.inputs):
