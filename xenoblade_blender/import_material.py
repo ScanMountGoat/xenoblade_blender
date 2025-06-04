@@ -373,6 +373,7 @@ def assign_normal_map(
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
 ):
+    # TODO: Create a node group for this to reduce node count.
     normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
     normals.inputs["X"].default_value = 0.5
     normals.inputs["Y"].default_value = 0.5
@@ -634,7 +635,7 @@ def tex_matrix_node_group():
     node_tree = bpy.data.node_groups.new("TexMatrix", "ShaderNodeTree")
 
     node_tree.interface.new_socket(
-        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Result"
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
     )
 
     nodes = node_tree.nodes
@@ -677,7 +678,86 @@ def tex_matrix_node_group():
     links.new(abd.outputs["Vector"], dot_uv.inputs[1])
 
     output_node = nodes.new("NodeGroupOutput")
-    links.new(dot_uv.outputs["Value"], output_node.inputs["Result"])
+    links.new(dot_uv.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node)
+
+    return node_tree
+
+
+def tex_parallax_node_group():
+    node_tree = bpy.data.node_groups.new("TexParallax", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Value"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+
+    # TODO: Implement this properly
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(input_node.outputs["Value"], output_node.inputs["Value"])
+
+    layout_nodes(output_node)
+
+    return node_tree
+
+
+def normal_map_xy_node_group():
+    node_tree = bpy.data.node_groups.new("NormalMapXY", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketFloat", name="Z"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    # TODO: Weight?
+
+    normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    links.new(input_node.outputs["X"], normals.inputs["X"])
+    links.new(input_node.outputs["Y"], normals.inputs["Y"])
+
+    remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.operation = "MULTIPLY_ADD"
+    links.new(normals.outputs["Normal"], remap_normals.inputs[0])
+    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
+    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
+
+    normal_map = nodes.new("ShaderNodeNormalMap")
+    links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
+
+    xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(normal_map.outputs["Normal"], xyz.inputs["Vector"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(xyz.outputs["X"], output_node.inputs["X"])
+    links.new(xyz.outputs["Y"], output_node.inputs["Y"])
+    links.new(xyz.outputs["Z"], output_node.inputs["Z"])
 
     layout_nodes(output_node)
 
@@ -838,13 +918,10 @@ def assign_output(
                 node = math_node("ABSOLUTE")
                 node.name = name
             case xc3_model_py.shader_database.Operation.TexMatrix:
-                # TODO: dot(vec4(arg0, arg1, 0, 1), vec4(arg2, arg3, arg4, arg5))
-                # TODO: dot(vec3(arg0, arg1, 1), vec4(arg2, arg3, arg5))
-                # TODO: Make a node group for this?
                 node = create_node_group(nodes, "TexMatrix", tex_matrix_node_group)
                 node.name = name
 
-                links.new(node.outputs["Result"], output)
+                links.new(node.outputs["Value"], output)
                 assign_index(func.args[0], node.inputs["U"])
                 assign_index(func.args[1], node.inputs["V"])
                 assign_index(func.args[2], node.inputs["A"])
@@ -852,9 +929,20 @@ def assign_output(
                 assign_index(func.args[4], node.inputs["C"])
                 assign_index(func.args[5], node.inputs["D"])
             case xc3_model_py.shader_database.Operation.TexParallaxX:
-                pass
+                # TODO: Separate node groups for each channel or split XY?
+                node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
+                node.name = name
+
+                links.new(node.outputs["Value"], output)
+                assign_index(func.args[0], node.inputs["Value"])
+                assign_index(func.args[1], node.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.TexParallaxY:
-                pass
+                node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
+                node.name = name
+
+                links.new(node.outputs["Value"], output)
+                assign_index(func.args[0], node.inputs["Value"])
+                assign_index(func.args[1], node.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.ReflectX:
                 pass
             case xc3_model_py.shader_database.Operation.ReflectY:
@@ -888,9 +976,20 @@ def assign_output(
             case xc3_model_py.shader_database.Operation.Dot4:
                 pass
             case xc3_model_py.shader_database.Operation.NormalMapX:
-                pass
+                node = create_node_group(nodes, "NormalMapXY", normal_map_xy_node_group)
+                node.name = name
+
+                links.new(node.outputs["X"], output)
+                assign_index(func.args[0], node.inputs["X"])
+                assign_index(func.args[1], node.inputs["Y"])
             case xc3_model_py.shader_database.Operation.NormalMapY:
-                pass
+                # TODO: Share with X based on the input indices?
+                node = create_node_group(nodes, "NormalMapXY", normal_map_xy_node_group)
+                node.name = name
+
+                links.new(node.outputs["Y"], output)
+                assign_index(func.args[0], node.inputs["X"])
+                assign_index(func.args[1], node.inputs["Y"])
             case _:
                 # TODO: This case shouldn't happen?
                 pass
@@ -1146,4 +1245,5 @@ def channel_name(channel: Optional[str]) -> str:
         case "w":
             return "Alpha"
 
-    return ""
+    # TODO: How to handle the None case?
+    return "Red"
