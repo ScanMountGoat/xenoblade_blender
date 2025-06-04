@@ -373,10 +373,10 @@ def assign_normal_map(
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
 ):
-    # TODO: Create a node group for this to reduce node count.
-    normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    normals = create_node_group(nodes, "NormalMapXYFinal", normal_map_xy_final_node_group)
     normals.inputs["X"].default_value = 0.5
     normals.inputs["Y"].default_value = 0.5
+    normals.inputs["Strength"].default_value = 1.0
 
     assign_output(
         x_assignment,
@@ -397,29 +397,20 @@ def assign_normal_map(
         is_data=True,
     )
 
-    remap_normals = nodes.new("ShaderNodeVectorMath")
-    remap_normals.operation = "MULTIPLY_ADD"
-    links.new(normals.outputs["Normal"], remap_normals.inputs[0])
-    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
-    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
-
-    normal_map = nodes.new("ShaderNodeNormalMap")
-    links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
-
     if intensity_assignment is not None:
         assign_output(
             intensity_assignment,
             assignments,
             nodes,
             links,
-            normal_map.inputs["Strength"],
+            normals.inputs["Strength"],
             textures,
             is_data=True,
         )
 
-    links.new(normal_map.outputs["Normal"], bsdf.inputs["Normal"])
+    links.new(normals.outputs["Normal"], bsdf.inputs["Normal"])
 
-    return normal_map
+    return normals
 
 
 def normals_xy_node_group():
@@ -764,6 +755,49 @@ def normal_map_xy_node_group():
     return node_tree
 
 
+def normal_map_xy_final_node_group():
+    node_tree = bpy.data.node_groups.new("NormalMapXYFinal", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Normal"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="X"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Strength"
+    )
+
+    normals = create_node_group(nodes, "NormalsXY", normals_xy_node_group)
+    links.new(input_node.outputs["X"], normals.inputs["X"])
+    links.new(input_node.outputs["Y"], normals.inputs["Y"])
+
+    remap_normals = nodes.new("ShaderNodeVectorMath")
+    remap_normals.operation = "MULTIPLY_ADD"
+    links.new(normals.outputs["Normal"], remap_normals.inputs[0])
+    remap_normals.inputs[1].default_value = (0.5, 0.5, 0.5)
+    remap_normals.inputs[2].default_value = (0.5, 0.5, 0.5)
+
+    normal_map = nodes.new("ShaderNodeNormalMap")
+    links.new(remap_normals.outputs["Vector"], normal_map.inputs["Color"])
+    links.new(input_node.outputs["Strength"], normal_map.inputs["Strength"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(normal_map.outputs["Normal"], output_node.inputs["Normal"])
+
+    layout_nodes(output_node)
+
+    return node_tree
+
+
 def assign_output(
     assignment_index: Optional[int],
     assignments: list[xc3_model_py.material.Assignment],
@@ -892,8 +926,10 @@ def assign_output(
                 node.name = name
             case xc3_model_py.shader_database.Operation.OverlayRatio:
                 node = mix_rgba_node("OVERLAY")
+                node.name = name
             case xc3_model_py.shader_database.Operation.Power:
                 node = math_node("POWER")
+                node.name = name
             case xc3_model_py.shader_database.Operation.Min:
                 node = math_node("MINIMUM")
                 node.name = name
@@ -901,7 +937,13 @@ def assign_output(
                 node = math_node("MAXIMUM")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Clamp:
-                pass
+                node = nodes.new("ShaderNodeClamp")
+                node.name = name
+
+                links.new(node.outputs["Result"], output)
+                assign_index(func.args[0], node.inputs["Value"])
+                assign_index(func.args[1], node.inputs["Min"])
+                assign_index(func.args[2], node.inputs["Max"])
             case xc3_model_py.shader_database.Operation.Abs:
                 node = math_node("ABSOLUTE")
                 node.name = name
@@ -915,7 +957,7 @@ def assign_output(
                 assign_index(func.args[0], node.inputs["Value"])
                 links.new(node.outputs["Value"], output)
             case xc3_model_py.shader_database.Operation.Sqrt:
-                node = math_node("ABSOLUTE")
+                node = math_node("SQRT")
                 node.name = name
             case xc3_model_py.shader_database.Operation.TexMatrix:
                 node = create_node_group(nodes, "TexMatrix", tex_matrix_node_group)
@@ -968,9 +1010,11 @@ def assign_output(
                 node = math_node("GREATER_THAN")
                 node.name = name
             case xc3_model_py.shader_database.Operation.LessEqual:
+                # TODO: node group?
                 node = math_node("LESS_THAN")
                 node.name = name
             case xc3_model_py.shader_database.Operation.GreaterEqual:
+                # TODO: node group?
                 node = math_node("GREATER_THAN")
                 node.name = name
             case xc3_model_py.shader_database.Operation.Dot4:
