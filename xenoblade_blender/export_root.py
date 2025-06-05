@@ -822,8 +822,9 @@ def get_texture_assignments(mesh_data, material, image_textures):
             continue
 
         # Update material texture assignments.
-        # TODO: samplers?
-        texture_index = parse_int(node.label)
+        # Support the old labels like "0" or new labels like "s0".
+        label = node.label.lstrip("s")
+        texture_index = parse_int(label)
         if texture_index is None:
             continue
 
