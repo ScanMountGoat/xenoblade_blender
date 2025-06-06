@@ -7,7 +7,7 @@ from xenoblade_blender.node_group import (
     create_node_group,
     fresnel_blend_node_group,
     normal_map_xy_final_node_group,
-    normal_map_xy_node_group,
+    normal_map_xyz_node_group,
     tex_matrix_node_group,
     tex_parallax_node_group,
     toon_grad_uvs_node_group,
@@ -480,9 +480,11 @@ def assign_output(
                 assign_index(func.args[4], mix_values.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.Overlay:
                 node = mix_rgba_node("OVERLAY")
+                node.inputs["Factor"].default_value = 1.0
                 node.name = name
             case xc3_model_py.shader_database.Operation.Overlay2:
                 node = mix_rgba_node("OVERLAY")
+                node.inputs["Factor"].default_value = 1.0
                 node.name = name
             case xc3_model_py.shader_database.Operation.OverlayRatio:
                 node = mix_rgba_node("OVERLAY")
@@ -580,7 +582,9 @@ def assign_output(
             case xc3_model_py.shader_database.Operation.Dot4:
                 pass
             case xc3_model_py.shader_database.Operation.NormalMapX:
-                node = create_node_group(nodes, "NormalMapXY", normal_map_xy_node_group)
+                node = create_node_group(
+                    nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                )
                 node.name = name
 
                 links.new(node.outputs["X"], output)
@@ -588,10 +592,22 @@ def assign_output(
                 assign_index(func.args[1], node.inputs["Y"])
             case xc3_model_py.shader_database.Operation.NormalMapY:
                 # TODO: Share with X based on the input indices?
-                node = create_node_group(nodes, "NormalMapXY", normal_map_xy_node_group)
+                node = create_node_group(
+                    nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                )
                 node.name = name
 
                 links.new(node.outputs["Y"], output)
+                assign_index(func.args[0], node.inputs["X"])
+                assign_index(func.args[1], node.inputs["Y"])
+            case xc3_model_py.shader_database.Operation.NormalMapZ:
+                # TODO: Share with X based on the input indices?
+                node = create_node_group(
+                    nodes, "NormalMapXYZ", normal_map_xyz_node_group
+                )
+                node.name = name
+
+                links.new(node.outputs["Z"], output)
                 assign_index(func.args[0], node.inputs["X"])
                 assign_index(func.args[1], node.inputs["Y"])
             case _:
@@ -679,7 +695,6 @@ def assign_mix_rgba(
     mix_values = nodes.new("ShaderNodeMix")
     mix_values.data_type = "RGBA"
     mix_values.blend_type = blend_type
-    mix_values.inputs["Factor"].default_value = 1.0
 
     links.new(mix_values.outputs["Result"], output)
 

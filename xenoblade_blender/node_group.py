@@ -305,7 +305,7 @@ def tex_parallax_node_group():
     return node_tree
 
 
-def normal_map_xy_node_group():
+def normal_map_xyz_node_group():
     node_tree = bpy.data.node_groups.new("NormalMapXY", "ShaderNodeTree")
 
     node_tree.interface.new_socket(
