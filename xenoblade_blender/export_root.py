@@ -320,7 +320,7 @@ def export_mesh_inner(
         attributes.append(attribute)
 
     for color_attribute in mesh_data.color_attributes:
-        if color_attribute.name != "OutlineVertexColor":
+        if color_attribute.name not in ["OutlineVertexColor", "VertexNormal"]:
             attribute = export_color_attribute(
                 mesh_name, mesh_data, vertex_indices, color_attribute
             )
@@ -704,9 +704,16 @@ def export_normals(mesh_data, z_up_to_y_up, vertex_indices):
 
     normals = np.zeros((len(mesh_data.vertices), 4), dtype=np.float32)
     normals[:, :3][vertex_indices] = loop_normals @ z_up_to_y_up
+
     # Some shaders use the 4th component for normal map intensity.
-    # TODO: Add proper import/export handling of the 4th component.
-    normals[:, 3] = 1.0
+    if attribute := mesh_data.attributes.get("VertexNormal"):
+        vertex_normals = np.zeros(len(mesh_data.vertices) * 4, dtype=np.float32)
+        attribute.data.foreach_get("color", vertex_normals)
+
+        normals[:, 3] = vertex_normals.reshape((-1, 4))[:, 3]
+    else:
+        normals[:, 3] = 1.0
+
     return normals
 
 
@@ -815,8 +822,9 @@ def get_texture_assignments(mesh_data, material, image_textures):
             continue
 
         # Update material texture assignments.
-        # TODO: samplers?
-        texture_index = parse_int(node.label)
+        # Support the old labels like "0" or new labels like "s0".
+        label = node.label.lstrip("s")
+        texture_index = parse_int(label)
         if texture_index is None:
             continue
 
@@ -900,7 +908,7 @@ def export_shape_keys(
     return morph_targets
 
 
-def copy_material(material):
+def copy_material(material: xc3_model_py.material.Material):
     # TODO: does pyo3 support deep copy?
     # TODO: Add deep copy support to xc3_model_py?
     textures = [
@@ -926,7 +934,7 @@ def copy_material(material):
         material.pass_type,
         material.parameters,
         material.m_unks2_2,
-        material.m_unks3_1,
+        material.gbuffer_flags,
         material.alpha_test,
         material.shader,
         material.fur_params,

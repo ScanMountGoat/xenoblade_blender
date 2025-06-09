@@ -27,7 +27,7 @@ def get_image_folder(image_folder: str, filepath: str) -> str:
 def init_logging():
     # Log any errors from Rust.
     log_fmt = "%(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s"
-    logging.basicConfig(format=log_fmt, level=logging.INFO)
+    logging.basicConfig(format=log_fmt, level=logging.ERROR)
 
 
 # https://github.com/ssbucarlos/smash-ultimate-blender/blob/a003be92bd27e34d2a6377bb98d55d5a34e63e56/source/model/import_model.py#L371
@@ -182,10 +182,15 @@ def import_image(image, png: bytes, model_name: str, i: int):
     # TODO: This should depend on srgb vs linear in format.
     blender_image.colorspace_settings.is_data = True
 
+    # Necessary for 0 alpha to not set RGB to black.
+    blender_image.alpha_mode = "CHANNEL_PACKED"
+
     return blender_image
 
 
-def import_monolib_shader_images(path: str, flip: bool) -> Optional[Dict[str, bpy.types.Image]]:
+def import_monolib_shader_images(
+    path: str, flip: bool
+) -> Optional[Dict[str, bpy.types.Image]]:
     # Assume the path is in a game dump.
     for parent in Path(path).parents:
         folder = parent.joinpath("monolib").joinpath("shader")
@@ -468,16 +473,22 @@ def import_mesh(
             xc3_model_py.vertex.AttributeType.Normal2,
         ]:
             # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1, :3]
-            normals = normalize(data)
+            data = attribute.data[min_index : max_index + 1]
+            normals = normalize(data[:, :3])
             blender_mesh.normals_split_custom_set_from_vertices(normals)
+
+            # Store the data to use with shader nodes.
+            import_colors(blender_mesh, data, "VertexNormal")
 
     for attribute in vertex_buffer.morph_blend_target:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal4:
             # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1, :3]
-            normals = normalize(data)
+            data = attribute.data[min_index : max_index + 1]
+            normals = normalize(data[:, :3])
             blender_mesh.normals_split_custom_set_from_vertices(normals)
+
+            # Store the data to use with shader nodes.
+            import_colors(blender_mesh, data, "VertexNormal")
 
     blender_mesh.validate()
 

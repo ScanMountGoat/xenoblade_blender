@@ -58,8 +58,10 @@ class ImportCamdo(bpy.types.Operator, ImportHelper):
     def execute(self, context: bpy.types.Context):
         init_logging()
 
-        database_path = get_database_path()
-        database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+        # TODO: enable this again once camdo shader support is improved.
+        # database_path = get_database_path()
+        # database = xc3_model_py.shader_database.ShaderDatabase.from_file(database_path)
+        database = None
 
         image_folder = get_image_folder(self.image_folder, self.filepath)
 
