@@ -67,7 +67,6 @@ def import_material(
         links,
         base_color.inputs["Red"],
         textures,
-        is_data=False,
     )
     assign_output(
         output_assignments.output_assignments[0].y,
@@ -76,7 +75,6 @@ def import_material(
         links,
         base_color.inputs["Green"],
         textures,
-        is_data=False,
     )
     assign_output(
         output_assignments.output_assignments[0].z,
@@ -85,7 +83,6 @@ def import_material(
         links,
         base_color.inputs["Blue"],
         textures,
-        is_data=False,
     )
 
     if material.state_flags.blend_mode not in [
@@ -99,7 +96,6 @@ def import_material(
             links,
             bsdf.inputs["Alpha"],
             textures,
-            is_data=True,
         )
 
     mix_ao = nodes.new("ShaderNodeMix")
@@ -117,7 +113,6 @@ def import_material(
         links,
         mix_ao.inputs["B"],
         textures,
-        is_data=True,
     )
 
     normal_map = assign_normal_map(
@@ -138,7 +133,6 @@ def import_material(
         links,
         bsdf.inputs["Metallic"],
         textures,
-        is_data=True,
     )
 
     if (
@@ -159,7 +153,6 @@ def import_material(
             links,
             color.inputs["Red"],
             textures,
-            is_data=False,
         )
         assign_output(
             output_assignments.output_assignments[5].y,
@@ -168,7 +161,6 @@ def import_material(
             links,
             color.inputs["Green"],
             textures,
-            is_data=False,
         )
         assign_output(
             output_assignments.output_assignments[5].z,
@@ -177,7 +169,6 @@ def import_material(
             links,
             color.inputs["Blue"],
             textures,
-            is_data=False,
         )
 
         # TODO: Toon and hair shaders always use specular color?
@@ -200,7 +191,6 @@ def import_material(
         links,
         invert.inputs[1],
         textures,
-        is_data=True,
     )
     links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
@@ -244,13 +234,19 @@ def import_material(
             # This avoids black material rendering.
             final_albedo = mix_ramp
 
+    # In game textures use _UNORM formats and write to a non sRGB texture.
+    # The deferred lighting shaders for all games use gamma 2.2 instead of sRGB.
+    base_color = nodes.new("ShaderNodeGamma")
+    links.new(final_albedo.outputs["Result"], base_color.inputs["Color"])
+    base_color.inputs["Gamma"].default_value = 2.2
+
     if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
         # Workaround for Blender not supporting alpha blending modes.
         transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
-        links.new(final_albedo.outputs["Result"], transparent_bsdf.inputs["Color"])
+        links.new(base_color.outputs["Color"], transparent_bsdf.inputs["Color"])
         links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
     else:
-        links.new(final_albedo.outputs["Result"], bsdf.inputs["Base Color"])
+        links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
 
     if material.state_flags.blend_mode not in [
         xc3_model_py.material.BlendMode.Disabled,
@@ -308,14 +304,17 @@ def assign_normal_map(
     nodes,
     links,
     bsdf,
-    x_assignment: int,
-    y_assignment: int,
+    x_assignment: Optional[int],
+    y_assignment: Optional[int],
     intensity_assignment: Optional[int],
     assignments: list[xc3_model_py.material.Assignment],
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
-):
+) -> Optional[bpy.types.Node]:
+    if x_assignment is None or y_assignment is None:
+        return None
+
     normals = create_node_group(
         nodes, "NormalMapXYFinal", normal_map_xy_final_node_group
     )
@@ -330,7 +329,6 @@ def assign_normal_map(
         links,
         normals.inputs["X"],
         textures,
-        is_data=True,
     )
     assign_output(
         y_assignment,
@@ -339,7 +337,6 @@ def assign_normal_map(
         links,
         normals.inputs["Y"],
         textures,
-        is_data=True,
     )
 
     if intensity_assignment is not None:
@@ -350,7 +347,6 @@ def assign_normal_map(
             links,
             normals.inputs["Strength"],
             textures,
-            is_data=True,
         )
 
     links.new(normals.outputs["Normal"], bsdf.inputs["Normal"])
@@ -367,7 +363,6 @@ def assign_output(
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
-    is_data: bool,
 ):
     if assignment_index is None:
         return
@@ -394,7 +389,6 @@ def assign_output(
         links,
         output,
         textures,
-        is_data,
         ty,
     )
 
@@ -405,7 +399,6 @@ def assign_output(
         links,
         output,
         textures,
-        is_data,
         ty,
     )
 
@@ -416,7 +409,6 @@ def assign_output(
         links,
         output,
         textures,
-        is_data,
     )
 
     if func is not None:
@@ -645,7 +637,7 @@ def assign_output(
                 # Set defaults to match xc3_wgpu and make debugging easier.
                 assign_float(output, 0.0)
     elif value is not None:
-        assign_value(value, assignments, nodes, links, output, textures, is_data)
+        assign_value(value, assignments, nodes, links, output, textures)
 
 
 def assign_value(
@@ -655,7 +647,6 @@ def assign_value(
     links,
     output,
     textures,
-    is_data,
 ):
     texture = value.texture()
     f = value.float()
@@ -666,7 +657,7 @@ def assign_value(
     elif attribute is not None:
         assign_attribute(attribute, nodes, links, output)
     elif texture is not None:
-        assign_texture(texture, assignments, nodes, links, output, textures, is_data)
+        assign_texture(texture, assignments, nodes, links, output, textures)
 
 
 def assign_float(output, f):
@@ -719,7 +710,6 @@ def assign_mix_rgba(
     links,
     output,
     textures,
-    is_data,
     blend_type: str,
 ):
     mix_values = nodes.new("ShaderNodeMix")
@@ -739,7 +729,6 @@ def assign_mix_rgba(
         links,
         mix_values.inputs["A"],
         textures,
-        is_data,
     )
     assign_output(
         func.args[1],
@@ -748,7 +737,6 @@ def assign_mix_rgba(
         links,
         mix_values.inputs["B"],
         textures,
-        is_data,
     )
     if len(func.args) == 3:
         assign_output(
@@ -758,7 +746,6 @@ def assign_mix_rgba(
             links,
             mix_values.inputs["Factor"],
             textures,
-            is_data,
         )
 
     return mix_values
@@ -771,21 +758,11 @@ def assign_texture(
     links,
     output,
     textures,
-    is_data,
 ):
     # Load only the textures that are actually used.
     node = nodes.get(texture.name)
     if node is None:
         node = import_texture(texture.name, nodes, textures)
-
-    # TODO: Find a better way to handle color management.
-    # TODO: Why can't we just set everything to non color?
-    # TODO: This won't work if users have different color spaces installed like aces.
-    if node.image is not None:
-        if is_data:
-            node.image.colorspace_settings.name = "Non-Color"
-        else:
-            node.image.colorspace_settings.name = "sRGB"
 
     channel = channel_name(texture.channel)
     if channel == "Alpha":
@@ -817,7 +794,6 @@ def assign_texture(
                 links,
                 uv_node.inputs["X"],
                 textures,
-                is_data=True,
             )
             assign_output(
                 texture.texcoords[1],
@@ -826,7 +802,6 @@ def assign_texture(
                 links,
                 uv_node.inputs["Y"],
                 textures,
-                is_data=True,
             )
 
     links.new(uv_node.outputs["Vector"], node.inputs["Vector"])
@@ -871,7 +846,6 @@ def assign_math(
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
-    is_data: bool,
     op: str,
 ) -> bpy.types.Node:
     node = nodes.new("ShaderNodeMath")
@@ -890,7 +864,6 @@ def assign_math(
             links,
             input,
             textures,
-            is_data,
         )
 
     return node

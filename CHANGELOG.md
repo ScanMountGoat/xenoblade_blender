@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Changed material import to automatically arrange shader nodes.
 * Adjusted wimdo import and export to preserve the 4th component from the "VertexNormal" attribute used for normal map intensity for some models.
 
+### Fixed
+* Fixed an issue where material nodes for base color did not correctly handle gamma.
+
 ## 0.19.0 - 2025-03-28
 ### Added
 * Added support for importing Xenoblade Chronicles X Definitive Edition wimdo models.
