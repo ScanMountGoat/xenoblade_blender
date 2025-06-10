@@ -370,17 +370,21 @@ def assign_output(
     if assignment_index >= len(assignments):
         return
 
-    # Cache node creation to avoid creating too many nodes.
-    # These names are unique to this material node tree.
-    name = f"Assignment[{assignment_index}]"
-    if node := nodes.get(name):
-        links.new(node.outputs[0], output)
-        return
-
     # Assign one output channel.
     assignment = assignments[assignment_index]
     value = assignment.value()
     func = assignment.func()
+
+    # Cache node creation to avoid creating too many nodes.
+    # These names are unique to this material node tree.
+    name = f"Assignment[{assignment_index}]"
+
+    name, channel = assignment_name_channel(assignment_index, assignments)
+    if node := nodes.get(name):
+        # TODO: This isn't always the right link?
+        cached_output = 0 if channel is None else channel
+        links.new(node.outputs[cached_output], output)
+        return
 
     mix_rgba_node = lambda ty: assign_mix_rgba(
         func,
@@ -446,7 +450,6 @@ def assign_output(
                 assign_index(func.args[1], mix_values.inputs["B"])
                 assign_index(func.args[2], mix_values.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.AddNormalX:
-                # TODO: Share with Y based on the input indices?
                 mix_values = create_node_group(
                     nodes, "AddNormals", add_normals_node_group
                 )
@@ -459,7 +462,6 @@ def assign_output(
                 assign_index(func.args[3], mix_values.inputs["B.y"])
                 assign_index(func.args[4], mix_values.inputs["Factor"])
             case xc3_model_py.shader_database.Operation.AddNormalY:
-                # TODO: Share with X based on the input indices?
                 mix_values = create_node_group(
                     nodes, "AddNormals", add_normals_node_group
                 )
@@ -526,7 +528,6 @@ def assign_output(
                 assign_index(func.args[4], node.inputs["C"])
                 assign_index(func.args[5], node.inputs["D"])
             case xc3_model_py.shader_database.Operation.TexParallaxX:
-                # TODO: Separate node groups for each channel or split XY?
                 node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
                 node.name = name
 
@@ -552,7 +553,6 @@ def assign_output(
                 assign_index(func.args[4], node.inputs["B.y"])
                 assign_index(func.args[5], node.inputs["B.z"])
             case xc3_model_py.shader_database.Operation.ReflectY:
-                # TODO: Share with X based on the input indices?
                 node = create_node_group(nodes, "ReflectXYZ", reflect_xyz_node_group)
                 node.name = name
 
@@ -564,7 +564,6 @@ def assign_output(
                 assign_index(func.args[4], node.inputs["B.y"])
                 assign_index(func.args[5], node.inputs["B.z"])
             case xc3_model_py.shader_database.Operation.ReflectZ:
-                # TODO: Share with X based on the input indices?
                 node = create_node_group(nodes, "ReflectXYZ", reflect_xyz_node_group)
                 node.name = name
 
@@ -613,7 +612,6 @@ def assign_output(
                 assign_index(func.args[0], node.inputs["X"])
                 assign_index(func.args[1], node.inputs["Y"])
             case xc3_model_py.shader_database.Operation.NormalMapY:
-                # TODO: Share with X based on the input indices?
                 node = create_node_group(
                     nodes, "NormalMapXYZ", normal_map_xyz_node_group
                 )
@@ -623,7 +621,6 @@ def assign_output(
                 assign_index(func.args[0], node.inputs["X"])
                 assign_index(func.args[1], node.inputs["Y"])
             case xc3_model_py.shader_database.Operation.NormalMapZ:
-                # TODO: Share with X based on the input indices?
                 node = create_node_group(
                     nodes, "NormalMapXYZ", normal_map_xyz_node_group
                 )
@@ -882,3 +879,55 @@ def channel_name(channel: Optional[str]) -> str:
 
     # TODO: How to handle the None case?
     return "Red"
+
+
+def assignment_name_channel(
+    i: int,
+    assignments: list[xc3_model_py.material.Assignment],
+) -> Tuple[str, Optional[str]]:
+    # Generate a key for caching nodes.
+    # TODO: use the to_string impl from Rust?
+    assignment = assignments[i]
+    value = assignment.value()
+    func = assignment.func()
+
+    name = ""
+    channel = None
+
+    if func is not None:
+        op_name = str(func.op).removeprefix("Operation.")
+        # Node groups that have multiple outputs can share a node.
+        replacements = [
+            ("AddNormalX", "AddNormal", "X"),
+            ("AddNormalY", "AddNormal", "Y"),
+            ("TexParallaxX", "TexParallax", "X"),
+            ("TexParallaxY", "TexParallax", "Y"),
+            ("ReflectX", "Reflect", "X"),
+            ("ReflectY", "Reflect", "Y"),
+            ("ReflectZ", "Reflect", "Z"),
+            ("NormalMapX", "NormalMap", "X"),
+            ("NormalMapY", "NormalMap", "Y"),
+            ("NormalMapZ", "NormalMap", "Z"),
+        ]
+        for old, new, c in replacements:
+            if op_name.startswith(old):
+                op_name = op_name.replace(old, new)
+                channel = c
+                break
+
+        args = ", ".join(str(a) for a in func.args)
+        name = f"{op_name}({args})"
+    elif value is not None:
+        texture = value.texture()
+        f = value.float()
+        attribute = value.attribute()
+
+        if f is not None:
+            name = str(f)
+        elif attribute is not None:
+            channels = "" if attribute.channel is None else f".{attribute.channel}"
+            name = f"{attribute.name}{channels}"
+        elif texture is not None:
+            channels = "" if texture.channel is None else f".{texture.channel}"
+            name = f"{texture.name}{channels}"
+    return name, channel
