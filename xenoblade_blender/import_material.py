@@ -261,7 +261,7 @@ def import_material(
 
         node = nodes.get(name)
         if node is None:
-            node = import_texture(name, nodes, textures)
+            node = import_texture(name, name, nodes, textures)
 
         if channel == "Alpha":
             links.new(node.outputs["Alpha"], bsdf.inputs["Alpha"])
@@ -756,11 +756,14 @@ def assign_texture(
     output,
     textures,
 ):
-    # Load only the textures that are actually used.
     name = texture_assignment_name(texture)
-    node = nodes.get(name)
+
+    # Don't use the above name for node caching for any of the texture nodes.
+    # This ensures the correct channel is assigned for each assignment.
+    rgba_name = f"{name}.rgba"
+    node = nodes.get(rgba_name)
     if node is None:
-        node = import_texture(texture.name, nodes, textures)
+        node = import_texture(rgba_name, texture.name, nodes, textures)
 
     channel = channel_name(texture.channel)
     if channel == "Alpha":
@@ -773,8 +776,8 @@ def assign_texture(
         if rgb_node is None:
             rgb_node = nodes.new("ShaderNodeSeparateColor")
             rgb_node.name = rgb_name
+            links.new(node.outputs["Color"], rgb_node.inputs["Color"])
 
-        links.new(node.outputs["Color"], rgb_node.inputs["Color"])
         links.new(rgb_node.outputs[channel], output)
 
     # Texture coordinates can be made of multiple nodes.
@@ -809,6 +812,7 @@ def assign_texture(
 
 def import_texture(
     name: str,
+    label: str,
     nodes,
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
@@ -816,10 +820,10 @@ def import_texture(
 ):
     node = nodes.new("ShaderNodeTexImage")
     node.name = name
-    node.label = name
+    node.label = label
 
-    if name in textures:
-        image, sampler = textures[name]
+    if label in textures:
+        image, sampler = textures[label]
         node.image = image
 
         if sampler is not None:
@@ -933,5 +937,4 @@ def assignment_name_channel(
 
 def texture_assignment_name(texture):
     coords = ", ".join(str(c) for c in texture.texcoords)
-    channels = "" if texture.channel is None else f".{texture.channel}"
-    return f"{texture.name}({coords}){channels}"
+    return f"{texture.name}({coords})"
