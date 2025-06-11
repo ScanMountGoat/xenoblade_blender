@@ -34,6 +34,7 @@ def assign_node_layers(
 ):
     # Assign each node to only one layer.
     # Assign to the deepest layer to make edges go from left to right.
+    # This assumes the graph is acyclic.
     if previous_layer := node_layer.get(node.name):
         if layer <= previous_layer:
             return

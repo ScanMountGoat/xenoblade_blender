@@ -757,7 +757,8 @@ def assign_texture(
     textures,
 ):
     # Load only the textures that are actually used.
-    node = nodes.get(texture.name)
+    name = texture_assignment_name(texture)
+    node = nodes.get(name)
     if node is None:
         node = import_texture(texture.name, nodes, textures)
 
@@ -767,7 +768,7 @@ def assign_texture(
         links.new(node.outputs["Alpha"], output)
     else:
         # Avoid creating more than one separate RGB for each texture.
-        rgb_name = f"{texture.name}.rgb"
+        rgb_name = f"{name}.rgb"
         rgb_node = nodes.get(rgb_name)
         if rgb_node is None:
             rgb_node = nodes.new("ShaderNodeSeparateColor")
@@ -900,8 +901,6 @@ def assignment_name_channel(
         replacements = [
             ("AddNormalX", "AddNormal", "X"),
             ("AddNormalY", "AddNormal", "Y"),
-            ("TexParallaxX", "TexParallax", "X"),
-            ("TexParallaxY", "TexParallax", "Y"),
             ("ReflectX", "Reflect", "X"),
             ("ReflectY", "Reflect", "Y"),
             ("ReflectZ", "Reflect", "Z"),
@@ -928,6 +927,11 @@ def assignment_name_channel(
             channels = "" if attribute.channel is None else f".{attribute.channel}"
             name = f"{attribute.name}{channels}"
         elif texture is not None:
-            channels = "" if texture.channel is None else f".{texture.channel}"
-            name = f"{texture.name}{channels}"
+            name = texture_assignment_name(texture)
     return name, channel
+
+
+def texture_assignment_name(texture):
+    coords = ", ".join(str(c) for c in texture.texcoords)
+    channels = "" if texture.channel is None else f".{texture.channel}"
+    return f"{texture.name}({coords}){channels}"

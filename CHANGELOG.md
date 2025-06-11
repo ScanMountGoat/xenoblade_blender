@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue preventing the import of materials that use the same texture with multiple UVs in some cases.
+
 ## 0.20.0 - 2025-06-10
 ### Changed
 * Improved accuracy of material assignments.
