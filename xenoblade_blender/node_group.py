@@ -518,3 +518,124 @@ def reflect_xyz_node_group():
     layout_nodes(output_node)
 
     return node_tree
+
+
+def power_xyz_node_group():
+    return math_xyz_node_group("PowerXYZ", "POWER", ["Base", "Exponent"])
+
+
+def less_xyz_node_group():
+    return math_xyz_node_group("LessXYZ", "LESS_THAN", ["Value", "Threshold"])
+
+
+def greater_xyz_node_group():
+    return math_xyz_node_group("GreaterXYZ", "GREATER_THAN", ["Value", "Threshold"])
+
+
+def clamp_xyz_node_group():
+    node_tree = bpy.data.node_groups.new("ClampXYZ", "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Value"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Min"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Max"
+    )
+
+    min_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(input_node.outputs["Min"], min_xyz.inputs["Vector"])
+
+    max_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(input_node.outputs["Max"], max_xyz.inputs["Vector"])
+
+    value_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(input_node.outputs["Value"], value_xyz.inputs["Vector"])
+
+    clamp_x = nodes.new("ShaderNodeClamp")
+    links.new(value_xyz.outputs["X"], clamp_x.inputs["Value"])
+    links.new(min_xyz.outputs["X"], clamp_x.inputs["Min"])
+    links.new(max_xyz.outputs["X"], clamp_x.inputs["Max"])
+
+    clamp_y = nodes.new("ShaderNodeClamp")
+    links.new(value_xyz.outputs["Y"], clamp_y.inputs["Value"])
+    links.new(min_xyz.outputs["Y"], clamp_y.inputs["Min"])
+    links.new(max_xyz.outputs["Y"], clamp_y.inputs["Max"])
+
+    clamp_z = nodes.new("ShaderNodeClamp")
+    links.new(value_xyz.outputs["Z"], clamp_z.inputs["Value"])
+    links.new(min_xyz.outputs["Z"], clamp_z.inputs["Min"])
+    links.new(max_xyz.outputs["Z"], clamp_z.inputs["Max"])
+
+    output_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(clamp_x.outputs["Result"], output_xyz.inputs["X"])
+    links.new(clamp_y.outputs["Result"], output_xyz.inputs["Y"])
+    links.new(clamp_z.outputs["Result"], output_xyz.inputs["Z"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_xyz.outputs["Vector"], output_node.inputs["Vector"])
+
+    layout_nodes(output_node)
+
+    return node_tree
+
+
+def math_xyz_node_group(name: str, op: str, inputs: list[str]):
+    # Apply a scalar operation to independent XYZ components.
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+    for i in inputs:
+        node_tree.interface.new_socket(
+            in_out="INPUT", socket_type="NodeSocketVector", name=i
+        )
+
+    input_xyz_nodes = []
+    for i in inputs:
+        node = nodes.new("ShaderNodeSeparateXYZ")
+        links.new(input_node.outputs[i], node.inputs["Vector"])
+        input_xyz_nodes.append(node)
+
+    op_x = nodes.new("ShaderNodeMath")
+    op_x.operation = op
+    for i, node in enumerate(input_xyz_nodes):
+        links.new(node.outputs["X"], op_x.inputs[i])
+
+    op_y = nodes.new("ShaderNodeMath")
+    op_y.operation = op
+    for i, node in enumerate(input_xyz_nodes):
+        links.new(node.outputs["Y"], op_y.inputs[i])
+
+    op_z = nodes.new("ShaderNodeMath")
+    op_z.operation = op
+    for i, node in enumerate(input_xyz_nodes):
+        links.new(node.outputs["Z"], op_z.inputs[i])
+
+    output_xyz = nodes.new("ShaderNodeCombineXYZ")
+    links.new(op_x.outputs["Value"], output_xyz.inputs["X"])
+    links.new(op_y.outputs["Value"], output_xyz.inputs["Y"])
+    links.new(op_z.outputs["Value"], output_xyz.inputs["Z"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(output_xyz.outputs["Vector"], output_node.inputs["Vector"])
+
+    layout_nodes(output_node)
+
+    return node_tree
