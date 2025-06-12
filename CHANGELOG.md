@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Improved accuracy of material assignments and reduced shader node count in some cases.
+
 ### Fixed
 * Fixed an issue preventing the import of materials that use the same texture with multiple UVs in some cases.
 
