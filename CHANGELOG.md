@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue preventing the import of materials that use the same texture with multiple UVs in some cases.
+* Fixed an issue where animations would incorrectly import without root motion in some cases.
 
 ## 0.20.0 - 2025-06-10
 ### Changed
