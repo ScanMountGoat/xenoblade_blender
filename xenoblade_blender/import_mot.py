@@ -20,7 +20,7 @@ class ImportMot(bpy.types.Operator, ImportHelper):
     filename_ext = ".mot"
 
     filter_glob: StringProperty(
-        default="*.mot;*.anm;*.motstm_data",
+        default="*.mot;*.anm;*.motstm_data;*.sar",
         options={"HIDDEN"},
         maxlen=255,
     )

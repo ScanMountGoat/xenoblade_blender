@@ -9,7 +9,7 @@ from . import import_idcm
 
 
 def menu_import_mot(self, context):
-    text = "Xenoblade Animation (.mot/.anm/.motstm_data)"
+    text = "Xenoblade Animation (.mot/.anm/.motstm_data/.sar)"
     self.layout.operator(import_mot.ImportMot.bl_idname, text=text)
 
 
