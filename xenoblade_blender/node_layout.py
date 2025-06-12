@@ -2,11 +2,20 @@ from typing import Tuple
 import bpy
 
 
-def layout_nodes(root: bpy.types.Node):
+def layout_nodes(root: bpy.types.Node, links: bpy.types.NodeLinks):
+    # Finding links for each node input searches all links.
+    # Cache connected nodes to only iterate over the links once.
+    child_nodes = dict()
+    for link in links.values():
+        if link.to_node not in child_nodes:
+            child_nodes[link.to_node] = []
+
+        child_nodes[link.to_node].append(link.from_node)
+
     # Assign each node to a layer.
     layers = []
     node_layer = {}
-    assign_node_layers(root, layers, 0, node_layer)
+    assign_node_layers(root, child_nodes, layers, 0, node_layer)
 
     # Basic layered graph layout.
     margin_x = 100
@@ -28,6 +37,7 @@ def layout_nodes(root: bpy.types.Node):
 
 def assign_node_layers(
     node: bpy.types.Node,
+    child_nodes: dict[bpy.types.Node, list[bpy.types.Node]],
     layers: list[list[bpy.types.Node]],
     layer: int,
     node_layer: dict[str, int],
@@ -48,10 +58,9 @@ def assign_node_layers(
 
     layers[layer].append(node)
 
-    for input in node.inputs:
-        if input.is_linked:
-            for link in input.links:
-                assign_node_layers(link.from_node, layers, layer + 1, node_layer)
+    if children := child_nodes.get(node):
+        for child in children:
+            assign_node_layers(child, child_nodes, layers, layer + 1, node_layer)
 
 
 def node_dimensions(node: bpy.types.Node) -> Tuple[float, float]:

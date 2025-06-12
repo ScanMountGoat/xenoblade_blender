@@ -71,7 +71,7 @@ def normals_xy_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(normal_xyz.outputs["Vector"], output_node.inputs["Normal"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -179,7 +179,7 @@ def add_normals_node_group():
     links.new(output_xyz.outputs["X"], output_node.inputs["X"])
     links.new(output_xyz.outputs["Y"], output_node.inputs["Y"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -218,7 +218,7 @@ def fresnel_blend_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(pow_5.outputs["Value"], output_node.inputs["Value"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -272,7 +272,7 @@ def tex_matrix_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(dot_uv.outputs["Value"], output_node.inputs["Value"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -300,7 +300,7 @@ def tex_parallax_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(input_node.outputs["Value"], output_node.inputs["Value"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -351,7 +351,7 @@ def normal_map_xyz_node_group():
     links.new(xyz.outputs["Y"], output_node.inputs["Y"])
     links.new(xyz.outputs["Z"], output_node.inputs["Z"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -394,7 +394,7 @@ def normal_map_xy_final_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(normal_map.outputs["Normal"], output_node.inputs["Normal"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -451,7 +451,7 @@ def toon_grad_uvs_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(uv.outputs["Vector"], output_node.inputs["Vector"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -515,7 +515,7 @@ def reflect_xyz_node_group():
     links.new(output_xyz.outputs["Y"], output_node.inputs["Y"])
     links.new(output_xyz.outputs["Z"], output_node.inputs["Z"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -585,7 +585,7 @@ def clamp_xyz_node_group():
     output_node = nodes.new("NodeGroupOutput")
     links.new(output_xyz.outputs["Vector"], output_node.inputs["Vector"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree
 
@@ -636,6 +636,6 @@ def math_xyz_node_group(name: str, op: str, inputs: list[str]):
     output_node = nodes.new("NodeGroupOutput")
     links.new(output_xyz.outputs["Vector"], output_node.inputs["Vector"])
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return node_tree

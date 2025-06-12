@@ -299,7 +299,7 @@ def import_material(
         # TODO: Support alpha blending?
         blender_material.blend_method = "CLIP"
 
-    layout_nodes(output_node)
+    layout_nodes(output_node, links)
 
     return blender_material
 
