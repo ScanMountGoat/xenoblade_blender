@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 * Improved accuracy of material assignments and reduced shader node count in some cases.
+* Optimized import times for materials.
 
 ### Fixed
 * Fixed an issue preventing the import of materials that use the same texture with multiple UVs in some cases.

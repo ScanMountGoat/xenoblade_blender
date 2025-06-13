@@ -327,11 +327,18 @@ def import_model_root(
     # TODO: Cache based on vertex and index buffer indices?
     for model in root.models.models:
         for i, mesh in enumerate(model.meshes):
+            material = root.models.materials[mesh.material_index]
+
+            if not import_all_meshes:
+                if base_lods is not None and mesh.lod_item_index not in base_lods:
+                    continue
+
+                if "_outline" in material.name or "_speff_" in material.name:
+                    continue
+
             # Many materials are for meshes that won't be loaded.
             # Lazy load materials to improve import times.
-            material = root.models.materials[mesh.material_index]
             material_name = f"{model_name}.{mesh.material_index}.{material.name}"
-
             blender_material = bpy.data.materials.get(material_name)
             if blender_material is None:
                 blender_material = import_material(
@@ -342,13 +349,6 @@ def import_model_root(
                     root.image_textures,
                     root.models.samplers,
                 )
-
-            if not import_all_meshes:
-                if base_lods is not None and mesh.lod_item_index not in base_lods:
-                    continue
-
-                if "_outline" in material.name or "_speff_" in material.name:
-                    continue
 
             import_mesh(
                 operator,
