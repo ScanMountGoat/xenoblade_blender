@@ -524,6 +524,10 @@ def power_xyz_node_group():
     return math_xyz_node_group("PowerXYZ", "POWER", ["Base", "Exponent"])
 
 
+def sqrt_xyz_node_group():
+    return math_xyz_node_group("SqrtXYZ", "SQRT", ["Value"])
+
+
 def less_xyz_node_group():
     return math_xyz_node_group("LessXYZ", "LESS_THAN", ["Value", "Threshold"])
 
