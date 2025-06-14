@@ -29,9 +29,7 @@ def layout_nodes(root: bpy.types.Node, links: bpy.types.NodeLinks):
 
         location_y = 0
         for n in nodes:
-            n.location.x = location_x
-            n.location.y = location_y
-
+            n.location = (location_x, location_y)
             location_y -= node_dimensions(n)[1] + margin_y
 
 
