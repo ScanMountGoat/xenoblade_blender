@@ -681,33 +681,15 @@ def assign_float(output, f):
 def assign_attribute(
     attribute: xc3_model_py.material.AssignmentValueAttribute, nodes, links
 ) -> Tuple[bpy.types.Node, str]:
-    node = nodes.get(attribute.name)
-    if node is None:
-        node = nodes.new("ShaderNodeAttribute")
-        node.name = attribute.name
-
-        if attribute.name == "vPos":
-            node.attribute_name = "position"
-        elif attribute.name == "vNormal":
-            node.attribute_name = "VertexNormal"
-        elif attribute.name == "vColor":
-            node.attribute_name = "VertexColor"
-        elif attribute.name == "vBlend":
-            node.attribute_name = "Blend"
-        else:
-            for i in range(9):
-                if attribute.name == f"vTex{i}":
-                    node.attribute_name = f"TexCoord{i}"
-                    break
-
-    channel = channel_name(attribute.channel)
-    return assign_channel(attribute.name, channel, node, nodes, links)
+    node = import_attribute(attribute.name, nodes)
+    return assign_channel(attribute.name, attribute.channel, node, nodes, links)
 
 
 def assign_channel(
-    name: str, channel: str, node, nodes, links
+    name: str, channel: Optional[str], node, nodes, links
 ) -> Tuple[bpy.types.Node, str]:
-    if channel == "Alpha":
+    output = channel_name(channel)
+    if output == "Alpha":
         # Alpha isn't part of the RGB node.
         return node, "Alpha"
     else:
@@ -719,7 +701,22 @@ def assign_channel(
             rgb_node.name = rgb_name
             links.new(node.outputs["Color"], rgb_node.inputs["Color"])
 
-        return rgb_node, channel
+        return rgb_node, output
+
+
+def channel_name(channel: Optional[str]) -> str:
+    match channel:
+        case "x":
+            return "Red"
+        case "y":
+            return "Green"
+        case "z":
+            return "Blue"
+        case "w":
+            return "Alpha"
+
+    # TODO: How to handle the None case?
+    return "Red"
 
 
 def assign_mix_rgba(
@@ -765,11 +762,9 @@ def assign_texture(
     if node is None:
         node = import_texture(rgba_name, texture.name, nodes, textures)
 
-    channel = channel_name(texture.channel)
-
     assign_uvs(texture.texcoords, assignment_outputs, node, nodes, links)
 
-    return assign_channel(name, channel, node, nodes, links)
+    return assign_channel(name, texture.channel, node, nodes, links)
 
 
 def assign_uvs(texcoords: list[int], assignment_outputs, node, nodes, links):
@@ -843,94 +838,34 @@ def assign_math(
     return node, "Value"
 
 
-def channel_name(channel: Optional[str]) -> str:
-    match channel:
-        case "x":
-            return "Red"
-        case "y":
-            return "Green"
-        case "z":
-            return "Blue"
-        case "w":
-            return "Alpha"
-
-    # TODO: How to handle the None case?
-    return "Red"
-
-
-def assignment_name_channel(
-    i: int,
-    assignments: list[xc3_model_py.material.Assignment],
-) -> Tuple[str, Optional[str]]:
-    # Generate a key for caching nodes.
-    # TODO: use the to_string impl from Rust?
-    assignment = assignments[i]
-    value = assignment.value()
-    func = assignment.func()
-
-    name = ""
-    channel = None
-
-    if func is not None:
-        channel = func_name(func)
-    elif value is not None:
-        texture = value.texture()
-        f = value.float()
-        attribute = value.attribute()
-
-        if f is not None:
-            name = str(f)
-        elif attribute is not None:
-            channels = "" if attribute.channel is None else f".{attribute.channel}"
-            name = f"{attribute.name}{channels}"
-        elif texture is not None:
-            name = texture_assignment_name(texture)
-    return name, channel
-
-
 def func_name(func: xc3_model_py.material.AssignmentFunc):
-    op_name = str(func.op).removeprefix("Operation.")
-    # Node groups that have multiple outputs can share a node.
-    replacements = [
-        ("AddNormalX", "AddNormal", "X"),
-        ("AddNormalY", "AddNormal", "Y"),
-        ("ReflectX", "Reflect", "X"),
-        ("ReflectY", "Reflect", "Y"),
-        ("ReflectZ", "Reflect", "Z"),
-        ("NormalMapX", "NormalMap", "X"),
-        ("NormalMapY", "NormalMap", "Y"),
-        ("NormalMapZ", "NormalMap", "Z"),
-    ]
-    for old, new, c in replacements:
-        if op_name.startswith(old):
-            op_name = op_name.replace(old, new)
-            break
-
-    args = ", ".join(str(a) for a in func.args)
-    name = f"{op_name}({args})"
-    return name
+    return func_name_inner(func.op, func.args)
 
 
 def func_xyz_name(func: xc3_model_py.material.AssignmentFuncXyz):
-    op_name = str(func.op).removeprefix("Operation.")
+    return func_name_inner(func.op, func.args)
+
+
+def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int]):
+    op_name = str(op).removeprefix("Operation.")
     # Node groups that have multiple outputs can share a node.
     replacements = [
-        ("AddNormalX", "AddNormal", "X"),
-        ("AddNormalY", "AddNormal", "Y"),
-        ("ReflectX", "Reflect", "X"),
-        ("ReflectY", "Reflect", "Y"),
-        ("ReflectZ", "Reflect", "Z"),
-        ("NormalMapX", "NormalMap", "X"),
-        ("NormalMapY", "NormalMap", "Y"),
-        ("NormalMapZ", "NormalMap", "Z"),
+        ("AddNormalX", "AddNormal"),
+        ("AddNormalY", "AddNormal"),
+        ("ReflectX", "Reflect"),
+        ("ReflectY", "Reflect"),
+        ("ReflectZ", "Reflect"),
+        ("NormalMapX", "NormalMap"),
+        ("NormalMapY", "NormalMap"),
+        ("NormalMapZ", "NormalMap"),
     ]
-    for old, new, c in replacements:
+    for old, new in replacements:
         if op_name.startswith(old):
             op_name = op_name.replace(old, new)
             break
 
-    args = ", ".join(str(a) for a in func.args)
-    name = f"xyz_{op_name}({args})"
+    func_args = ", ".join(str(a) for a in args)
+    name = f"xyz_{op_name}({func_args})"
     return name
 
 
@@ -1216,30 +1151,33 @@ def assign_value_xyz(
         return None
 
 
-# TODO: Share code with scalar version
 def assign_attribute_xyz(
     attribute: xc3_model_py.material.AssignmentValueAttributeXyz, nodes, links
 ) -> Optional[Tuple[bpy.types.Node, str]]:
-    node = nodes.get(attribute.name)
+    node = import_attribute(attribute.name, nodes)
+    return assign_channel_xyz(attribute.name, attribute.channel, node, nodes, links)
+
+
+def import_attribute(name: str, nodes) -> bpy.types.Node:
+    node = nodes.get(name)
     if node is None:
         node = nodes.new("ShaderNodeAttribute")
-        node.name = attribute.name
+        node.name = name
 
-        if attribute.name == "vPos":
+        if name == "vPos":
             node.attribute_name = "position"
-        elif attribute.name == "vNormal":
+        elif name == "vNormal":
             node.attribute_name = "VertexNormal"
-        elif attribute.name == "vColor":
+        elif name == "vColor":
             node.attribute_name = "VertexColor"
-        elif attribute.name == "vBlend":
+        elif name == "vBlend":
             node.attribute_name = "Blend"
         else:
             for i in range(9):
-                if attribute.name == f"vTex{i}":
+                if name == f"vTex{i}":
                     node.attribute_name = f"TexCoord{i}"
                     break
-
-    return assign_channel_xyz(attribute.name, attribute.channel, node, nodes, links)
+    return node
 
 
 def assign_channel_xyz(
