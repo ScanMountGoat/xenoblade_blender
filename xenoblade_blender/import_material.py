@@ -649,6 +649,10 @@ def assign_index(
         if node_output := assignment_outputs[i]:
             node, output_name = node_output
             links.new(node.outputs[output_name], output)
+            return
+        else:
+            # Set defaults to match xc3_wgpu and make debugging easier.
+            assign_float(output, 0.0)
 
 
 def assign_value(
@@ -733,10 +737,6 @@ def assign_mix_rgba(
 
     if blend_type == "OVERLAY":
         node.inputs["Factor"].default_value = 1.0
-
-    # Set defaults to match xc3_wgpu and make debugging easier.
-    for input in node.inputs:
-        assign_float(input, 0.0)
 
     assign_index(func.args[0], assignment_outputs, links, node.inputs["A"])
     assign_index(func.args[1], assignment_outputs, links, node.inputs["B"])
