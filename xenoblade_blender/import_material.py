@@ -63,9 +63,14 @@ def import_material(
     for name, image in shader_images.items():
         textures[name] = (image, None)
 
+    has_alpha = material.state_flags.blend_mode not in [
+        xc3_model_py.material.BlendMode.Disabled,
+        xc3_model_py.material.BlendMode.Disabled2,
+    ]
+
     # Create nodes for each unique assignment.
     # Storing the output name allows using a single node for values with multiple channels.
-    assignment_indices = used_assignments(output_assignments)
+    assignment_indices = used_assignments(output_assignments, has_alpha)
     assignment_outputs = []
     for i, assignment in enumerate(output_assignments.assignments):
         if i in assignment_indices:
@@ -76,10 +81,7 @@ def import_material(
         else:
             assignment_outputs.append(None)
 
-    if material.state_flags.blend_mode not in [
-        xc3_model_py.material.BlendMode.Disabled,
-        xc3_model_py.material.BlendMode.Disabled2,
-    ]:
+    if has_alpha:
         assign_index(
             output_assignments.output_assignments[0].w,
             assignment_outputs,
@@ -426,11 +428,7 @@ def assign_output(
 
         match func.op:
             case xc3_model_py.shader_database.Operation.Unk:
-                # Set defaults to match xc3_wgpu and make debugging easier.
-                node = nodes.new("ShaderNodeValue")
-                node.outputs[0].default_value = 0.0
-                node.label = "Unk"
-                return node, "Value"
+                return None
             case xc3_model_py.shader_database.Operation.Mix:
                 return mix_rgba_node("MIX")
             case xc3_model_py.shader_database.Operation.Mul:
@@ -614,7 +612,7 @@ def assign_output(
                 return math_node("COMPARE")
             case xc3_model_py.shader_database.Operation.NotEqual:
                 # TODO: Invert compare.
-                pass
+                return math_node("COMPARE")
             case xc3_model_py.shader_database.Operation.Less:
                 return math_node("LESS_THAN")
             case xc3_model_py.shader_database.Operation.Greater:
@@ -670,11 +668,7 @@ def assign_output(
                 return node, "Z"
             case _:
                 # TODO: This case shouldn't happen?
-                # Set defaults to match xc3_wgpu and make debugging easier.
-                node = nodes.new("ShaderNodeValue")
-                node.outputs[0].default_value = 0.0
-                node.label = str(func.op)
-                return node, "Value"
+                return None
     elif value := assignment.value():
         return assign_value(value, assignment_outputs, nodes, links, textures)
     else:
@@ -952,13 +946,7 @@ def assign_output_xyz(
 
         match func.op:
             case xc3_model_py.shader_database.Operation.Unk:
-                # Set defaults to match xc3_wgpu and make debugging easier.
-                node = nodes.new("ShaderNodeCombineXYZ")
-                node.inputs["X"].default_value = 0.0
-                node.inputs["Y"].default_value = 0.0
-                node.inputs["Z"].default_value = 0.0
-                node.label = "Unk"
-                return node, "Vector"
+                return None
             case xc3_model_py.shader_database.Operation.Mix:
                 return mix_rgba_node("MIX")
             case xc3_model_py.shader_database.Operation.Mul:
@@ -1099,13 +1087,7 @@ def assign_output_xyz(
                 pass
             case _:
                 # TODO: This case shouldn't happen?
-                # Set defaults to match xc3_wgpu and make debugging easier.
-                node = nodes.new("ShaderNodeCombineXYZ")
-                node.inputs["X"].default_value = 0.0
-                node.inputs["Y"].default_value = 0.0
-                node.inputs["Z"].default_value = 0.0
-                node.label = str(func.op)
-                return node, "Vector"
+                return None
     elif value := assignment_xyz.value():
         return assign_value_xyz(value, assignment_outputs, nodes, links, textures)
 
@@ -1178,13 +1160,18 @@ def assign_value_xyz(
     links,
     textures,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
-    if f := value.float():
-        # TODO: use rgb color if in range 0.0 to 1.0?
-        node = nodes.new("ShaderNodeCombineXYZ")
-        node.inputs["X"].default_value = f[0]
-        node.inputs["Y"].default_value = f[1]
-        node.inputs["Z"].default_value = f[2]
-        return node, "Vector"
+    if floats := value.float():
+        if all(f >= 0.0 and f <= 1.0 for f in floats):
+            # Use an RGB node if possible to show a preview color.
+            node = nodes.new("ShaderNodeRGB")
+            node.outputs[0].default_value = (floats[0], floats[1], floats[2], 1.0)
+            return node, "Color"
+        else:
+            node = nodes.new("ShaderNodeCombineXYZ")
+            node.inputs["X"].default_value = floats[0]
+            node.inputs["Y"].default_value = floats[1]
+            node.inputs["Z"].default_value = floats[2]
+            return node, "Vector"
     elif attribute := value.attribute():
         return assign_attribute_xyz(attribute, nodes, links)
     elif texture := value.texture():
@@ -1268,7 +1255,7 @@ def assign_texture_xyz(
 
 
 def used_assignments(
-    output_assignments: xc3_model_py.material.OutputAssignments,
+    output_assignments: xc3_model_py.material.OutputAssignments, has_alpha: bool
 ) -> Set[int]:
     visited = set()
 
@@ -1282,7 +1269,8 @@ def used_assignments(
         add_used_assignments(visited, assignments, outputs[0].y)
         add_used_assignments(visited, assignments, outputs[0].z)
 
-    add_used_assignments(visited, assignments, outputs[0].w)
+    if has_alpha:
+        add_used_assignments(visited, assignments, outputs[0].w)
 
     add_used_assignments(visited, assignments, outputs[1].x)
     add_used_assignments(visited, assignments, outputs[1].y)
