@@ -100,9 +100,7 @@ class ImportIdcm(bpy.types.Operator, ImportHelper):
 
                     # Transform the instance using the in game coordinate system and convert back.
                     obj.matrix_world = (
-                        y_up_to_z_up
-                        @ Matrix(instance).transposed()
-                        @ y_up_to_z_up.inverted()
+                        y_up_to_z_up @ Matrix(instance) @ y_up_to_z_up.inverted()
                     )
 
         end = time.time()

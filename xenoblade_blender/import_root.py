@@ -50,7 +50,7 @@ def import_armature(operator, context, root, name: str):
             new_bone = armature.data.edit_bones.new(name=bone.name)
             new_bone.head = [0, 0, 0]
             new_bone.tail = [0, 1, 0]
-            matrix = Matrix(transform).transposed()
+            matrix = Matrix(transform)
             y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
             x_major_to_y_major = Matrix.Rotation(math.radians(-90), 4, "Z")
             new_bone.matrix = y_up_to_z_up @ matrix @ x_major_to_y_major
@@ -295,9 +295,7 @@ def import_map_root(
                 for i, transform in enumerate(model.instances):
                     # Transform the instance using the in game coordinate system and convert back.
                     matrix_world = (
-                        y_up_to_z_up
-                        @ Matrix(transform).transposed()
-                        @ y_up_to_z_up.inverted()
+                        y_up_to_z_up @ Matrix(transform) @ y_up_to_z_up.inverted()
                     )
 
                     collection_instance = bpy.data.objects.new(
