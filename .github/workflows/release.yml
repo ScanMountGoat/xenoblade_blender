@@ -19,12 +19,10 @@ jobs:
       with:
         python-version: '3.11'
     - name: Build
-      run: |
-        cd xc3_model_py
-        cargo build --release
+      run: cargo build --release
     - name: Create Release Zip
       run: |
-        cp xc3_model_py/target/release/libxc3_model_py.so xenoblade_blender/xc3_model_py.so
+        cp target/release/libxc3_model_py.so xenoblade_blender/xc3_model_py.so
         zip -r xenoblade_blender_linux_x64.zip xenoblade_blender
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -49,12 +47,10 @@ jobs:
       with:
         python-version: '3.11'
     - name: Build
-      run: |
-        cd xc3_model_py
-        cargo build --release
+      run: cargo build --release
     - name: Create Release Zip
       run: |
-        cp xc3_model_py/target/release/xc3_model_py.dll xenoblade_blender/xc3_model_py.pyd
+        cp target/release/xc3_model_py.dll xenoblade_blender/xc3_model_py.pyd
         Compress-Archive -path xenoblade_blender -destinationPath xenoblade_blender_win_x64.zip 
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -96,12 +92,12 @@ jobs:
         target: ${{matrix.target}}
     - name: Build
       run: |
-        cd xc3_model_py/xc3_model_py 
+        cd xc3_model_py
         maturin build --release --target=${{matrix.target}}
         cd ../..
     - name: Create Release Zip
       run: |
-        cp xc3_model_py/target/${{matrix.target}}/release/libxc3_model_py.dylib xenoblade_blender/xc3_model_py.so
+        cp target/${{matrix.target}}/release/libxc3_model_py.dylib xenoblade_blender/xc3_model_py.so
         zip -r xenoblade_blender_macos_${{matrix.desc}}.zip xenoblade_blender
     - name: Upload Zip
       uses: actions/upload-artifact@v4

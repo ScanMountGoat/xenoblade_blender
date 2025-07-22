@@ -1,0 +1,3 @@
+[workspace]
+members = ["xc3_model_py"]
+resolver = "2"
