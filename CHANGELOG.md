@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed a potential crash when importing normals for model and map geometry in some cases.
+
 ## 0.20.1
 ### Added
 * Added support for importing animations with the `.sar` extension.

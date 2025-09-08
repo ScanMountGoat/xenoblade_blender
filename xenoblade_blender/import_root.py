@@ -461,8 +461,6 @@ def import_mesh(
                 import_colors(blender_mesh, data, "OutlineVertexColor")
                 outline_vertex_colors = data
 
-    blender_mesh.update()
-
     # The validate call may modify and reindex geometry.
     # Assign normals now that the mesh has been updated.
     for attribute in vertex_buffer.attributes:
@@ -470,25 +468,27 @@ def import_mesh(
             xc3_model_py.vertex.AttributeType.Normal,
             xc3_model_py.vertex.AttributeType.Normal2,
         ]:
-            # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1]
-            normals = normalize(data[:, :3])
-            blender_mesh.normals_split_custom_set_from_vertices(normals)
-
             # Store the data to use with shader nodes.
+            data = attribute.data[min_index : max_index + 1]
             import_colors(blender_mesh, data, "VertexNormal")
 
     for attribute in vertex_buffer.morph_blend_target:
         if attribute.attribute_type == xc3_model_py.vertex.AttributeType.Normal4:
-            # We can't assume that the attribute data is normalized.
-            data = attribute.data[min_index : max_index + 1]
-            normals = normalize(data[:, :3])
-            blender_mesh.normals_split_custom_set_from_vertices(normals)
-
             # Store the data to use with shader nodes.
+            data = attribute.data[min_index : max_index + 1]
             import_colors(blender_mesh, data, "VertexNormal")
 
+    blender_mesh.update()
     blender_mesh.validate()
+
+    # Calculating normals for invalid meshes seems to cause inconsistent crashes.
+    # Setting normals after updating and validating is more reliable on some Blender versions.
+    if attribute := blender_mesh.color_attributes.get("VertexNormal"):
+        normals = np.zeros(len(blender_mesh.vertices) * 4)
+        attribute.data.foreach_get("color", normals)
+        # We can't assume that the attribute data is normalized.
+        normals = normalize(normals.reshape((-1, 4))[:, :3])
+        blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     # Assign materials from the current group.
     blender_mesh.materials.append(material)
