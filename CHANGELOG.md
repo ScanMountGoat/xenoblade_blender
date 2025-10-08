@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Fixed
 * Fixed a potential crash when importing normals for model and map geometry in some cases.
+* Fixed an issue where exporting would fail if the "VertexNormal" attribute used the "Face Corner" domain.
+* Fixed an issue where exporting would fail if the "OutlineThickness" vertex group contained no vertices.
 
 ## 0.20.1
 ### Added

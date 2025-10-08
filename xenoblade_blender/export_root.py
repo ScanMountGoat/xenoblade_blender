@@ -530,7 +530,10 @@ def export_outline_alpha(blender_mesh, positions):
         # TODO: Is there a way to do this without looping?
         outline_alpha = np.zeros(positions.shape[0], dtype=np.float32)
         for i in range(positions.shape[0]):
-            outline_alpha[i] = outline_vertex_group.weight(i)
+            try:
+                outline_alpha[i] = outline_vertex_group.weight(i)
+            except:
+                outline_alpha[i] = 0.0
 
         blender_mesh.vertex_groups.remove(outline_vertex_group)
 
