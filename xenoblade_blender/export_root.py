@@ -707,10 +707,8 @@ def export_normals(mesh_data, z_up_to_y_up, vertex_indices):
 
     # Some shaders use the 4th component for normal map intensity.
     if attribute := mesh_data.attributes.get("VertexNormal"):
-        vertex_normals = np.zeros(len(mesh_data.vertices) * 4, dtype=np.float32)
-        attribute.data.foreach_get("color", vertex_normals)
-
-        normals[:, 3] = vertex_normals.reshape((-1, 4))[:, 3]
+        vertex_normals = export_per_vertex_colors(mesh_data, vertex_indices, attribute)
+        normals[:, 3] = vertex_normals[:, 3]
     else:
         normals[:, 3] = 1.0
 
@@ -750,7 +748,13 @@ def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute
             message += ' Valid names are "VertexColor" and "Blend".'
             raise ExportException(message)
 
-        # TODO: error for unsupported data_type.
+    colors = export_per_vertex_colors(mesh_data, vertex_indices, color_attribute)
+    a = xc3_model_py.vertex.AttributeData(ty, colors)
+    return a
+
+
+def export_per_vertex_colors(mesh_data, vertex_indices, color_attribute):
+    # TODO: error for unsupported data_type.
     if color_attribute.domain == "POINT":
         colors = np.zeros(len(mesh_data.vertices) * 4, dtype=np.float32)
         color_attribute.data.foreach_get("color", colors)
@@ -764,9 +768,7 @@ def export_color_attribute(mesh_name, mesh_data, vertex_indices, color_attribute
         message = f"Unsupported color attribute domain {color_attribute.domain}"
         raise ExportException(message)
 
-    colors = colors.reshape((-1, 4))
-    a = xc3_model_py.vertex.AttributeData(ty, colors)
-    return a
+    return colors.reshape((-1, 4))
 
 
 def export_uv_layer(mesh_name, mesh_data, positions, vertex_indices, uv_layer):
