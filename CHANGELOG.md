@@ -3,13 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.20.2 - 2025-10-10
 ### Fixed
 * Fixed a potential crash when importing normals for model and map geometry in some cases.
 * Fixed an issue where exporting would fail if the "VertexNormal" attribute used the "Face Corner" domain.
 * Fixed an issue where exporting would fail if the "OutlineThickness" vertex group contained no vertices.
 
-## 0.20.1
+## 0.20.1 - 2025-06-18
 ### Added
 * Added support for importing animations with the `.sar` extension.
 
