@@ -233,6 +233,7 @@ def export_mesh(
     morph_names: list[str],
     create_speff_meshes: bool,
     image_replacements: set,
+    bone_names: list[str],
 ):
     # Work on a copy in case we need to make any changes.
     mesh_copy = blender_mesh.copy()
@@ -252,6 +253,7 @@ def export_mesh(
             morph_names,
             create_speff_meshes,
             image_replacements,
+            bone_names,
         )
     finally:
         bpy.data.meshes.remove(mesh_copy.data)
@@ -269,6 +271,7 @@ def export_mesh_inner(
     morph_names: list[str],
     create_speff_meshes: bool,
     image_replacements: set,
+    bone_names: list[str],
 ):
 
     mesh_data: bpy.types.Mesh = blender_mesh.data
@@ -292,9 +295,11 @@ def export_mesh_inner(
     outline_alpha = export_outline_alpha(blender_mesh, positions)
 
     influences = export_influences(
-        operator, blender_mesh, mesh_data, mesh_name, combined_weights.bone_names
+        operator, blender_mesh, mesh_data, mesh_name, bone_names
     )
-    weight_indices = combined_weights.add_influences(influences, positions.shape[0])
+    weight_indices = combined_weights.add_influences(
+        influences, positions.shape[0], bone_names
+    )
 
     # Export all available vertex attributes.
     # xc3_model will handle ordering and selecting attributes required by the shader.

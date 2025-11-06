@@ -117,7 +117,9 @@ def export_wimdo(
 
     # Initialize weight buffer to share with all meshes.
     # TODO: Missing bone names?
-    bone_names = root.buffers.weights.weight_buffer(16385).bone_names
+    bone_names = []
+    if root.models.skinning is not None:
+        bone_names = [b.name for b in root.models.skinning.bones]
 
     # TODO: ignore groups without weights?
     vertex_group_names = set()
@@ -142,7 +144,7 @@ def export_wimdo(
                 bone_names.append(name)
 
     combined_weights = xc3_model_py.skinning.SkinWeights(
-        np.zeros((0, 4), dtype=np.uint8), np.zeros((0, 4), dtype=np.float32), bone_names
+        np.zeros((0, 4), dtype=np.uint8), np.zeros((0, 4), dtype=np.float32)
     )
 
     image_replacements = set()
@@ -162,6 +164,7 @@ def export_wimdo(
             morph_names,
             create_speff_meshes,
             image_replacements,
+            bone_names,
         )
 
     # The vertex shaders have a limited SSBO size for preskinned transform matrices.

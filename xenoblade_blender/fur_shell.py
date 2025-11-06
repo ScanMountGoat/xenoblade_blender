@@ -22,16 +22,28 @@ def import_fur_shells(
 
     modifier.node_group = node_tree
 
-    set_modifier_property(modifier, "Count", fur_params.instance_count)
-    set_modifier_property(modifier, "Scale", fur_params.shell_width)
-    set_modifier_property(modifier, "Height Offset", fur_params.y_offset)
-    set_modifier_property(modifier, "Alpha", fur_params.alpha)
+    # Set inputs.
+    set_modifier_input_property(modifier, "Count", fur_params.instance_count)
+    set_modifier_input_property(modifier, "Scale", fur_params.shell_width)
+    set_modifier_input_property(modifier, "Height Offset", fur_params.y_offset)
+    set_modifier_input_property(modifier, "Alpha", fur_params.alpha)
+
+    # Set output name to use in shaders.
+    set_modifier_output_property_name(modifier, "FurAlpha", "FurAlpha")
 
 
-def set_modifier_property(modifier: bpy.types.Modifier, name: str, value):
+def set_modifier_input_property(modifier: bpy.types.Modifier, name: str, value):
     # Inputs don't use the specified name.
     id = modifier.node_group.interface.items_tree[name].identifier
     modifier[id] = value
+
+
+def set_modifier_output_property_name(
+    modifier: bpy.types.Modifier, name: str, value: str
+):
+    # Output names use a special naming convention.
+    id = modifier.node_group.interface.items_tree[name].identifier
+    modifier[f"{id}_attribute_name"] = value
 
 
 def fur_shell_geometry_node_group(name: str):

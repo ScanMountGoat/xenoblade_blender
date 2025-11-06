@@ -9,6 +9,7 @@ from xenoblade_blender.node_group import (
     fresnel_blend_node_group,
     greater_xyz_node_group,
     less_xyz_node_group,
+    monochrome_xyz_node_group,
     normal_map_xy_final_node_group,
     normal_map_xyz_node_group,
     power_xyz_node_group,
@@ -666,6 +667,68 @@ def assign_output(
                 assign_arg(func.args[1], node.inputs["Y"])
 
                 return node, "Z"
+            case xc3_model_py.shader_database.Operation.MonochromeX:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
+                    )
+                    node.name = name
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+                assign_arg(func.args[3], node.inputs["Factor"])
+
+                return node, "X"
+            case xc3_model_py.shader_database.Operation.MonochromeY:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
+                    )
+                    node.name = name
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+                assign_arg(func.args[3], node.inputs["Factor"])
+
+                return node, "Y"
+            case xc3_model_py.shader_database.Operation.MonochromeZ:
+                # Reuse the node for other channels if possible.
+                name = func_name(func)
+                node = nodes.get(name)
+                if node is None:
+                    node = create_node_group(
+                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
+                    )
+                    node.name = name
+
+                assign_arg(func.args[0], node.inputs["X"])
+                assign_arg(func.args[1], node.inputs["Y"])
+                assign_arg(func.args[2], node.inputs["Z"])
+                assign_arg(func.args[3], node.inputs["Factor"])
+
+                return node, "Z"
+            case xc3_model_py.shader_database.Operation.Negate:
+                node = nodes.new("ShaderNodeMath")
+                node.name = func_name(func)
+                node.operation = "MULTIPLY"
+
+                assign_arg(func.args[0], node.inputs[0])
+                node.inputs[1].default_value = -1.0
+
+                return node, "Value"
+            case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
+                node = nodes.new("ShaderNodeAttribute")
+                node.name = func_name(func)
+                node.attribute_name = "FurAlpha"
+                return node, "Fac"
             case _:
                 # TODO: This case shouldn't happen?
                 return None
@@ -894,6 +957,9 @@ def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int])
         ("NormalMapX", "NormalMap"),
         ("NormalMapY", "NormalMap"),
         ("NormalMapZ", "NormalMap"),
+        ("MonochromeX", "Monochrome"),
+        ("MonochromeY", "Monochrome"),
+        ("MonochromeZ", "Monochrome"),
     ]
     for old, new in replacements:
         if op_name.startswith(old):
@@ -1085,6 +1151,21 @@ def assign_output_xyz(
                 pass
             case xc3_model_py.shader_database.Operation.NormalMapZ:
                 pass
+            # TODO: Fix merging for monochrome xyz?
+            case xc3_model_py.shader_database.Operation.Negate:
+                node = nodes.new("ShaderNodeVectorMath")
+                node.name = func_xyz_name(func)
+                node.operation = "MULTIPLY"
+
+                assign_arg(func.args[0], node.inputs[0])
+                node.inputs[1].default_value = (-1.0, -1.0, -1.0)
+
+                return node, "Vector"
+            case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
+                node = nodes.new("ShaderNodeAttribute")
+                node.name = func_name(func)
+                node.attribute_name = "FurAlpha"
+                return node, "Fac"
             case _:
                 # TODO: This case shouldn't happen?
                 return None

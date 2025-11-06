@@ -512,11 +512,21 @@ def import_mesh(
             mesh.flags2, lod_item_index, pass_type
         )
 
+        bone_names = []
+        if models.skinning is not None:
+            bone_names = [b.name for b in models.skinning.bones]
+
         # An extra step is required since some Xenoblade X models have multiple weight buffers.
         weight_buffer = buffers.weights.weight_buffer(mesh.flags2)
         if weight_buffer is not None:
             import_weight_groups(
-                weight_buffer, start_index, obj, vertex_buffer, min_index, max_index
+                weight_buffer,
+                start_index,
+                obj,
+                vertex_buffer,
+                min_index,
+                max_index,
+                bone_names,
             )
 
     if len(vertex_buffer.morph_targets) > 0:
@@ -694,6 +704,7 @@ def import_weight_groups(
     vertex_buffer,
     min_index: int,
     max_index: int,
+    bone_names: list[str],
 ):
     # Find the per vertex skinning information.
     weight_indices = None
@@ -706,7 +717,7 @@ def import_weight_groups(
 
     if weight_indices is not None:
         # This automatically removes zero weights.
-        influences = skin_weights.to_influences(weight_indices)
+        influences = skin_weights.to_influences(weight_indices, bone_names)
 
         for influence in influences:
             # Lazily load only used vertex groups.
