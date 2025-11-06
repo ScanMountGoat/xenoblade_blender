@@ -250,11 +250,21 @@ def import_map_root(
                 ].children[model_collection.name].exclude = True
 
                 for i, mesh in enumerate(model.meshes):
+                    material = models.materials[mesh.material_index]
+
+                    if not import_all_meshes:
+                        if (
+                            base_lods is not None
+                            and mesh.lod_item_index not in base_lods
+                        ):
+                            continue
+
+                        if "_outline" in material.name or "_speff_" in material.name:
+                            continue
+
                     # Many materials are for meshes that won't be loaded.
                     # Lazy load materials to improve import times.
-                    material = models.materials[mesh.material_index]
                     material_name = f"{mesh.material_index}.{material.name}"
-
                     blender_material = bpy.data.materials.get(material_name)
                     if blender_material is None:
                         blender_material = import_material(
@@ -267,17 +277,6 @@ def import_map_root(
                         )
 
                     buffers = group.buffers[model.model_buffers_index]
-
-                    # TODO: Should this check move earlier?
-                    if not import_all_meshes:
-                        if (
-                            base_lods is not None
-                            and mesh.lod_item_index not in base_lods
-                        ):
-                            continue
-
-                        if "_outline" in material.name or "_speff_" in material.name:
-                            continue
 
                     import_mesh(
                         operator,
