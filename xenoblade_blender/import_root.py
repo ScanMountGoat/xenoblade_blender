@@ -5,6 +5,8 @@ import numpy as np
 import os
 import math
 
+from xenoblade_blender.fur_shell import import_fur_shells
+
 from .import_material import import_material
 from . import xc3_model_py
 
@@ -266,6 +268,7 @@ def import_map_root(
 
                     buffers = group.buffers[model.model_buffers_index]
 
+                    # TODO: Should this check move earlier?
                     if not import_all_meshes:
                         if (
                             base_lods is not None
@@ -284,7 +287,7 @@ def import_map_root(
                         models,
                         mesh,
                         blender_material,
-                        material.name,
+                        material,
                         flip_uvs,
                         i,
                         import_outlines=True,
@@ -356,7 +359,7 @@ def import_model_root(
                 root.models,
                 mesh,
                 blender_material,
-                material.name,
+                material,
                 flip_uvs,
                 i,
                 import_outlines,
@@ -370,12 +373,13 @@ def import_mesh(
     buffers,
     models,
     mesh,
-    material: bpy.types.Material,
-    material_name: str,
+    blender_material: bpy.types.Material,
+    material: xc3_model_py.material.Material,
     flip_uvs: bool,
     i: int,
     import_outlines: bool,
 ):
+    material_name = material.name
     blender_mesh = bpy.data.meshes.new(f"{i}.{material_name}")
 
     # Vertex buffers are shared with multiple index buffers.
@@ -491,7 +495,7 @@ def import_mesh(
         blender_mesh.normals_split_custom_set_from_vertices(normals)
 
     # Assign materials from the current group.
-    blender_mesh.materials.append(material)
+    blender_mesh.materials.append(blender_material)
 
     # Convert from Y up to Z up.
     y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
@@ -553,6 +557,9 @@ def import_mesh(
         # Prevent rendering issues with overlapping geoemtry.
         # The in game shaders discard fragments with 0.0 outline alpha.
         modifier.thickness_vertex_group = 0.01
+
+    if material.fur_params is not None:
+        import_fur_shells(obj, material.fur_params)
 
     # Attach the mesh to the armature or empty.
     # Assume the root_obj is an armature if there are weights.

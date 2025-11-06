@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Added
+* Added support for fur shell rendering using geometry nodes.
+
 ## 0.20.2 - 2025-10-10
 ### Fixed
 * Fixed a potential crash when importing normals for model and map geometry in some cases.
