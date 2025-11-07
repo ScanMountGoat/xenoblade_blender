@@ -1397,12 +1397,11 @@ def add_used_xyz_assignments(
 ):
     # Collect the scalar assignments for texture coordinates.
     if i is not None:
-        if i not in visited:
-            assignment = assignments_xyz[i]
-            if func := assignment.func():
-                for arg in func.args:
-                    add_used_xyz_assignments(visited, assignments, assignments_xyz, arg)
-            elif value := assignment.value():
-                if texture := value.texture():
-                    for coord in texture.texcoords:
-                        add_used_assignments(visited, assignments, coord)
+        assignment = assignments_xyz[i]
+        if func := assignment.func():
+            for arg in func.args:
+                add_used_xyz_assignments(visited, assignments, assignments_xyz, arg)
+        elif value := assignment.value():
+            if texture := value.texture():
+                for coord in texture.texcoords:
+                    add_used_assignments(visited, assignments, coord)
