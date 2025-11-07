@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 * Added support for fur shell rendering using geometry nodes.
 
+### Changed
+* Improved accuracy of material assignments and reduced shader node count in some cases.
+
 ### Fixed
 * Fixed an issue where camdo import would not import all bones in some cases.
 
