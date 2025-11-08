@@ -1,3 +1,4 @@
+import copy
 import bpy
 import time
 import numpy as np
@@ -9,7 +10,6 @@ from xenoblade_blender.import_root import init_logging
 
 from .export_root import (
     ExportException,
-    copy_material,
     export_mesh,
     image_index_to_replace,
 )
@@ -108,7 +108,7 @@ def export_wimdo(
     # TODO: Create this from scratch eventually?
     root = xc3_model_py.load_model(wimdo_path, None)
     original_meshes = [m for m in root.models.models[0].meshes]
-    original_materials = [copy_material(m) for m in root.models.materials]
+    original_materials = [copy.deepcopy(m) for m in root.models.materials]
     morph_names = root.models.morph_controller_names
     root.buffers.vertex_buffers = []
     root.buffers.outline_buffers = []

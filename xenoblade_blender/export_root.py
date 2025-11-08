@@ -5,6 +5,7 @@ import numpy as np
 from . import xc3_model_py
 from mathutils import Matrix
 import bmesh
+import copy
 
 
 class ExportException(Exception):
@@ -380,7 +381,7 @@ def export_mesh_inner(
     if is_new_material:
         # Add a new material with the given name.
         # Avoid potentially referencing an added material here.
-        material_to_edit = copy_material(original_material)
+        material_to_edit = copy.deepcopy(original_material)
         material_to_edit.name = material_name
         material_index = len(root.models.materials)
         root.models.materials.append(material_to_edit)
@@ -422,7 +423,7 @@ def export_mesh_inner(
                 # Avoid modifying existing speff materials if the material is new.
                 speff_material_index = mesh.material_index
                 if is_new_material:
-                    material_to_edit = copy_material(
+                    material_to_edit = copy.deepcopy(
                         root.models.materials[mesh.material_index]
                     )
                     speff_material_index = len(root.models.materials)
@@ -433,7 +434,7 @@ def export_mesh_inner(
                 apply_texture_indices(material_to_edit, material_texture_indices)
                 apply_toon_gradient_row(mesh_data, material_to_edit)
 
-                speff_mesh = copy_mesh(new_mesh)
+                speff_mesh = copy.deepcopy(new_mesh)
                 speff_mesh.material_index = speff_material_index
                 speff_mesh.flags1 = mesh.flags1
                 speff_mesh.flags2 = mesh.flags2
@@ -506,7 +507,7 @@ def export_outline_mesh(
             break
 
     if original_outline_mesh is not None and outline_material_index is not None:
-        outline_mesh = copy_mesh(new_mesh)
+        outline_mesh = copy.deepcopy(new_mesh)
         outline_mesh.material_index = outline_material_index
         outline_mesh.flags1 = original_outline_mesh.flags1
         outline_mesh.flags2 = original_outline_mesh.flags2
@@ -916,50 +917,3 @@ def export_shape_keys(
             morph_targets.append(target)
 
     return morph_targets
-
-
-def copy_material(material: xc3_model_py.material.Material):
-    # TODO: does pyo3 support deep copy?
-    # TODO: Add deep copy support to xc3_model_py?
-    textures = [
-        xc3_model_py.material.Texture(t.image_texture_index, t.sampler_index)
-        for t in material.textures
-    ]
-    return xc3_model_py.material.Material(
-        material.name,
-        material.flags,
-        material.render_flags,
-        material.state_flags,
-        material.color,
-        textures,
-        np.array(material.work_values, dtype=np.float32),
-        material.shader_vars,
-        material.work_callbacks,
-        material.alpha_test_ref,
-        material.m_unks1_1,
-        material.m_unks1_2,
-        material.m_unks1_3,
-        material.m_unks1_4,
-        material.technique_index,
-        material.pass_type,
-        material.parameters,
-        material.m_unks2_2,
-        material.gbuffer_flags,
-        material.alpha_test,
-        material.shader,
-        material.fur_params,
-    )
-
-
-def copy_mesh(mesh: xc3_model_py.Mesh) -> xc3_model_py.Mesh:
-    return xc3_model_py.Mesh(
-        mesh.vertex_buffer_index,
-        mesh.index_buffer_index,
-        mesh.index_buffer_index2,
-        mesh.material_index,
-        mesh.flags1,
-        mesh.flags2,
-        mesh.lod_item_index,
-        mesh.ext_mesh_index,
-        mesh.base_mesh_index,
-    )
