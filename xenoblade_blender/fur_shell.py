@@ -23,9 +23,10 @@ def import_fur_shells(
     modifier.node_group = node_tree
 
     # Set inputs.
-    set_modifier_input_property(modifier, "Count", fur_params.instance_count)
-    set_modifier_input_property(modifier, "Scale", fur_params.shell_width)
-    set_modifier_input_property(modifier, "Height Offset", fur_params.y_offset)
+    set_modifier_input_property(modifier, "Instance Count", fur_params.instance_count)
+    set_modifier_input_property(modifier, "View Distance", fur_params.view_distance)
+    set_modifier_input_property(modifier, "Shell Width", fur_params.shell_width)
+    set_modifier_input_property(modifier, "Y Offset", fur_params.y_offset)
     set_modifier_input_property(modifier, "Alpha", fur_params.alpha)
 
     # Set output name to use in shaders.
@@ -63,24 +64,44 @@ def fur_shell_geometry_node_group(name: str):
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketGeometry", name="Geometry"
     )
-    # TODO: Better names?
+
+    # Create inputs based on the fur params struct exposed by xc3_model_py.
+    # Use min/max values based on the typical value range for in game models.
     count_socket = node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketInt", name="Count"
+        in_out="INPUT", socket_type="NodeSocketInt", name="Instance Count"
     )
-    count_socket.min_value = 0
-    count_socket.max_value = 20  # TODO: Find a good max value in game.
+    count_socket.description = "The number of fur shells to render"
+    count_socket.min_value = 1
+    count_socket.max_value = 10
+
+    distance_socket = node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="View Distance"
+    )
+    distance_socket.description = "The distance at which shell count starts to lower"
+    distance_socket.min_value = 0.0
+    distance_socket.max_value = 500.0
 
     scale_socket = node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketFloat", name="Scale"
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Shell Width"
     )
+    scale_socket.description = "The width applied increasingly to each fur shell"
     scale_socket.min_value = 0.0
-    scale_socket.max_value = 1.0  # TODO: Find a good max value in game.
+    scale_socket.max_value = 0.1
 
-    node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketFloat", name="Height Offset"
+    y_offset_socket = node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Y Offset"
     )
+    y_offset_socket.description = (
+        "The vertical offset applied increasingly to each fur shell"
+    )
+    y_offset_socket.min_value = -1.0
+    y_offset_socket.max_value = 1.0
+
     alpha_socket = node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Alpha"
+    )
+    alpha_socket.description = (
+        "The alpha transparency applied increasingly to each fur shell"
     )
     alpha_socket.min_value = 0.0
     alpha_socket.max_value = 1.0
@@ -89,7 +110,7 @@ def fur_shell_geometry_node_group(name: str):
     grid = nodes.new("GeometryNodeMeshGrid")
     grid.inputs[0].default_value = 0.0
     grid.inputs[1].default_value = 0.0
-    links.new(input_node.outputs["Count"], grid.inputs[2])
+    links.new(input_node.outputs["Instance Count"], grid.inputs[2])
     grid.inputs[3].default_value = 1
 
     instances = nodes.new("GeometryNodeInstanceOnPoints")
@@ -117,11 +138,11 @@ def fur_shell_geometry_node_group(name: str):
     one_over_count = nodes.new("ShaderNodeMath")
     one_over_count.operation = "DIVIDE"
     one_over_count.inputs[0].default_value = 1.0
-    links.new(input_node.outputs["Count"], one_over_count.inputs[1])
+    links.new(input_node.outputs["Instance Count"], one_over_count.inputs[1])
 
     shell_width_param = nodes.new("ShaderNodeMath")
     shell_width_param.operation = "MULTIPLY"
-    links.new(input_node.outputs["Scale"], shell_width_param.inputs[0])
+    links.new(input_node.outputs["Shell Width"], shell_width_param.inputs[0])
     links.new(one_over_count.outputs["Value"], shell_width_param.inputs[1])
 
     # Vertex shader instance "scale" by translating along normal.
@@ -145,14 +166,14 @@ def fur_shell_geometry_node_group(name: str):
     # Uniform buffer height offset parameter.
     height_offset_param = nodes.new("ShaderNodeMath")
     height_offset_param.operation = "MULTIPLY"
-    links.new(input_node.outputs["Scale"], height_offset_param.inputs[0])
-    links.new(input_node.outputs["Height Offset"], height_offset_param.inputs[1])
+    links.new(input_node.outputs["Shell Width"], height_offset_param.inputs[0])
+    links.new(input_node.outputs["Y Offset"], height_offset_param.inputs[1])
 
     # Vertex shader instance height offset.
     y_offset_param = nodes.new("ShaderNodeMath")
     y_offset_param.operation = "DIVIDE"
     links.new(index_plus_one.outputs["Value"], y_offset_param.inputs[0])
-    links.new(input_node.outputs["Count"], y_offset_param.inputs[1])
+    links.new(input_node.outputs["Instance Count"], y_offset_param.inputs[1])
 
     y_offset_param3 = nodes.new("ShaderNodeMath")
     y_offset_param3.operation = "POWER"
@@ -189,7 +210,7 @@ def fur_shell_geometry_node_group(name: str):
     alpha_param = nodes.new("ShaderNodeMath")
     alpha_param.operation = "DIVIDE"
     links.new(one_minus_alpha.outputs["Value"], alpha_param.inputs[0])
-    links.new(input_node.outputs["Count"], alpha_param.inputs[1])
+    links.new(input_node.outputs["Instance Count"], alpha_param.inputs[1])
 
     # Vertex shader instance alpha.
     alpha_factor = nodes.new("ShaderNodeMath")
