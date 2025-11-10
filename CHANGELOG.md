@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
 ### Added
-* Added import and export support fur shell rendering for wimdo models using geometry nodes.
+* Added import and export support for fur shells for wimdo models using geometry nodes.
 
 ### Changed
 * Improved accuracy of material assignments and reduced shader node count in some cases.
