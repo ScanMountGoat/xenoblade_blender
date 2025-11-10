@@ -95,14 +95,14 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     mesh.data.transform(mesh.matrix_basis)
     mesh.matrix_basis.identity()
 
-    # Apply modifiers other than armature and outlines.
+    # Apply modifiers not created during import like skinning, outlines, or fur.
     override = context.copy()
     override["object"] = mesh
     override["active_object"] = mesh
     override["selected_objects"] = [mesh]
     with context.temp_override(**override):
         for modifier in mesh.modifiers:
-            if modifier.type != "ARMATURE" and modifier.type != "SOLIDIFY":
+            if modifier.type not in ["ARMATURE", "SOLIDIFY", "NODES"]:
                 bpy.ops.object.modifier_apply(modifier=modifier.name)
 
     # Get the custom normals from the original mesh.
@@ -392,6 +392,8 @@ def export_mesh_inner(
     apply_texture_indices(material_to_edit, material_texture_indices)
     apply_toon_gradient_row(mesh_data, material_to_edit)
 
+    apply_fur_params(blender_mesh, mesh_name, material_to_edit)
+
     for i, image in material_texture_indices.values():
         image_replacements.add((i, image))
 
@@ -482,6 +484,24 @@ def export_mesh_inner(
     root.buffers.index_buffers.append(index_buffer)
 
 
+def apply_fur_params(blender_mesh, mesh_name, material_to_edit):
+    if modifier := find_fur_modifier(blender_mesh):
+        params = material_to_edit.fur_params
+        if params is not None:
+            params.instance_count = get_modifier_input_property(
+                modifier, "Instance Count"
+            )
+            params.view_distance = get_modifier_input_property(
+                modifier, "View Distance"
+            )
+            params.shell_width = get_modifier_input_property(modifier, "Shell Width")
+            params.y_offset = get_modifier_input_property(modifier, "Y Offset")
+            params.alpha = get_modifier_input_property(modifier, "Alpha")
+        else:
+            message = f"Mesh {mesh_name} has fur geometry nodes but not fur params in the original material."
+            raise ExportException(message)
+
+
 def export_outline_mesh(
     original_meshes,
     original_materials,
@@ -517,13 +537,27 @@ def export_outline_mesh(
         return None
 
 
-def mesh_has_outlines(blender_mesh):
+def mesh_has_outlines(blender_mesh: bpy.types.Object) -> bool:
     # TODO: Is there a more reliable way to check for outlines?
     for modifier in blender_mesh.modifiers:
         if modifier.type == "SOLIDIFY":
             return True
 
     return False
+
+
+def find_fur_modifier(blender_mesh: bpy.types.Object) -> Optional[bpy.types.Modifier]:
+    for modifier in blender_mesh.modifiers:
+        if modifier.type == "NODES" and modifier.name == "FurShellGeometryNodes":
+            return modifier
+
+    return None
+
+
+def get_modifier_input_property(modifier: bpy.types.Modifier, name: str):
+    # Inputs don't use the specified name.
+    id = modifier.node_group.interface.items_tree[name].identifier
+    return modifier[id]
 
 
 def export_outline_alpha(blender_mesh, positions):
