@@ -650,6 +650,7 @@ def import_shape_keys(
 
     for target in vertex_buffer.morph_targets:
         sk = obj.shape_key_add(name=names[target.morph_controller_index])
+        sk.value = 0.0
         if target.vertex_indices.size > 0:
             # Morph targets are stored as sparse deltas for the base positions.
             # TODO: Blender doesn't have shape key normals?

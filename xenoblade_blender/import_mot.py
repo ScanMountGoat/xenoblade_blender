@@ -67,6 +67,16 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
         action = import_animation(armature, skeleton, bone_names, animation)
         armature.animation_data.action = action
 
+        if bpy.app.version >= (4, 4, 0):
+            # TODO: Why are there empty animations that don't create slots?
+            if len(action.slots) == 0:
+                slot = action.slots.new(id_type="OBJECT", name="Legacy Slot")
+            else:
+                slot = action.slots[0]
+
+            # Automatic slot assignment works differently on 5.0 or later.
+            armature.animation_data.action_slot = action.slots[0]
+
     end = time.time()
     print(f"Import Blender Animation: {end - start}")
 
@@ -119,6 +129,32 @@ def set_fcurves_component(
 
     # Each coordinate of each value has its own fcurve.
     data_path = f'pose.bones["{bone_name}"].{value_name}'
-    fcurve = action.fcurves.new(data_path, index=i, action_group=bone_name)
+    fcurve = create_fcurve(action, data_path, i, bone_name)
     fcurve.keyframe_points.add(count=values.size)
     fcurve.keyframe_points.foreach_set("co", keyframe_points.reshape(-1))
+
+
+def create_fcurve(
+    action, data_path: str, index: int, group_name: str
+) -> bpy.types.FCurve:
+    if bpy.app.version >= (5, 0, 0):
+        # Blender 5.0 removes the legacy Action API.
+        if len(action.layers) == 0:
+            layer = action.layers.new("Layer")
+        else:
+            layer = action.layers[0]
+
+        if len(layer.strips) == 0:
+            strip = layer.strips.new(type="KEYFRAME")
+        else:
+            strip = layer.strips[0]
+
+        if len(action.slots) == 0:
+            slot = action.slots.new(id_type="OBJECT", name="Legacy Slot")
+        else:
+            slot = action.slots[0]
+
+        channelbag = strip.channelbag(slot, ensure=True)
+        return channelbag.fcurves.new(data_path, index=index, group_name=group_name)
+    else:
+        return action.fcurves.new(data_path, index=index, action_group=group_name)
