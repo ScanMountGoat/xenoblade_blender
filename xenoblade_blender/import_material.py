@@ -276,10 +276,7 @@ def import_material(
     else:
         links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
 
-    if material.state_flags.blend_mode not in [
-        xc3_model_py.material.BlendMode.Disabled,
-        xc3_model_py.material.BlendMode.Disabled2,
-    ]:
+    if has_alpha:
         blender_material.blend_method = "BLEND"
 
     if material.alpha_test is not None:

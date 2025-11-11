@@ -7,15 +7,15 @@ def create_node_group(nodes, name: str, create_node_tree):
     # Cache the node group creation.
     node_tree = bpy.data.node_groups.get(name)
     if node_tree is None:
-        node_tree = create_node_tree()
+        node_tree = create_node_tree(name)
 
     group = nodes.new("ShaderNodeGroup")
     group.node_tree = node_tree
     return group
 
 
-def normals_xy_node_group():
-    node_tree = bpy.data.node_groups.new("NormalsXY", "ShaderNodeTree")
+def normals_xy_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketVector", name="Normal"
@@ -76,8 +76,8 @@ def normals_xy_node_group():
     return node_tree
 
 
-def add_normals_node_group():
-    node_tree = bpy.data.node_groups.new("AddNormals", "ShaderNodeTree")
+def add_normals_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
@@ -184,8 +184,8 @@ def add_normals_node_group():
     return node_tree
 
 
-def fresnel_blend_node_group():
-    node_tree = bpy.data.node_groups.new("FresnelBlend", "ShaderNodeTree")
+def fresnel_blend_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
@@ -223,8 +223,8 @@ def fresnel_blend_node_group():
     return node_tree
 
 
-def tex_matrix_node_group():
-    node_tree = bpy.data.node_groups.new("TexMatrix", "ShaderNodeTree")
+def tex_matrix_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
@@ -277,8 +277,8 @@ def tex_matrix_node_group():
     return node_tree
 
 
-def tex_parallax_node_group():
-    node_tree = bpy.data.node_groups.new("TexParallax", "ShaderNodeTree")
+def tex_parallax_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="Value"
@@ -305,8 +305,8 @@ def tex_parallax_node_group():
     return node_tree
 
 
-def normal_map_xyz_node_group():
-    node_tree = bpy.data.node_groups.new("NormalMapXY", "ShaderNodeTree")
+def normal_map_xyz_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
@@ -356,8 +356,8 @@ def normal_map_xyz_node_group():
     return node_tree
 
 
-def normal_map_xy_final_node_group():
-    node_tree = bpy.data.node_groups.new("NormalMapXYFinal", "ShaderNodeTree")
+def normal_map_xy_final_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketVector", name="Normal"
@@ -399,8 +399,8 @@ def normal_map_xy_final_node_group():
     return node_tree
 
 
-def toon_grad_uvs_node_group():
-    node_tree = bpy.data.node_groups.new("ToonGradUVs", "ShaderNodeTree")
+def toon_grad_uvs_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
@@ -456,8 +456,8 @@ def toon_grad_uvs_node_group():
     return node_tree
 
 
-def reflect_xyz_node_group():
-    node_tree = bpy.data.node_groups.new("ReflectXYZ", "ShaderNodeTree")
+def reflect_xyz_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketVector", name="X"
@@ -520,24 +520,24 @@ def reflect_xyz_node_group():
     return node_tree
 
 
-def power_xyz_node_group():
-    return math_xyz_node_group("PowerXYZ", "POWER", ["Base", "Exponent"])
+def power_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "POWER", ["Base", "Exponent"])
 
 
-def sqrt_xyz_node_group():
-    return math_xyz_node_group("SqrtXYZ", "SQRT", ["Value"])
+def sqrt_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "SQRT", ["Value"])
 
 
-def less_xyz_node_group():
-    return math_xyz_node_group("LessXYZ", "LESS_THAN", ["Value", "Threshold"])
+def less_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "LESS_THAN", ["Value", "Threshold"])
 
 
-def greater_xyz_node_group():
-    return math_xyz_node_group("GreaterXYZ", "GREATER_THAN", ["Value", "Threshold"])
+def greater_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "GREATER_THAN", ["Value", "Threshold"])
 
 
-def clamp_xyz_node_group():
-    node_tree = bpy.data.node_groups.new("ClampXYZ", "ShaderNodeTree")
+def clamp_xyz_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
@@ -645,9 +645,9 @@ def math_xyz_node_group(name: str, op: str, inputs: list[str]):
     return node_tree
 
 
-def monochrome_xyz_node_group():
+def monochrome_xyz_node_group(name: str):
     # Apply a scalar operation to independent XYZ components.
-    node_tree = bpy.data.node_groups.new("MonochromeXYZ", "ShaderNodeTree")
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
         in_out="OUTPUT", socket_type="NodeSocketFloat", name="X"
