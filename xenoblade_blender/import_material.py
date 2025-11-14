@@ -420,8 +420,8 @@ def assign_output(
             ty,
         )
 
-        assign_arg = lambda i, output: assign_index(
-            i, assignment_outputs, links, output
+        assign_args = lambda func, node, params: assign_func_args(
+            func, params, assignment_outputs, links, node
         )
 
         match func.op:
@@ -444,45 +444,21 @@ def assign_output(
                 node.data_type = "RGBA"
                 node.blend_type = "MULTIPLY"
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["A"])
-                assign_arg(func.args[1], node.inputs["B"])
-                assign_arg(func.args[2], node.inputs["Factor"])
-
+                assign_args(func, node, ["A", "B", "Factor"])
                 return node, "Result"
             case xc3_model_py.shader_database.Operation.AddNormalX:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "AddNormals", add_normals_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["B.x"])
-                assign_arg(func.args[3], node.inputs["B.y"])
-                assign_arg(func.args[4], node.inputs["Factor"])
-
+                node = create_cached_group_node(
+                    nodes, func, "AddNormals", add_normals_node_group
+                )
+                assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
                 return node, "X"
             case xc3_model_py.shader_database.Operation.AddNormalY:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "AddNormals", add_normals_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["B.x"])
-                assign_arg(func.args[3], node.inputs["B.y"])
-                assign_arg(func.args[4], node.inputs["Factor"])
-
+                node = create_cached_group_node(
+                    nodes, func, "AddNormals", add_normals_node_group
+                )
+                assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
                 return node, "Y"
             case xc3_model_py.shader_database.Operation.Overlay:
                 return mix_rgba_node("OVERLAY")
@@ -499,11 +475,7 @@ def assign_output(
             case xc3_model_py.shader_database.Operation.Clamp:
                 node = nodes.new("ShaderNodeClamp")
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Min"])
-                assign_arg(func.args[2], node.inputs["Max"])
-
+                assign_args(func, node, ["Value", "Min", "Max"])
                 return node, "Result"
             case xc3_model_py.shader_database.Operation.Abs:
                 return math_node("ABSOLUTE")
@@ -515,92 +487,45 @@ def assign_output(
 
                 # TODO: normals?
 
-                assign_arg(func.args[0], node.inputs["Value"])
-
+                assign_args(func, node, ["Value"])
                 return node, "Value"
             case xc3_model_py.shader_database.Operation.Sqrt:
                 return math_node("SQRT")
             case xc3_model_py.shader_database.Operation.TexMatrix:
                 node = create_node_group(nodes, "TexMatrix", tex_matrix_node_group)
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["U"])
-                assign_arg(func.args[1], node.inputs["V"])
-                assign_arg(func.args[2], node.inputs["A"])
-                assign_arg(func.args[3], node.inputs["B"])
-                assign_arg(func.args[4], node.inputs["C"])
-                assign_arg(func.args[5], node.inputs["D"])
-
+                assign_args(func, node, ["U", "V", "A", "B", "C", "D"])
                 return node, "Value"
             case xc3_model_py.shader_database.Operation.TexParallaxX:
                 node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Factor"])
-
+                assign_args(func, node, ["Value", "Factor"])
                 return node, "Value"
             case xc3_model_py.shader_database.Operation.TexParallaxY:
                 node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
                 node.name = func_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Factor"])
-
+                assign_args(func, node, ["Value", "Factor"])
                 return node, "Value"
             case xc3_model_py.shader_database.Operation.ReflectX:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "ReflectXYZ", reflect_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["A.z"])
-                assign_arg(func.args[3], node.inputs["B.x"])
-                assign_arg(func.args[4], node.inputs["B.y"])
-                assign_arg(func.args[5], node.inputs["B.z"])
-
+                node = create_cached_group_node(
+                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
+                )
+                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
                 return node, "X"
             case xc3_model_py.shader_database.Operation.ReflectY:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "ReflectXYZ", reflect_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["A.z"])
-                assign_arg(func.args[3], node.inputs["B.x"])
-                assign_arg(func.args[4], node.inputs["B.y"])
-                assign_arg(func.args[5], node.inputs["B.z"])
-
+                node = create_cached_group_node(
+                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
+                )
+                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
                 return node, "Y"
             case xc3_model_py.shader_database.Operation.ReflectZ:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "ReflectXYZ", reflect_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["A.x"])
-                assign_arg(func.args[1], node.inputs["A.y"])
-                assign_arg(func.args[2], node.inputs["A.z"])
-                assign_arg(func.args[3], node.inputs["B.x"])
-                assign_arg(func.args[4], node.inputs["B.y"])
-                assign_arg(func.args[5], node.inputs["B.z"])
-
+                node = create_cached_group_node(
+                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
+                )
+                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
                 return node, "Z"
             case xc3_model_py.shader_database.Operation.Floor:
                 return math_node("FLOOR")
@@ -625,99 +550,52 @@ def assign_output(
                 pass
             case xc3_model_py.shader_database.Operation.NormalMapX:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-
+                node = create_cached_group_node(
+                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y"])
                 return node, "X"
             case xc3_model_py.shader_database.Operation.NormalMapY:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[1], node.inputs["Y"])
-
+                node = create_cached_group_node(
+                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y"])
                 return node, "Y"
             case xc3_model_py.shader_database.Operation.NormalMapZ:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "NormalMapXYZ", normal_map_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-
+                node = create_cached_group_node(
+                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y"])
                 return node, "Z"
             case xc3_model_py.shader_database.Operation.MonochromeX:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-                assign_arg(func.args[3], node.inputs["Factor"])
-
+                node = create_cached_group_node(
+                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z", "Factor"])
                 return node, "X"
             case xc3_model_py.shader_database.Operation.MonochromeY:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-                assign_arg(func.args[3], node.inputs["Factor"])
-
+                node = create_cached_group_node(
+                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z", "Factor"])
                 return node, "Y"
             case xc3_model_py.shader_database.Operation.MonochromeZ:
                 # Reuse the node for other channels if possible.
-                name = func_name(func)
-                node = nodes.get(name)
-                if node is None:
-                    node = create_node_group(
-                        nodes, "MonochromeXYZ", monochrome_xyz_node_group
-                    )
-                    node.name = name
-
-                assign_arg(func.args[0], node.inputs["X"])
-                assign_arg(func.args[1], node.inputs["Y"])
-                assign_arg(func.args[2], node.inputs["Z"])
-                assign_arg(func.args[3], node.inputs["Factor"])
-
+                node = create_cached_group_node(
+                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
+                )
+                assign_args(func, node, ["X", "Y", "Z", "Factor"])
                 return node, "Z"
             case xc3_model_py.shader_database.Operation.Negate:
                 node = nodes.new("ShaderNodeMath")
                 node.name = func_name(func)
                 node.operation = "MULTIPLY"
 
-                assign_arg(func.args[0], node.inputs[0])
+                assign_args(func, node, [0])
                 node.inputs[1].default_value = -1.0
 
                 return node, "Value"
@@ -1000,11 +878,8 @@ def assign_output_xyz(
             ty,
         )
 
-        assign_arg = lambda i, output: assign_index(
-            i,
-            assignment_outputs_xyz,
-            links,
-            output,
+        assign_args = lambda func, node, params: assign_func_args(
+            func, params, assignment_outputs_xyz, links, node
         )
 
         match func.op:
@@ -1027,11 +902,7 @@ def assign_output_xyz(
                 node.data_type = "RGBA"
                 node.blend_type = "MULTIPLY"
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["A"])
-                assign_arg(func.args[1], node.inputs["B"])
-                assign_arg(func.args[2], node.inputs["Factor"])
-
+                assign_args(func, node, ["A", "B", "Factor"])
                 return node, "Result"
             case xc3_model_py.shader_database.Operation.AddNormalX:
                 pass
@@ -1046,10 +917,7 @@ def assign_output_xyz(
             case xc3_model_py.shader_database.Operation.Power:
                 node = create_node_group(nodes, "PowerXYZ", power_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Base"])
-                assign_arg(func.args[1], node.inputs["Exponent"])
-
+                assign_args(func, node, ["Base", "Exponent"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.Min:
                 return math_node("MINIMUM")
@@ -1058,11 +926,7 @@ def assign_output_xyz(
             case xc3_model_py.shader_database.Operation.Clamp:
                 node = create_node_group(nodes, "ClampXYZ", clamp_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Min"])
-                assign_arg(func.args[2], node.inputs["Max"])
-
+                assign_args(func, node, ["Value", "Min", "Max"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.Abs:
                 return math_node("ABSOLUTE")
@@ -1074,16 +938,12 @@ def assign_output_xyz(
                 node.name = func_xyz_name(func)
 
                 # TODO: normals?
-
-                assign_arg(func.args[0], node.inputs["Value"])
-
+                assign_args(func, node, ["Value"])
                 return node, "Value"
             case xc3_model_py.shader_database.Operation.Sqrt:
                 node = create_node_group(nodes, "SqrtXYZ", sqrt_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-
+                assign_args(func, node, ["Value"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.TexMatrix:
                 pass
@@ -1109,36 +969,24 @@ def assign_output_xyz(
             case xc3_model_py.shader_database.Operation.Less:
                 node = create_node_group(nodes, "LessXYZ", less_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Threshold"])
-
+                assign_args(func, node, ["Value", "Threshold"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.Greater:
                 node = create_node_group(nodes, "GreaterXYZ", greater_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Threshold"])
-
+                assign_args(func, node, ["Value", "Threshold"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.LessEqual:
                 # TODO: node group for leq?
                 node = create_node_group(nodes, "LessXYZ", less_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Threshold"])
-
+                assign_args(func, node, ["Value", "Threshold"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.GreaterEqual:
                 # TODO: node group for geq?
                 node = create_node_group(nodes, "GreaterXYZ", greater_xyz_node_group)
                 node.name = func_xyz_name(func)
-
-                assign_arg(func.args[0], node.inputs["Value"])
-                assign_arg(func.args[1], node.inputs["Threshold"])
-
+                assign_args(func, node, ["Value", "Threshold"])
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.Dot4:
                 pass
@@ -1153,10 +1001,8 @@ def assign_output_xyz(
                 node = nodes.new("ShaderNodeVectorMath")
                 node.name = func_xyz_name(func)
                 node.operation = "MULTIPLY"
-
-                assign_arg(func.args[0], node.inputs[0])
+                assign_args(func, node, [0])
                 node.inputs[1].default_value = (-1.0, -1.0, -1.0)
-
                 return node, "Vector"
             case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
                 node = nodes.new("ShaderNodeAttribute")
@@ -1402,3 +1248,29 @@ def add_used_xyz_assignments(
             if texture := value.texture():
                 for coord in texture.texcoords:
                     add_used_assignments(visited, assignments, coord)
+
+
+def create_cached_group_node(
+    nodes,
+    func: xc3_model_py.material.AssignmentFunc,
+    node_group_name: str,
+    create_node_tree,
+) -> bpy.types.Node:
+    name = func_name(func)
+    node = nodes.get(name)
+    if node is None:
+        node = create_node_group(nodes, node_group_name, create_node_tree)
+        node.name = name
+
+    return node
+
+
+def assign_func_args(
+    func: xc3_model_py.material.AssignmentFunc,
+    params: list[int | str],
+    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    links,
+    node: bpy.types.Node,
+):
+    for i, param in zip(func.args, params):
+        assign_index(i, assignment_outputs, links, node.inputs[param])
