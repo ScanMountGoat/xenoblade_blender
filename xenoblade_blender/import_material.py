@@ -404,213 +404,196 @@ def assign_output(
     ],
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := assignment.func():
-        mix_rgba_node = lambda ty: assign_mix_rgba(
-            func,
-            assignment_outputs,
-            nodes,
-            links,
-            ty,
-        )
-
-        math_node = lambda ty: assign_math(
-            func,
-            assignment_outputs,
-            nodes,
-            links,
-            ty,
-        )
-
-        assign_args = lambda func, node, params: assign_func_args(
-            func, params, assignment_outputs, links, node
-        )
-
-        match func.op:
-            case xc3_model_py.shader_database.Operation.Unk:
-                return None
-            case xc3_model_py.shader_database.Operation.Mix:
-                return mix_rgba_node("MIX")
-            case xc3_model_py.shader_database.Operation.Mul:
-                return math_node("MULTIPLY")
-            case xc3_model_py.shader_database.Operation.Div:
-                return math_node("DIVIDE")
-            case xc3_model_py.shader_database.Operation.Add:
-                return math_node("ADD")
-            case xc3_model_py.shader_database.Operation.Sub:
-                return math_node("SUBTRACT")
-            case xc3_model_py.shader_database.Operation.Fma:
-                return math_node("MULTIPLY_ADD")
-            case xc3_model_py.shader_database.Operation.MulRatio:
-                node = nodes.new("ShaderNodeMix")
-                node.data_type = "RGBA"
-                node.blend_type = "MULTIPLY"
-                node.name = func_name(func)
-                assign_args(func, node, ["A", "B", "Factor"])
-                return node, "Result"
-            case xc3_model_py.shader_database.Operation.AddNormalX:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "AddNormals", add_normals_node_group
-                )
-                assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
-                return node, "X"
-            case xc3_model_py.shader_database.Operation.AddNormalY:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "AddNormals", add_normals_node_group
-                )
-                assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
-                return node, "Y"
-            case xc3_model_py.shader_database.Operation.Overlay:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.Overlay2:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.OverlayRatio:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.Power:
-                return math_node("POWER")
-            case xc3_model_py.shader_database.Operation.Min:
-                return math_node("MINIMUM")
-            case xc3_model_py.shader_database.Operation.Max:
-                return math_node("MAXIMUM")
-            case xc3_model_py.shader_database.Operation.Clamp:
-                node = nodes.new("ShaderNodeClamp")
-                node.name = func_name(func)
-                assign_args(func, node, ["Value", "Min", "Max"])
-                return node, "Result"
-            case xc3_model_py.shader_database.Operation.Abs:
-                return math_node("ABSOLUTE")
-            case xc3_model_py.shader_database.Operation.Fresnel:
-                node = create_node_group(
-                    nodes, "FresnelBlend", fresnel_blend_node_group
-                )
-                node.name = func_name(func)
-
-                # TODO: normals?
-
-                assign_args(func, node, ["Value"])
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.Sqrt:
-                return math_node("SQRT")
-            case xc3_model_py.shader_database.Operation.TexMatrix:
-                node = create_node_group(nodes, "TexMatrix", tex_matrix_node_group)
-                node.name = func_name(func)
-                assign_args(func, node, ["U", "V", "A", "B", "C", "D"])
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.TexParallaxX:
-                node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
-                node.name = func_name(func)
-                assign_args(func, node, ["Value", "Factor"])
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.TexParallaxY:
-                node = create_node_group(nodes, "TexParallax", tex_parallax_node_group)
-                node.name = func_name(func)
-                assign_args(func, node, ["Value", "Factor"])
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.ReflectX:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
-                )
-                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
-                return node, "X"
-            case xc3_model_py.shader_database.Operation.ReflectY:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
-                )
-                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
-                return node, "Y"
-            case xc3_model_py.shader_database.Operation.ReflectZ:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "ReflectXYZ", reflect_xyz_node_group
-                )
-                assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
-                return node, "Z"
-            case xc3_model_py.shader_database.Operation.Floor:
-                return math_node("FLOOR")
-            case xc3_model_py.shader_database.Operation.Select:
-                return mix_rgba_node("MIX")
-            case xc3_model_py.shader_database.Operation.Equal:
-                return math_node("COMPARE")
-            case xc3_model_py.shader_database.Operation.NotEqual:
-                # TODO: Invert compare.
-                return math_node("COMPARE")
-            case xc3_model_py.shader_database.Operation.Less:
-                return math_node("LESS_THAN")
-            case xc3_model_py.shader_database.Operation.Greater:
-                return math_node("GREATER_THAN")
-            case xc3_model_py.shader_database.Operation.LessEqual:
-                # TODO: node group for leq?
-                return math_node("LESS_THAN")
-            case xc3_model_py.shader_database.Operation.GreaterEqual:
-                # TODO: node group for geq?
-                return math_node("GREATER_THAN")
-            case xc3_model_py.shader_database.Operation.Dot4:
-                pass
-            case xc3_model_py.shader_database.Operation.NormalMapX:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y"])
-                return node, "X"
-            case xc3_model_py.shader_database.Operation.NormalMapY:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y"])
-                return node, "Y"
-            case xc3_model_py.shader_database.Operation.NormalMapZ:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "NormalMapXYZ", normal_map_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y"])
-                return node, "Z"
-            case xc3_model_py.shader_database.Operation.MonochromeX:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y", "Z", "Factor"])
-                return node, "X"
-            case xc3_model_py.shader_database.Operation.MonochromeY:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y", "Z", "Factor"])
-                return node, "Y"
-            case xc3_model_py.shader_database.Operation.MonochromeZ:
-                # Reuse the node for other channels if possible.
-                node = create_cached_group_node(
-                    nodes, func, "MonochromeXYZ", monochrome_xyz_node_group
-                )
-                assign_args(func, node, ["X", "Y", "Z", "Factor"])
-                return node, "Z"
-            case xc3_model_py.shader_database.Operation.Negate:
-                node = nodes.new("ShaderNodeMath")
-                node.name = func_name(func)
-                node.operation = "MULTIPLY"
-
-                assign_args(func, node, [0])
-                node.inputs[1].default_value = -1.0
-
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
-                node = nodes.new("ShaderNodeAttribute")
-                node.name = func_name(func)
-                node.attribute_name = "FurAlpha"
-                return node, "Fac"
-            case _:
-                # TODO: This case shouldn't happen?
-                return None
+        return assign_func(func, assignment_outputs, nodes, links)
     elif value := assignment.value():
         return assign_value(value, assignment_outputs, nodes, links, textures)
     else:
         return None
+
+
+def assign_func(
+    func: xc3_model_py.material.AssignmentFunc,
+    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    nodes,
+    links,
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    mix_rgba_node = lambda ty: assign_mix_rgba(
+        func,
+        assignment_outputs,
+        nodes,
+        links,
+        ty,
+    )
+
+    math_node = lambda ty: assign_math(
+        func,
+        assignment_outputs,
+        nodes,
+        links,
+        ty,
+    )
+
+    group_node = lambda func, name, create_node_tree: create_cached_func_group_node(
+        nodes, func, name, create_node_tree
+    )
+
+    assign_args = lambda func, node, params: assign_func_args(
+        func, params, assignment_outputs, links, node
+    )
+
+    match func.op:
+        case xc3_model_py.shader_database.Operation.Unk:
+            return None
+        case xc3_model_py.shader_database.Operation.Mix:
+            return mix_rgba_node("MIX")
+        case xc3_model_py.shader_database.Operation.Mul:
+            return math_node("MULTIPLY")
+        case xc3_model_py.shader_database.Operation.Div:
+            return math_node("DIVIDE")
+        case xc3_model_py.shader_database.Operation.Add:
+            return math_node("ADD")
+        case xc3_model_py.shader_database.Operation.Sub:
+            return math_node("SUBTRACT")
+        case xc3_model_py.shader_database.Operation.Fma:
+            return math_node("MULTIPLY_ADD")
+        case xc3_model_py.shader_database.Operation.MulRatio:
+            node = nodes.new("ShaderNodeMix")
+            node.data_type = "RGBA"
+            node.blend_type = "MULTIPLY"
+            node.name = func_name(func)
+            assign_args(func, node, ["A", "B", "Factor"])
+            return node, "Result"
+        case xc3_model_py.shader_database.Operation.AddNormalX:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "AddNormals", add_normals_node_group)
+            assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
+            return node, "X"
+        case xc3_model_py.shader_database.Operation.AddNormalY:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "AddNormals", add_normals_node_group)
+            assign_args(func, node, ["A.x", "A.y", "B.x", "B.y", "Factor"])
+            return node, "Y"
+        case xc3_model_py.shader_database.Operation.Overlay:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.Overlay2:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.OverlayRatio:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.Power:
+            return math_node("POWER")
+        case xc3_model_py.shader_database.Operation.Min:
+            return math_node("MINIMUM")
+        case xc3_model_py.shader_database.Operation.Max:
+            return math_node("MAXIMUM")
+        case xc3_model_py.shader_database.Operation.Clamp:
+            node = nodes.new("ShaderNodeClamp")
+            node.name = func_name(func)
+            assign_args(func, node, ["Value", "Min", "Max"])
+            return node, "Result"
+        case xc3_model_py.shader_database.Operation.Abs:
+            return math_node("ABSOLUTE")
+        case xc3_model_py.shader_database.Operation.Fresnel:
+            node = group_node(func, "FresnelBlend", fresnel_blend_node_group)
+            # TODO: normals?
+            assign_args(func, node, ["Value"])
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.Sqrt:
+            return math_node("SQRT")
+        case xc3_model_py.shader_database.Operation.TexMatrix:
+            node = group_node(func, "TexMatrix", tex_matrix_node_group)
+            assign_args(func, node, ["U", "V", "A", "B", "C", "D"])
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.TexParallaxX:
+            node = group_node(func, "TexParallax", tex_parallax_node_group)
+            assign_args(func, node, ["Value", "Factor"])
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.TexParallaxY:
+            node = group_node(func, "TexParallax", tex_parallax_node_group)
+            assign_args(func, node, ["Value", "Factor"])
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.ReflectX:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "ReflectXYZ", reflect_xyz_node_group)
+            assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
+            return node, "X"
+        case xc3_model_py.shader_database.Operation.ReflectY:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "ReflectXYZ", reflect_xyz_node_group)
+            assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
+            return node, "Y"
+        case xc3_model_py.shader_database.Operation.ReflectZ:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "ReflectXYZ", reflect_xyz_node_group)
+            assign_args(func, node, ["A.x", "A.y", "A.z", "B.x", "B.y", "B.z"])
+            return node, "Z"
+        case xc3_model_py.shader_database.Operation.Floor:
+            return math_node("FLOOR")
+        case xc3_model_py.shader_database.Operation.Select:
+            return mix_rgba_node("MIX")
+        case xc3_model_py.shader_database.Operation.Equal:
+            return math_node("COMPARE")
+        case xc3_model_py.shader_database.Operation.NotEqual:
+            # TODO: Invert compare.
+            return math_node("COMPARE")
+        case xc3_model_py.shader_database.Operation.Less:
+            return math_node("LESS_THAN")
+        case xc3_model_py.shader_database.Operation.Greater:
+            return math_node("GREATER_THAN")
+        case xc3_model_py.shader_database.Operation.LessEqual:
+            # TODO: node group for leq?
+            return math_node("LESS_THAN")
+        case xc3_model_py.shader_database.Operation.GreaterEqual:
+            # TODO: node group for geq?
+            return math_node("GREATER_THAN")
+        case xc3_model_py.shader_database.Operation.Dot4:
+            pass
+        case xc3_model_py.shader_database.Operation.NormalMapX:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+            assign_args(func, node, ["X", "Y"])
+            return node, "X"
+        case xc3_model_py.shader_database.Operation.NormalMapY:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+            assign_args(func, node, ["X", "Y"])
+            return node, "Y"
+        case xc3_model_py.shader_database.Operation.NormalMapZ:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "NormalMapXYZ", normal_map_xyz_node_group)
+            assign_args(func, node, ["X", "Y"])
+            return node, "Z"
+        case xc3_model_py.shader_database.Operation.MonochromeX:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "MonochromeXYZ", monochrome_xyz_node_group)
+            assign_args(func, node, ["X", "Y", "Z", "Factor"])
+            return node, "X"
+        case xc3_model_py.shader_database.Operation.MonochromeY:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "MonochromeXYZ", monochrome_xyz_node_group)
+            assign_args(func, node, ["X", "Y", "Z", "Factor"])
+            return node, "Y"
+        case xc3_model_py.shader_database.Operation.MonochromeZ:
+            # Reuse the node for other channels if possible.
+            node = group_node(func, "MonochromeXYZ", monochrome_xyz_node_group)
+            assign_args(func, node, ["X", "Y", "Z", "Factor"])
+            return node, "Z"
+        case xc3_model_py.shader_database.Operation.Negate:
+            node = nodes.new("ShaderNodeMath")
+            node.name = func_name(func)
+            node.operation = "MULTIPLY"
+
+            assign_args(func, node, [0])
+            node.inputs[1].default_value = -1.0
+
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
+            node = nodes.new("ShaderNodeAttribute")
+            node.name = func_name(func)
+            node.attribute_name = "FurAlpha"
+            return node, "Fac"
+        case _:
+            # TODO: This case shouldn't happen?
+            return None
 
 
 def assign_index(
@@ -623,7 +606,6 @@ def assign_index(
         if node_output := assignment_outputs[i]:
             node, output_name = node_output
             links.new(node.outputs[output_name], output)
-            return
         else:
             # Set defaults to match xc3_wgpu and make debugging easier.
             assign_float(output, 0.0)
@@ -862,158 +844,160 @@ def assign_output_xyz(
     ],
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := assignment_xyz.func():
-        mix_rgba_node = lambda ty: assign_mix_xyz(
-            func,
-            assignment_outputs_xyz,
-            nodes,
-            links,
-            ty,
-        )
-
-        math_node = lambda ty: assign_math_xyz(
-            func,
-            assignment_outputs_xyz,
-            nodes,
-            links,
-            ty,
-        )
-
-        assign_args = lambda func, node, params: assign_func_args(
-            func, params, assignment_outputs_xyz, links, node
-        )
-
-        match func.op:
-            case xc3_model_py.shader_database.Operation.Unk:
-                return None
-            case xc3_model_py.shader_database.Operation.Mix:
-                return mix_rgba_node("MIX")
-            case xc3_model_py.shader_database.Operation.Mul:
-                return math_node("MULTIPLY")
-            case xc3_model_py.shader_database.Operation.Div:
-                return math_node("DIVIDE")
-            case xc3_model_py.shader_database.Operation.Add:
-                return math_node("ADD")
-            case xc3_model_py.shader_database.Operation.Sub:
-                return math_node("SUBTRACT")
-            case xc3_model_py.shader_database.Operation.Fma:
-                return math_node("MULTIPLY_ADD")
-            case xc3_model_py.shader_database.Operation.MulRatio:
-                node = nodes.new("ShaderNodeMix")
-                node.data_type = "RGBA"
-                node.blend_type = "MULTIPLY"
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["A", "B", "Factor"])
-                return node, "Result"
-            case xc3_model_py.shader_database.Operation.AddNormalX:
-                pass
-            case xc3_model_py.shader_database.Operation.AddNormalY:
-                pass
-            case xc3_model_py.shader_database.Operation.Overlay:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.Overlay2:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.OverlayRatio:
-                return mix_rgba_node("OVERLAY")
-            case xc3_model_py.shader_database.Operation.Power:
-                node = create_node_group(nodes, "PowerXYZ", power_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Base", "Exponent"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.Min:
-                return math_node("MINIMUM")
-            case xc3_model_py.shader_database.Operation.Max:
-                return math_node("MAXIMUM")
-            case xc3_model_py.shader_database.Operation.Clamp:
-                node = create_node_group(nodes, "ClampXYZ", clamp_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value", "Min", "Max"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.Abs:
-                return math_node("ABSOLUTE")
-            case xc3_model_py.shader_database.Operation.Fresnel:
-                # TODO: Separate factors for xyz?
-                node = create_node_group(
-                    nodes, "FresnelBlend", fresnel_blend_node_group
-                )
-                node.name = func_xyz_name(func)
-
-                # TODO: normals?
-                assign_args(func, node, ["Value"])
-                return node, "Value"
-            case xc3_model_py.shader_database.Operation.Sqrt:
-                node = create_node_group(nodes, "SqrtXYZ", sqrt_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.TexMatrix:
-                pass
-            case xc3_model_py.shader_database.Operation.TexParallaxX:
-                pass
-            case xc3_model_py.shader_database.Operation.TexParallaxY:
-                pass
-            case xc3_model_py.shader_database.Operation.ReflectX:
-                pass
-            case xc3_model_py.shader_database.Operation.ReflectY:
-                pass
-            case xc3_model_py.shader_database.Operation.ReflectZ:
-                pass
-            case xc3_model_py.shader_database.Operation.Floor:
-                return math_node("FLOOR")
-            case xc3_model_py.shader_database.Operation.Select:
-                return mix_rgba_node("MIX")
-            case xc3_model_py.shader_database.Operation.Equal:
-                return math_node("COMPARE")
-            case xc3_model_py.shader_database.Operation.NotEqual:
-                # TODO: Invert compare.
-                pass
-            case xc3_model_py.shader_database.Operation.Less:
-                node = create_node_group(nodes, "LessXYZ", less_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value", "Threshold"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.Greater:
-                node = create_node_group(nodes, "GreaterXYZ", greater_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value", "Threshold"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.LessEqual:
-                # TODO: node group for leq?
-                node = create_node_group(nodes, "LessXYZ", less_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value", "Threshold"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.GreaterEqual:
-                # TODO: node group for geq?
-                node = create_node_group(nodes, "GreaterXYZ", greater_xyz_node_group)
-                node.name = func_xyz_name(func)
-                assign_args(func, node, ["Value", "Threshold"])
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.Dot4:
-                pass
-            case xc3_model_py.shader_database.Operation.NormalMapX:
-                pass
-            case xc3_model_py.shader_database.Operation.NormalMapY:
-                pass
-            case xc3_model_py.shader_database.Operation.NormalMapZ:
-                pass
-            # TODO: Fix merging for monochrome xyz?
-            case xc3_model_py.shader_database.Operation.Negate:
-                node = nodes.new("ShaderNodeVectorMath")
-                node.name = func_xyz_name(func)
-                node.operation = "MULTIPLY"
-                assign_args(func, node, [0])
-                node.inputs[1].default_value = (-1.0, -1.0, -1.0)
-                return node, "Vector"
-            case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
-                node = nodes.new("ShaderNodeAttribute")
-                node.name = func_name(func)
-                node.attribute_name = "FurAlpha"
-                return node, "Fac"
-            case _:
-                # TODO: This case shouldn't happen?
-                return None
+        return assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
     elif value := assignment_xyz.value():
         return assign_value_xyz(value, assignment_outputs, nodes, links, textures)
+
+
+def assign_func_xyz(
+    func: xc3_model_py.material.AssignmentFuncXyz,
+    assignment_outputs_xyz: list[Optional[Tuple[bpy.types.Node, str]]],
+    nodes,
+    links,
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    mix_rgba_node = lambda ty: assign_mix_xyz(
+        func,
+        assignment_outputs_xyz,
+        nodes,
+        links,
+        ty,
+    )
+
+    math_node = lambda ty: assign_math_xyz(
+        func,
+        assignment_outputs_xyz,
+        nodes,
+        links,
+        ty,
+    )
+
+    group_node = lambda func, name, create_node_tree: create_cached_func_xyz_group_node(
+        nodes, func, name, create_node_tree
+    )
+
+    assign_args = lambda func, node, params: assign_func_args(
+        func, params, assignment_outputs_xyz, links, node
+    )
+
+    match func.op:
+        case xc3_model_py.shader_database.Operation.Unk:
+            return None
+        case xc3_model_py.shader_database.Operation.Mix:
+            return mix_rgba_node("MIX")
+        case xc3_model_py.shader_database.Operation.Mul:
+            return math_node("MULTIPLY")
+        case xc3_model_py.shader_database.Operation.Div:
+            return math_node("DIVIDE")
+        case xc3_model_py.shader_database.Operation.Add:
+            return math_node("ADD")
+        case xc3_model_py.shader_database.Operation.Sub:
+            return math_node("SUBTRACT")
+        case xc3_model_py.shader_database.Operation.Fma:
+            return math_node("MULTIPLY_ADD")
+        case xc3_model_py.shader_database.Operation.MulRatio:
+            node = nodes.new("ShaderNodeMix")
+            node.data_type = "RGBA"
+            node.blend_type = "MULTIPLY"
+            node.name = func_xyz_name(func)
+            assign_args(func, node, ["A", "B", "Factor"])
+            return node, "Result"
+        case xc3_model_py.shader_database.Operation.AddNormalX:
+            pass
+        case xc3_model_py.shader_database.Operation.AddNormalY:
+            pass
+        case xc3_model_py.shader_database.Operation.Overlay:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.Overlay2:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.OverlayRatio:
+            return mix_rgba_node("OVERLAY")
+        case xc3_model_py.shader_database.Operation.Power:
+            node = group_node(func, "PowerXYZ", power_xyz_node_group)
+            assign_args(func, node, ["Base", "Exponent"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.Min:
+            return math_node("MINIMUM")
+        case xc3_model_py.shader_database.Operation.Max:
+            return math_node("MAXIMUM")
+        case xc3_model_py.shader_database.Operation.Clamp:
+            node = group_node(func, "ClampXYZ", clamp_xyz_node_group)
+            assign_args(func, node, ["Value", "Min", "Max"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.Abs:
+            return math_node("ABSOLUTE")
+        case xc3_model_py.shader_database.Operation.Fresnel:
+            # TODO: Separate factors for xyz?
+            node = group_node(func, "FresnelBlend", fresnel_blend_node_group)
+            # TODO: normals?
+            assign_args(func, node, ["Value"])
+            return node, "Value"
+        case xc3_model_py.shader_database.Operation.Sqrt:
+            node = group_node(func, "SqrtXYZ", sqrt_xyz_node_group)
+            assign_args(func, node, ["Value"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.TexMatrix:
+            pass
+        case xc3_model_py.shader_database.Operation.TexParallaxX:
+            pass
+        case xc3_model_py.shader_database.Operation.TexParallaxY:
+            pass
+        case xc3_model_py.shader_database.Operation.ReflectX:
+            pass
+        case xc3_model_py.shader_database.Operation.ReflectY:
+            pass
+        case xc3_model_py.shader_database.Operation.ReflectZ:
+            pass
+        case xc3_model_py.shader_database.Operation.Floor:
+            return math_node("FLOOR")
+        case xc3_model_py.shader_database.Operation.Select:
+            return mix_rgba_node("MIX")
+        case xc3_model_py.shader_database.Operation.Equal:
+            return math_node("COMPARE")
+        case xc3_model_py.shader_database.Operation.NotEqual:
+            # TODO: Invert compare.
+            pass
+        case xc3_model_py.shader_database.Operation.Less:
+            node = group_node(nodes, "LessXYZ", less_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.Greater:
+            node = group_node(nodes, "GreaterXYZ", greater_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.LessEqual:
+            # TODO: node group for leq?
+            node = group_node(nodes, "LessXYZ", less_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.GreaterEqual:
+            # TODO: node group for geq?
+            node = group_node(nodes, "GreaterXYZ", greater_xyz_node_group)
+            assign_args(func, node, ["Value", "Threshold"])
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.Dot4:
+            pass
+        case xc3_model_py.shader_database.Operation.NormalMapX:
+            pass
+        case xc3_model_py.shader_database.Operation.NormalMapY:
+            pass
+        case xc3_model_py.shader_database.Operation.NormalMapZ:
+            pass
+        # TODO: Fix merging for monochrome xyz?
+        case xc3_model_py.shader_database.Operation.Negate:
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "MULTIPLY"
+            assign_args(func, node, [0])
+            node.inputs[1].default_value = (-1.0, -1.0, -1.0)
+            return node, "Vector"
+        case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
+            node = nodes.new("ShaderNodeAttribute")
+            node.name = func_name(func)
+            node.attribute_name = "FurAlpha"
+            return node, "Fac"
+        case _:
+            # TODO: This case shouldn't happen?
+            return None
 
 
 def assign_mix_xyz(
@@ -1250,7 +1234,7 @@ def add_used_xyz_assignments(
                     add_used_assignments(visited, assignments, coord)
 
 
-def create_cached_group_node(
+def create_cached_func_group_node(
     nodes,
     func: xc3_model_py.material.AssignmentFunc,
     node_group_name: str,
@@ -1274,3 +1258,18 @@ def assign_func_args(
 ):
     for i, param in zip(func.args, params):
         assign_index(i, assignment_outputs, links, node.inputs[param])
+
+
+def create_cached_func_xyz_group_node(
+    nodes,
+    func: xc3_model_py.material.AssignmentFuncXyz,
+    node_group_name: str,
+    create_node_tree,
+) -> bpy.types.Node:
+    name = func_xyz_name(func)
+    node = nodes.get(name)
+    if node is None:
+        node = create_node_group(nodes, node_group_name, create_node_tree)
+        node.name = name
+
+    return node
