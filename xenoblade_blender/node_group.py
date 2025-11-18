@@ -413,9 +413,11 @@ def toon_grad_uvs_node_group(name: str):
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Row Index"
     )
-    node_tree.interface.new_socket(
+    normal_socket = node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketVector", name="Normal"
     )
+    # TODO: Why is necessary to avoid black layer weight node values in Blender 5.0?
+    normal_socket.hide_value = True
 
     uv = nodes.new("ShaderNodeCombineXYZ")
 
