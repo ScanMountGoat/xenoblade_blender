@@ -795,14 +795,14 @@ def assign_math(
 
 
 def func_name(func: xc3_model_py.material.AssignmentFunc):
-    return func_name_inner(func.op, func.args)
+    return func_name_inner(func.op, func.args, "")
 
 
 def func_xyz_name(func: xc3_model_py.material.AssignmentFuncXyz):
-    return func_name_inner(func.op, func.args)
+    return func_name_inner(func.op, func.args, "xyz_")
 
 
-def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int]):
+def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int], prefix: str):
     op_name = str(op).removeprefix("Operation.")
     # Node groups that have multiple outputs can share a node.
     replacements = [
@@ -824,7 +824,7 @@ def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int])
             break
 
     func_args = ", ".join(str(a) for a in args)
-    name = f"xyz_{op_name}({func_args})"
+    name = f"{prefix}{op_name}({func_args})"
     return name
 
 
@@ -1268,7 +1268,7 @@ def create_cached_func_xyz_group_node(
 ) -> bpy.types.Node:
     name = func_xyz_name(func)
     node = nodes.get(name)
-    if node is None:
+    if node is None or True:
         node = create_node_group(nodes, node_group_name, create_node_tree)
         node.name = name
 
