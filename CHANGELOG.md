@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 * Fixed an issue where camdo import would not import all bones in some cases.
 * Fixed a compatibility issue preventing animation import in Blender 5.0.
+* Fixed an issue where wimdo export would not correctly disable LOD transitions when only exporting base LOD meshes.
 
 ## 0.20.2 - 2025-10-10
 ### Fixed

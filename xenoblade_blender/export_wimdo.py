@@ -177,15 +177,16 @@ def export_wimdo(
 
     root.buffers.weights.update_weights(combined_weights)
 
-    # Detect the default import behavior of a single lod level in each group.
-    # Setting the lod count avoids needing to export LOD or speff meshes.
     lod_data = root.models.lod_data
     if lod_data is not None:
+        # Disable LOD transitions if only the base LOD from each group is present.
+        # This handles the default import behavior of only importing the base LODs.
         base_lod_indices = [g.base_lod_index for g in lod_data.groups]
         if all(
             m.lod_item_index in base_lod_indices for m in root.models.models[0].meshes
         ):
             for g in lod_data.groups:
+                lod_data.items[g.base_lod_index].unk2 = 0.0
                 g.lod_count = 1
 
     if export_images:
