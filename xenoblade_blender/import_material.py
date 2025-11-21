@@ -957,21 +957,21 @@ def assign_func_xyz(
             # TODO: Invert compare.
             pass
         case xc3_model_py.shader_database.Operation.Less:
-            node = group_node(nodes, "LessXYZ", less_xyz_node_group)
+            node = group_node(func, "LessXYZ", less_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
         case xc3_model_py.shader_database.Operation.Greater:
-            node = group_node(nodes, "GreaterXYZ", greater_xyz_node_group)
+            node = group_node(func, "GreaterXYZ", greater_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
         case xc3_model_py.shader_database.Operation.LessEqual:
             # TODO: node group for leq?
-            node = group_node(nodes, "LessXYZ", less_xyz_node_group)
+            node = group_node(func, "LessXYZ", less_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
         case xc3_model_py.shader_database.Operation.GreaterEqual:
             # TODO: node group for geq?
-            node = group_node(nodes, "GreaterXYZ", greater_xyz_node_group)
+            node = group_node(func, "GreaterXYZ", greater_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
         case xc3_model_py.shader_database.Operation.Dot4:
