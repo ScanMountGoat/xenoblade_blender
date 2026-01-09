@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 * Fixed an issue where wismhd import would not include some additional models in some cases.
 
 ### 0.21.1 - 2025-11-21
+### Fixed
 * Fixed an issue where material import would fail to generate shader nodes in some cases.
 
 ## 0.21.0 - 2025-11-19
