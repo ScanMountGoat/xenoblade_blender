@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 * Fixed an issue where wismhd import would not include some additional models in some cases.
+* Fixed an issue where wimdo models for Xenoblade Chronicles X Definitive edition would not correctly import fur shells.
 
 ### 0.21.1 - 2025-11-21
 ### Fixed
