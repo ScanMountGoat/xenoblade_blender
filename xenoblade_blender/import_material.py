@@ -280,27 +280,43 @@ def import_material(
         blender_material.blend_method = "BLEND"
 
     if material.alpha_test is not None:
-        texture = material.alpha_test
-        name = f"s{texture.texture_index}"
-        channel = ["Red", "Green", "Blue", "Alpha"][texture.channel_index]
-
-        node = nodes.get(name)
-        if node is None:
-            node = import_texture(name, name, nodes, textures)
-
-        if channel == "Alpha":
-            links.new(node.outputs["Alpha"], bsdf.inputs["Alpha"])
-        else:
-            rgb_node = nodes.new("ShaderNodeSeparateColor")
-            links.new(node.outputs["Color"], rgb_node.inputs["Color"])
-            links.new(rgb_node.outputs[channel], bsdf.inputs["Alpha"])
-
-        # TODO: Support alpha blending?
-        blender_material.blend_method = "CLIP"
+        import_texture_alpha_test(
+            material, blender_images, samplers, blender_material, nodes, links, bsdf
+        )
 
     layout_nodes(output_node, links)
 
     return blender_material
+
+
+def import_texture_alpha_test(
+    material, blender_images, samplers, blender_material, nodes, links, bsdf
+):
+    texture = material.alpha_test
+    name = f"alpha_test_texture"
+    channel = ["Red", "Green", "Blue", "Alpha"][material.alpha_texture_channel_index()]
+
+    node = nodes.new("ShaderNodeTexImage")
+    node.name = name
+    node.label = "AlphaTest"
+
+    try:
+        node.image = blender_images[texture.image_texture_index]
+    except IndexError:
+        pass
+
+    if texture.sampler_index < len(samplers):
+        set_sampler(node, samplers[texture.sampler_index])
+
+    if channel == "Alpha":
+        links.new(node.outputs["Alpha"], bsdf.inputs["Alpha"])
+    else:
+        rgb_node = nodes.new("ShaderNodeSeparateColor")
+        links.new(node.outputs["Color"], rgb_node.inputs["Color"])
+        links.new(rgb_node.outputs[channel], bsdf.inputs["Alpha"])
+
+    # TODO: Support alpha blending?
+    blender_material.blend_method = "CLIP"
 
 
 def create_assignment_outputs_xyz(
@@ -765,16 +781,24 @@ def import_texture(
         node.image = image
 
         if sampler is not None:
-            # TODO: Check if U and V have the same address mode.
-            match sampler.address_mode_u:
-                case xc3_model_py.AddressMode.ClampToEdge:
-                    node.extension = "CLIP"
-                case xc3_model_py.AddressMode.Repeat:
-                    node.extension = "REPEAT"
-                case xc3_model_py.AddressMode.MirrorRepeat:
-                    node.extension = "MIRROR"
+            set_sampler(node, sampler)
 
     return node
+
+
+def set_sampler(
+    node: bpy.types.Node,
+    sampler: Optional[xc3_model_py.Sampler],
+):
+    if sampler is not None:
+        # TODO: Check if U and V have the same address mode.
+        match sampler.address_mode_u:
+            case xc3_model_py.AddressMode.ClampToEdge:
+                node.extension = "CLIP"
+            case xc3_model_py.AddressMode.Repeat:
+                node.extension = "REPEAT"
+            case xc3_model_py.AddressMode.MirrorRepeat:
+                node.extension = "MIRROR"
 
 
 def assign_math(
@@ -802,7 +826,9 @@ def func_xyz_name(func: xc3_model_py.material.AssignmentFuncXyz):
     return func_name_inner(func.op, func.args, "xyz_")
 
 
-def func_name_inner(op: xc3_model_py.shader_database.Operation, args: list[int], prefix: str):
+def func_name_inner(
+    op: xc3_model_py.shader_database.Operation, args: list[int], prefix: str
+):
     op_name = str(op).removeprefix("Operation.")
     # Node groups that have multiple outputs can share a node.
     replacements = [
