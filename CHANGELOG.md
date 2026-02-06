@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where non square textures would not export with the correct layout.
+
 ## 0.22.1 - 2026-01-30
 ### Changed
 * Improved performance for loading maps from wismhd files.

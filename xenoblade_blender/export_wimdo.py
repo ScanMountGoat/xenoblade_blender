@@ -271,8 +271,9 @@ def encode_args_from_image(image, original_image):
     image_data = np.zeros(width * height * 4, dtype=np.float32)
     image.pixels.foreach_get(image_data)
 
+    # Flip vertically to match in game.
     image_data = np.flip(
-        image_data.reshape((width, height, 4)),
+        image_data.reshape((height, width, 4)),
         axis=0,
     )
 
