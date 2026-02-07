@@ -391,6 +391,7 @@ def export_mesh_inner(
 
     apply_texture_indices(material_to_edit, material_texture_indices)
     apply_toon_gradient_row(mesh_data, material_to_edit)
+    apply_alpha_test_texture(root, mesh_data, material_to_edit)
 
     apply_fur_params(blender_mesh, mesh_name, material_to_edit)
 
@@ -436,6 +437,7 @@ def export_mesh_inner(
                 apply_texture_indices(material_to_edit, material_texture_indices)
                 apply_toon_gradient_row(mesh_data, material_to_edit)
 
+                # TODO: Detect if this mesh already exists?
                 speff_mesh = copy.deepcopy(new_mesh)
                 speff_mesh.material_index = speff_material_index
                 speff_mesh.flags1 = mesh.flags1
@@ -482,6 +484,24 @@ def export_mesh_inner(
     root.buffers.vertex_buffers.append(vertex_buffer)
 
     root.buffers.index_buffers.append(index_buffer)
+
+
+def apply_alpha_test_texture(root, mesh_data, material_to_edit):
+    # TODO: error if there are no nodes or not enough textures?
+    for node in mesh_data.materials[0].node_tree.nodes:
+        if node.bl_idname == "ShaderNodeTexImage" and node.label == "AlphaTest":
+            image_index = image_index_to_replace(root.image_textures, node.image.name)
+            # TODO: set the appropriate sampler index.
+            material_to_edit.alpha_test = xc3_model_py.material.Texture(
+                image_index, 0, 0
+            )
+            material_to_edit.flags.alpha_mask = True
+            # TODO: Check if this is connected to a principled or transparent BSDF?
+            if "Alpha" in node.outputs and node.outputs["Alpha"].is_linked:
+                material_to_edit.flags.separate_mask = False
+            else:
+                # TODO: This only supports the red channel.
+                material_to_edit.flags.separate_mask = True
 
 
 def apply_fur_params(blender_mesh, mesh_name, material_to_edit):

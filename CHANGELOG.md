@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added export support for editing the "AlphaTest" texture.
+
 ### Fixed
 * Fixed an issue where non square textures would not export with the correct layout.
 
