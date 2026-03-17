@@ -198,12 +198,8 @@ def fresnel_blend_node_group(name: str):
     node_tree.interface.new_socket(
         in_out="INPUT", socket_type="NodeSocketFloat", name="Value"
     )
-    node_tree.interface.new_socket(
-        in_out="INPUT", socket_type="NodeSocketVector", name="Normal"
-    )
 
     layer_weight = nodes.new("ShaderNodeLayerWeight")
-    links.new(input_node.outputs["Normal"], layer_weight.inputs["Normal"])
 
     multiply = nodes.new("ShaderNodeMath")
     multiply.operation = "MULTIPLY"
