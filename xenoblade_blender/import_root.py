@@ -231,15 +231,18 @@ def import_map_root(
     y_up_to_z_up = Matrix.Rotation(math.radians(90), 4, "X")
 
     # TODO: Create a group collection?
-    for group in root.groups:
-        for models in group.models:
+    for group_index, group in enumerate(root.groups):
+        for models_index, models in enumerate(group.models):
             base_lods = None
             if models.lod_data is not None:
                 base_lods = [g.base_lod_index for g in models.lod_data.groups]
 
             # TODO: Cache based on vertex and index buffer indices?
-            for model in models.models:
-                model_collection = bpy.data.collections.new("Model")
+            for model_index, model in enumerate(models.models):
+                name = (
+                    f"{root_collection.name}_{group_index}_{models_index}_{model_index}"
+                )
+                model_collection = bpy.data.collections.new(name)
                 root_collection.children.link(model_collection)
 
                 # Exclude the base collection that isn't transformed.
@@ -300,9 +303,7 @@ def import_map_root(
                         y_up_to_z_up @ Matrix(transform) @ y_up_to_z_up.inverted()
                     )
 
-                    collection_instance = bpy.data.objects.new(
-                        f"ModelInstance{i}", None
-                    )
+                    collection_instance = bpy.data.objects.new(f"{name}.{i}", None)
                     collection_instance.instance_type = "COLLECTION"
                     collection_instance.instance_collection = model_collection
                     collection_instance.matrix_world = matrix_world
