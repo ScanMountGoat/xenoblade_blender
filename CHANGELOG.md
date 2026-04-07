@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where map object models would not load or load with incorrect transforms in some cases.
+
 ## 0.23.1 - 2026-04-07
 ### Changed
 * Changed the names of imported map collections to use the `name.root_group_models_model.instance` naming convention to match xc3_viewer and xc3_wgpu_batch for easier debugging.

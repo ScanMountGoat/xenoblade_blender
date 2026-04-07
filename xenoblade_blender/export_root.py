@@ -664,9 +664,9 @@ def apply_toon_gradient_row(mesh_data, material):
     toon_row_index = extract_toon_gradient_row(mesh_data)
     if toon_row_index is not None:
         for c in material.work_callbacks:
-            if c.unk1 == 26:
-                material.work_values[c.unk2] = toon_row_index
-                material.work_values[c.unk2 + 1] = toon_row_index
+            if c.callback_type == xc3_model_py.material.WorkCallbackType.ToonId:
+                material.work_values[c.value] = toon_row_index
+                material.work_values[c.value + 1] = toon_row_index
 
 
 def extract_mesh_index(mesh_name, original_meshes, material_index):

@@ -244,8 +244,8 @@ def import_material(
         # Try and find the non processed value.
         # This works since type 26 only seems to be used for toon gradients.
         for c in material.work_callbacks:
-            if c.unk1 == 26:
-                row_index.outputs[0].default_value = material.work_values[c.unk2 + 1]
+            if c.callback_type == xc3_model_py.material.WorkCallbackType.ToonId:
+                row_index.outputs[0].default_value = material.work_values[c.value + 1]
                 break
 
         # Approximate the lighting ramp by multiplying base color.
