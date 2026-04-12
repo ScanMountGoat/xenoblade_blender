@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Fixed
 * Fixed an issue where map object models would not load or load with incorrect transforms in some cases.
+* Fixed an issue where exported Xenoblade Chronicles X DE wimdo models would have rendering errors in game in some cases.
 
 ## 0.23.1 - 2026-04-07
 ### Changed
