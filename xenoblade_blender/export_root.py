@@ -1,11 +1,13 @@
-from typing import Optional, Tuple
-import bpy
-import math
-import numpy as np
-from . import xc3_model_py
-from mathutils import Matrix
-import bmesh
 import copy
+import math
+from typing import Optional, Tuple
+
+import bmesh
+import bpy
+import numpy as np
+from mathutils import Matrix
+
+from . import xc3_model_py
 
 
 class ExportException(Exception):

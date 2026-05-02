@@ -1,5 +1,6 @@
-import bpy
 import typing
+
+import bpy
 
 from xenoblade_blender.node_layout import layout_nodes
 

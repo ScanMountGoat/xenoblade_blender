@@ -1,14 +1,14 @@
-import bpy
 import time
+
+import bpy
 import numpy as np
+from bpy.props import StringProperty
+from bpy_extras.io_utils import ImportHelper
 
 from xenoblade_blender.import_root import init_logging
 
 from . import xc3_model_py
 from .export_root import export_skeleton
-
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty
 
 
 class ImportMot(bpy.types.Operator, ImportHelper):

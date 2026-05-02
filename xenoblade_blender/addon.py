@@ -1,11 +1,13 @@
 import bpy
 
-from . import import_mot
-from . import import_wimdo
-from . import import_wismhd
-from . import import_camdo
-from . import export_wimdo
-from . import import_idcm
+from . import (
+    export_wimdo,
+    import_camdo,
+    import_idcm,
+    import_mot,
+    import_wimdo,
+    import_wismhd,
+)
 
 
 def menu_import_mot(self, context):

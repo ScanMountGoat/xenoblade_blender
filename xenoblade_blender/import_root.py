@@ -1,18 +1,18 @@
 import logging
+import math
+import os
+from pathlib import Path
 from typing import Dict, Optional
+
 import bpy
 import numpy as np
-import os
-import math
+from bpy_extras import image_utils
+from mathutils import Matrix
 
 from xenoblade_blender.fur_shell import import_fur_shells
 
-from .import_material import import_material
 from . import xc3_model_py
-
-from mathutils import Matrix
-from bpy_extras import image_utils
-from pathlib import Path
+from .import_material import import_material
 
 
 def get_database_path() -> str:

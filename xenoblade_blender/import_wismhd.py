@@ -1,18 +1,19 @@
-import bpy
-import time
 import os
+import time
+
+import bpy
+from bpy.props import BoolProperty, StringProperty
+from bpy_extras.io_utils import ImportHelper
 
 from . import xc3_model_py
 from .import_root import (
     get_database_path,
     get_image_folder,
-    import_map_root,
     import_images,
+    import_map_root,
     import_monolib_shader_images,
     init_logging,
 )
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty
 
 
 class ImportWismhd(bpy.types.Operator, ImportHelper):

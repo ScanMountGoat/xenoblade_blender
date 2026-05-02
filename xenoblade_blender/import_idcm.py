@@ -1,16 +1,16 @@
-from pathlib import Path
-import bpy
-import time
-import numpy as np
 import math
+import time
+from pathlib import Path
+
+import bpy
+import numpy as np
+from bpy.props import CollectionProperty, StringProperty
+from bpy_extras.io_utils import ImportHelper
+from mathutils import Matrix
 
 from xenoblade_blender.import_root import init_logging
 
 from . import xc3_model_py
-from mathutils import Matrix
-
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, CollectionProperty
 
 
 class ImportIdcm(bpy.types.Operator, ImportHelper):

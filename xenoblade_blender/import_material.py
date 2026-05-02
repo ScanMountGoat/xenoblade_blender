@@ -1,6 +1,7 @@
-from typing import Dict, Optional, Set, Tuple
-import bpy
 import typing
+from typing import Dict, Optional, Set, Tuple
+
+import bpy
 
 from xenoblade_blender.node_group import (
     add_normals_node_group,

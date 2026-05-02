@@ -1,24 +1,23 @@
 import copy
-import bpy
-import time
-import numpy as np
-from pathlib import Path
-import re
 import os
+import re
+import time
+from pathlib import Path
+
+import bpy
+import numpy as np
+from bpy.props import BoolProperty, StringProperty
+from bpy_extras import image_utils
+from bpy_extras.io_utils import ExportHelper
 
 from xenoblade_blender.import_root import init_logging
 
+from . import xc3_model_py
 from .export_root import (
     ExportException,
     export_mesh,
     image_index_to_replace,
 )
-
-from . import xc3_model_py
-
-from bpy_extras.io_utils import ExportHelper
-from bpy_extras import image_utils
-from bpy.props import StringProperty, BoolProperty
 
 
 class ExportWimdo(bpy.types.Operator, ExportHelper):

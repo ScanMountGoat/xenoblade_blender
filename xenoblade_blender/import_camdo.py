@@ -1,22 +1,21 @@
-from pathlib import Path
-import bpy
-import time
 import os
+import time
+from pathlib import Path
 
+import bpy
+from bpy.props import BoolProperty, CollectionProperty, StringProperty
+from bpy_extras.io_utils import ImportHelper
+
+from . import xc3_model_py
 from .import_root import (
     get_database_path,
     get_image_folder,
     import_armature,
-    import_model_root,
     import_images,
+    import_model_root,
     init_logging,
     merge_armatures,
 )
-
-from . import xc3_model_py
-
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty, CollectionProperty
 
 
 class ImportCamdo(bpy.types.Operator, ImportHelper):
