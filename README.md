@@ -17,7 +17,7 @@ Report bugs or request new features in [issues](https://github.com/ScanMountGoat
 * Download the latest version of the addon supported by your Blender version from [releases](https://github.com/ScanMountGoat/xenoblade_blender/releases).
 * Install the .zip file in Blender using Edit > Preferences > Addons > Install...
 * Enable the addon if it is not already enabled.
-* Extract the files from the arh and ard from your romfs dump of the game using [XbTool](https://github.com/AlexCSDev/XbTool/releases).
+* Extract the files from the arh and ard from your romfs dump of the game using [xbc_ard_extract](https://github.com/ScanMountGoat/xbc_ard_extract/releases).
 * Import any of the supported file types using the new menu options under File > Import.  
 
 ## Updating
