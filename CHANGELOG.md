@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where exported Xenoblade Chronicles X DE wimdo models would have visible seams in some cases.
+
 ## 0.23.2 - 2026-05-07
 ### Fixed
 * Fixed an issue where map object models would not load or load with incorrect transforms in some cases.
