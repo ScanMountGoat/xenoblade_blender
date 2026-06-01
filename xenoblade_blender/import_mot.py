@@ -73,7 +73,7 @@ def import_mot(operator: bpy.types.Operator, context: bpy.types.Context, path: s
         else:
             slot = action.slots[0]
 
-        armature.animation_data.action_slot = action.slots[0]
+        armature.animation_data.action_slot = slot
 
     end = time.time()
     print(f"Import Blender Animation: {end - start}")

@@ -63,7 +63,6 @@ def get_bone_transform(m: Matrix) -> Matrix:
 
 
 def parse_int(name: str) -> Optional[int]:
-    value = None
     try:
         value = int(name)
     except:

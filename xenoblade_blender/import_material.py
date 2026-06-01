@@ -294,7 +294,7 @@ def import_texture_alpha_test(
     material, blender_images, samplers, blender_material, nodes, links, bsdf
 ):
     texture = material.alpha_test
-    name = f"alpha_test_texture"
+    name = "alpha_test_texture"
     channel = ["Red", "Green", "Blue", "Alpha"][material.alpha_texture_channel_index()]
 
     node = nodes.new("ShaderNodeTexImage")
@@ -434,29 +434,29 @@ def assign_func(
     nodes,
     links,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
-    mix_rgba_node = lambda ty: assign_mix_rgba(
-        func,
-        assignment_outputs,
-        nodes,
-        links,
-        ty,
-    )
+    def mix_rgba_node(ty):
+        return assign_mix_rgba(
+            func,
+            assignment_outputs,
+            nodes,
+            links,
+            ty,
+        )
 
-    math_node = lambda ty: assign_math(
-        func,
-        assignment_outputs,
-        nodes,
-        links,
-        ty,
-    )
+    def math_node(ty):
+        return assign_math(
+            func,
+            assignment_outputs,
+            nodes,
+            links,
+            ty,
+        )
 
-    group_node = lambda func, name, create_node_tree: create_cached_func_group_node(
-        nodes, func, name, create_node_tree
-    )
+    def group_node(func, name, create_node_tree):
+        return create_cached_func_group_node(nodes, func, name, create_node_tree)
 
-    assign_args = lambda func, node, params: assign_func_args(
-        func, params, assignment_outputs, links, node
-    )
+    def assign_args(func, node, params):
+        return assign_func_args(func, params, assignment_outputs, links, node)
 
     match func.op:
         case xc3_model_py.shader_database.Operation.Unk:
@@ -882,29 +882,29 @@ def assign_func_xyz(
     nodes,
     links,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
-    mix_rgba_node = lambda ty: assign_mix_xyz(
-        func,
-        assignment_outputs_xyz,
-        nodes,
-        links,
-        ty,
-    )
+    def mix_rgba_node(ty):
+        return assign_mix_xyz(
+            func,
+            assignment_outputs_xyz,
+            nodes,
+            links,
+            ty,
+        )
 
-    math_node = lambda ty: assign_math_xyz(
-        func,
-        assignment_outputs_xyz,
-        nodes,
-        links,
-        ty,
-    )
+    def math_node(ty):
+        return assign_math_xyz(
+            func,
+            assignment_outputs_xyz,
+            nodes,
+            links,
+            ty,
+        )
 
-    group_node = lambda func, name, create_node_tree: create_cached_func_xyz_group_node(
-        nodes, func, name, create_node_tree
-    )
+    def group_node(func, name, create_node_tree):
+        return create_cached_func_xyz_group_node(nodes, func, name, create_node_tree)
 
-    assign_args = lambda func, node, params: assign_func_args(
-        func, params, assignment_outputs_xyz, links, node
-    )
+    def assign_args(func, node, params):
+        return assign_func_args(func, params, assignment_outputs_xyz, links, node)
 
     match func.op:
         case xc3_model_py.shader_database.Operation.Unk:

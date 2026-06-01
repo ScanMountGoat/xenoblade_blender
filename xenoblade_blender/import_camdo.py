@@ -8,7 +8,6 @@ from bpy_extras.io_utils import ImportHelper
 
 from . import xc3_model_py
 from .import_root import (
-    get_database_path,
     get_image_folder,
     import_armature,
     import_images,
