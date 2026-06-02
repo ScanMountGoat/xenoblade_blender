@@ -1,4 +1,5 @@
 import time
+import typing
 
 import bpy
 import numpy as np
@@ -7,7 +8,11 @@ from bpy_extras.io_utils import ImportHelper
 
 from xenoblade_blender.import_root import init_logging
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
+
 from .export_root import export_skeleton
 
 

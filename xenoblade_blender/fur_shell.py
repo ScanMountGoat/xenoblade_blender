@@ -5,7 +5,7 @@ import bpy
 from xenoblade_blender.node_layout import layout_nodes
 
 if typing.TYPE_CHECKING:
-    from ..xc3_model_py.xc3_model_py import xc3_model_py
+    from xc3_model_py import xc3_model_py
 else:
     from . import xc3_model_py
 

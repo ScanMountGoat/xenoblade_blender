@@ -2,6 +2,7 @@ import copy
 import os
 import re
 import time
+import typing
 from pathlib import Path
 
 import bpy
@@ -12,7 +13,11 @@ from bpy_extras.io_utils import ExportHelper
 
 from xenoblade_blender.import_root import init_logging
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
+
 from .export_root import (
     ExportException,
     export_mesh,

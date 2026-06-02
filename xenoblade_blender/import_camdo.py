@@ -1,12 +1,17 @@
 import os
 import time
+import typing
 from pathlib import Path
 
 import bpy
 from bpy.props import BoolProperty, CollectionProperty, StringProperty
 from bpy_extras.io_utils import ImportHelper
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
+
 from .import_root import (
     get_image_folder,
     import_armature,

@@ -23,7 +23,7 @@ from xenoblade_blender.node_group import (
 from xenoblade_blender.node_layout import layout_nodes
 
 if typing.TYPE_CHECKING:
-    from ..xc3_model_py.xc3_model_py import xc3_model_py
+    from xc3_model_py import xc3_model_py
 else:
     from . import xc3_model_py
 
@@ -74,10 +74,15 @@ def import_material(
     # Storing the output name allows using a single node for values with multiple channels.
     assignment_indices = used_assignments(output_assignments, has_alpha)
     assignment_outputs = []
-    for i, assignment in enumerate(output_assignments.assignments):
+    for i, assignment in enumerate(output_assignments.exprs):
         if i in assignment_indices:
             node_output = assign_output(
-                assignment, assignment_outputs, nodes, links, textures
+                assignment,
+                assignment_outputs,
+                nodes,
+                links,
+                textures,
+                material.parameters,
             )
             assignment_outputs.append(node_output)
         else:
@@ -99,18 +104,14 @@ def import_material(
 
     # RGB base color.
     if xyz := output_assignments.output_assignments[0].merge_xyz(
-        output_assignments.assignments
+        output_assignments.exprs
     ):
         assignment_outputs_xyz = create_assignment_outputs_xyz(
-            xyz,
-            assignment_outputs,
-            nodes,
-            links,
-            textures,
+            xyz, assignment_outputs, nodes, links, textures, material.parameters
         )
 
         assign_index(
-            xyz.assignment,
+            xyz.expr,
             assignment_outputs_xyz,
             links,
             mix_ao.inputs["A"],
@@ -178,17 +179,13 @@ def import_material(
             bsdf.inputs["Emission Strength"].default_value = 1.0
 
         if xyz := output_assignments.output_assignments[5].merge_xyz(
-            output_assignments.assignments
+            output_assignments.exprs
         ):
             assignment_outputs_xyz = create_assignment_outputs_xyz(
-                xyz,
-                assignment_outputs,
-                nodes,
-                links,
-                textures,
+                xyz, assignment_outputs, nodes, links, textures, material.parameters
             )
 
-            assign_index(xyz.assignment, assignment_outputs_xyz, links, output)
+            assign_index(xyz.expr, assignment_outputs_xyz, links, output)
         else:
             color = nodes.new("ShaderNodeCombineColor")
             assign_index(
@@ -326,11 +323,12 @@ def create_assignment_outputs_xyz(
     nodes,
     links,
     textures,
+    parameters: xc3_model_py.material.MaterialParameters,
 ):
     # Create nodes for each unique assignment.
     # Storing the output name allows using a single node for values with multiple channels.
     assignment_outputs_xyz = []
-    for assignment in xyz.assignments:
+    for assignment in xyz.exprs:
         node_output = assign_output_xyz(
             assignment,
             assignment_outputs,
@@ -338,6 +336,7 @@ def create_assignment_outputs_xyz(
             nodes,
             links,
             textures,
+            parameters,
         )
         assignment_outputs_xyz.append(node_output)
 
@@ -412,24 +411,27 @@ def assign_normal_map(
 
 
 def assign_output(
-    assignment: xc3_model_py.material.Assignment,
+    assignment: xc3_model_py.shader_database.OutputExpr,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
+    parameters: xc3_model_py.material.MaterialParameters,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := assignment.func():
         return assign_func(func, assignment_outputs, nodes, links)
     elif value := assignment.value():
-        return assign_value(value, assignment_outputs, nodes, links, textures)
+        return assign_value(
+            value, assignment_outputs, nodes, links, textures, parameters
+        )
     else:
         return None
 
 
 def assign_func(
-    func: xc3_model_py.material.AssignmentFunc,
+    func: xc3_model_py.shader_database.OutputExprFunc,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
@@ -608,6 +610,41 @@ def assign_func(
             node.name = func_name(func)
             node.attribute_name = "FurAlpha"
             return node, "Fac"
+        # TODO: handle remaining operations
+        case xc3_model_py.shader_database.Operation.Float:
+            return None
+        case xc3_model_py.shader_database.Operation.Int:
+            return None
+        case xc3_model_py.shader_database.Operation.Uint:
+            return None
+        case xc3_model_py.shader_database.Operation.Truncate:
+            return None
+        case xc3_model_py.shader_database.Operation.FloatBitsToInt:
+            return None
+        case xc3_model_py.shader_database.Operation.IntBitsToFloat:
+            return None
+        case xc3_model_py.shader_database.Operation.UintBitsToFloat:
+            return None
+        case xc3_model_py.shader_database.Operation.InverseSqrt:
+            return None
+        case xc3_model_py.shader_database.Operation.Not:
+            return None
+        case xc3_model_py.shader_database.Operation.LeftShift:
+            return None
+        case xc3_model_py.shader_database.Operation.RightShift:
+            return None
+        case xc3_model_py.shader_database.Operation.PartialDerivativeX:
+            return None
+        case xc3_model_py.shader_database.Operation.PartialDerivativeY:
+            return None
+        case xc3_model_py.shader_database.Operation.Exp2:
+            return None
+        case xc3_model_py.shader_database.Operation.Log2:
+            return None
+        case xc3_model_py.shader_database.Operation.Sin:
+            return math_node("SINE")
+        case xc3_model_py.shader_database.Operation.Cos:
+            return math_node("COSINE")
         case _:
             # TODO: This case shouldn't happen?
             return None
@@ -629,13 +666,15 @@ def assign_index(
 
 
 def assign_value(
-    value: xc3_model_py.material.AssignmentValue,
+    value: xc3_model_py.shader_database.Value,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
     textures,
+    parameters: xc3_model_py.material.MaterialParameters,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if f := value.float():
+        # TODO: Assign these directly to reduce links?
         node = nodes.new("ShaderNodeValue")
         node.outputs[0].default_value = f
         return node, "Value"
@@ -643,8 +682,27 @@ def assign_value(
         return assign_attribute(attribute, nodes, links)
     elif texture := value.texture():
         return assign_texture(texture, assignment_outputs, nodes, links, textures)
+    elif parameter := value.parameter():
+        node = nodes.new("ShaderNodeValue")
+        node.label = parameter_label(parameter)
+        f = parameters.get_parameter(parameter)
+        if f is not None:
+            node.outputs[0].default_value = f
+        return node, "Value"
     else:
         return None
+
+
+def parameter_label(p: xc3_model_py.shader_database.Parameter) -> str:
+    name = f"{p.name}.{p.field}"
+
+    if p.index is not None:
+        name += f"[{p.index}]"
+
+    if p.channel is not None:
+        name += f".{p.channel}"
+
+    return name
 
 
 def assign_float(output, f):
@@ -656,7 +714,7 @@ def assign_float(output, f):
 
 
 def assign_attribute(
-    attribute: xc3_model_py.material.AssignmentValueAttribute, nodes, links
+    attribute: xc3_model_py.shader_database.Attribute, nodes, links
 ) -> Tuple[bpy.types.Node, str]:
     node = import_attribute(attribute.name, nodes)
     return assign_channel(attribute.name, attribute.channel, node, nodes, links)
@@ -697,7 +755,7 @@ def channel_name(channel: Optional[str]) -> str:
 
 
 def assign_mix_rgba(
-    func: xc3_model_py.material.AssignmentFunc,
+    func: xc3_model_py.shader_database.OutputExprFunc,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
@@ -720,7 +778,7 @@ def assign_mix_rgba(
 
 
 def assign_texture(
-    texture: xc3_model_py.material.TextureAssignment,
+    texture: xc3_model_py.shader_database.Texture,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
@@ -803,7 +861,7 @@ def set_sampler(
 
 
 def assign_math(
-    func: xc3_model_py.material.AssignmentFunc,
+    func: xc3_model_py.shader_database.OutputExprFunc,
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     nodes,
     links,
@@ -819,7 +877,7 @@ def assign_math(
     return node, "Value"
 
 
-def func_name(func: xc3_model_py.material.AssignmentFunc):
+def func_name(func: xc3_model_py.shader_database.OutputExprFunc):
     return func_name_inner(func.op, func.args, "")
 
 
@@ -869,11 +927,14 @@ def assign_output_xyz(
     textures: Dict[
         str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
     ],
+    parameters: xc3_model_py.material.MaterialParameters,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := assignment_xyz.func():
         return assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
     elif value := assignment_xyz.value():
-        return assign_value_xyz(value, assignment_outputs, nodes, links, textures)
+        return assign_value_xyz(
+            value, assignment_outputs, nodes, links, textures, parameters
+        )
 
 
 def assign_func_xyz(
@@ -907,121 +968,130 @@ def assign_func_xyz(
         return assign_func_args(func, params, assignment_outputs_xyz, links, node)
 
     match func.op:
-        case xc3_model_py.shader_database.Operation.Unk:
+        case xc3_model_py.material.OperationXyz.Unk:
             return None
-        case xc3_model_py.shader_database.Operation.Mix:
+        case xc3_model_py.material.OperationXyz.Mix:
             return mix_rgba_node("MIX")
-        case xc3_model_py.shader_database.Operation.Mul:
+        case xc3_model_py.material.OperationXyz.Mul:
             return math_node("MULTIPLY")
-        case xc3_model_py.shader_database.Operation.Div:
+        case xc3_model_py.material.OperationXyz.Div:
             return math_node("DIVIDE")
-        case xc3_model_py.shader_database.Operation.Add:
+        case xc3_model_py.material.OperationXyz.Add:
             return math_node("ADD")
-        case xc3_model_py.shader_database.Operation.Sub:
+        case xc3_model_py.material.OperationXyz.Sub:
             return math_node("SUBTRACT")
-        case xc3_model_py.shader_database.Operation.Fma:
+        case xc3_model_py.material.OperationXyz.Fma:
             return math_node("MULTIPLY_ADD")
-        case xc3_model_py.shader_database.Operation.MulRatio:
+        case xc3_model_py.material.OperationXyz.MulRatio:
             node = nodes.new("ShaderNodeMix")
             node.data_type = "RGBA"
             node.blend_type = "MULTIPLY"
             node.name = func_xyz_name(func)
             assign_args(func, node, ["A", "B", "Factor"])
             return node, "Result"
-        case xc3_model_py.shader_database.Operation.AddNormalX:
-            pass
-        case xc3_model_py.shader_database.Operation.AddNormalY:
-            pass
-        case xc3_model_py.shader_database.Operation.Overlay:
+        case xc3_model_py.material.OperationXyz.Overlay:
             return mix_rgba_node("OVERLAY")
-        case xc3_model_py.shader_database.Operation.Overlay2:
+        case xc3_model_py.material.OperationXyz.Overlay2:
             return mix_rgba_node("OVERLAY")
-        case xc3_model_py.shader_database.Operation.OverlayRatio:
+        case xc3_model_py.material.OperationXyz.OverlayRatio:
             return mix_rgba_node("OVERLAY")
-        case xc3_model_py.shader_database.Operation.Power:
+        case xc3_model_py.material.OperationXyz.Power:
             node = group_node(func, "PowerXYZ", power_xyz_node_group)
             assign_args(func, node, ["Base", "Exponent"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.Min:
+        case xc3_model_py.material.OperationXyz.Min:
             return math_node("MINIMUM")
-        case xc3_model_py.shader_database.Operation.Max:
+        case xc3_model_py.material.OperationXyz.Max:
             return math_node("MAXIMUM")
-        case xc3_model_py.shader_database.Operation.Clamp:
+        case xc3_model_py.material.OperationXyz.Clamp:
             node = group_node(func, "ClampXYZ", clamp_xyz_node_group)
             assign_args(func, node, ["Value", "Min", "Max"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.Abs:
+        case xc3_model_py.material.OperationXyz.Abs:
             return math_node("ABSOLUTE")
-        case xc3_model_py.shader_database.Operation.Fresnel:
+        case xc3_model_py.material.OperationXyz.Fresnel:
             # TODO: Separate factors for xyz?
             node = group_node(func, "FresnelBlend", fresnel_blend_node_group)
             # TODO: normals?
             assign_args(func, node, ["Value"])
             return node, "Value"
-        case xc3_model_py.shader_database.Operation.Sqrt:
+        case xc3_model_py.material.OperationXyz.Sqrt:
             node = group_node(func, "SqrtXYZ", sqrt_xyz_node_group)
             assign_args(func, node, ["Value"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.TexMatrix:
-            pass
-        case xc3_model_py.shader_database.Operation.TexParallaxX:
-            pass
-        case xc3_model_py.shader_database.Operation.TexParallaxY:
-            pass
-        case xc3_model_py.shader_database.Operation.ReflectX:
-            pass
-        case xc3_model_py.shader_database.Operation.ReflectY:
-            pass
-        case xc3_model_py.shader_database.Operation.ReflectZ:
-            pass
-        case xc3_model_py.shader_database.Operation.Floor:
+        case xc3_model_py.material.OperationXyz.Reflect:
+            return math_node("REFLECT")
+        case xc3_model_py.material.OperationXyz.Floor:
             return math_node("FLOOR")
-        case xc3_model_py.shader_database.Operation.Select:
+        case xc3_model_py.material.OperationXyz.Select:
             return mix_rgba_node("MIX")
-        case xc3_model_py.shader_database.Operation.Equal:
+        case xc3_model_py.material.OperationXyz.Equal:
             return math_node("COMPARE")
-        case xc3_model_py.shader_database.Operation.NotEqual:
+        case xc3_model_py.material.OperationXyz.NotEqual:
             # TODO: Invert compare.
-            pass
-        case xc3_model_py.shader_database.Operation.Less:
+            return None
+        case xc3_model_py.material.OperationXyz.Less:
             node = group_node(func, "LessXYZ", less_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.Greater:
+        case xc3_model_py.material.OperationXyz.Greater:
             node = group_node(func, "GreaterXYZ", greater_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.LessEqual:
+        case xc3_model_py.material.OperationXyz.LessEqual:
             # TODO: node group for leq?
             node = group_node(func, "LessXYZ", less_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.GreaterEqual:
+        case xc3_model_py.material.OperationXyz.GreaterEqual:
             # TODO: node group for geq?
             node = group_node(func, "GreaterXYZ", greater_xyz_node_group)
             assign_args(func, node, ["Value", "Threshold"])
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.Dot4:
-            pass
-        case xc3_model_py.shader_database.Operation.NormalMapX:
-            pass
-        case xc3_model_py.shader_database.Operation.NormalMapY:
-            pass
-        case xc3_model_py.shader_database.Operation.NormalMapZ:
-            pass
+        case xc3_model_py.material.OperationXyz.Monochrome:
+            # TODO: handle monochrome x.x, y.y, z.z, factor.x
+            node = group_node(func, "MonochromeXYZ", monochrome_xyz_node_group)
+            assign_args(func, node, ["X", "Y", "Z", "Factor"])
+            return node, "X"
         # TODO: Fix merging for monochrome xyz?
-        case xc3_model_py.shader_database.Operation.Negate:
+        case xc3_model_py.material.OperationXyz.Negate:
             node = nodes.new("ShaderNodeVectorMath")
             node.name = func_xyz_name(func)
             node.operation = "MULTIPLY"
             assign_args(func, node, [0])
             node.inputs[1].default_value = (-1.0, -1.0, -1.0)
             return node, "Vector"
-        case xc3_model_py.shader_database.Operation.FurInstanceAlpha:
-            node = nodes.new("ShaderNodeAttribute")
-            node.name = func_name(func)
-            node.attribute_name = "FurAlpha"
-            return node, "Fac"
+        # TODO: Handle remaining operations
+        case xc3_model_py.material.OperationXyz.Float:
+            return None
+        case xc3_model_py.material.OperationXyz.Int:
+            return None
+        case xc3_model_py.material.OperationXyz.Uint:
+            return None
+        case xc3_model_py.material.OperationXyz.Truncate:
+            return None
+        case xc3_model_py.material.OperationXyz.FloatBitsToInt:
+            return None
+        case xc3_model_py.material.OperationXyz.IntBitsToFloat:
+            return None
+        case xc3_model_py.material.OperationXyz.UintBitsToFloat:
+            return None
+        case xc3_model_py.material.OperationXyz.InverseSqrt:
+            return None
+        case xc3_model_py.material.OperationXyz.Not:
+            return None
+        case xc3_model_py.material.OperationXyz.LeftShift:
+            return None
+        case xc3_model_py.material.OperationXyz.RightShift:
+            return None
+        case xc3_model_py.material.OperationXyz.Exp2:
+            return None
+        case xc3_model_py.material.OperationXyz.Log2:
+            return None
+        case xc3_model_py.material.OperationXyz.Sin:
+            return math_node("SINE")
+        case xc3_model_py.material.OperationXyz.Cos:
+            return math_node("COSINE")
         case _:
             # TODO: This case shouldn't happen?
             return None
@@ -1094,6 +1164,7 @@ def assign_value_xyz(
     nodes,
     links,
     textures,
+    parameters: xc3_model_py.material.MaterialParameters,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if floats := value.float():
         if all(f >= 0.0 and f <= 1.0 for f in floats):
@@ -1111,8 +1182,63 @@ def assign_value_xyz(
         return assign_attribute_xyz(attribute, nodes, links)
     elif texture := value.texture():
         return assign_texture_xyz(texture, assignment_outputs, nodes, links, textures)
+    elif parameter := value.parameter():
+        assign_parameter_xyz(parameter, nodes, parameters)
     else:
         return None
+
+
+def assign_parameter_xyz(
+    parameter: xc3_model_py.material.AssignmentValueParameterXyz,
+    nodes,
+    parameters: xc3_model_py.material.MaterialParameters,
+) -> Optional[Tuple[bpy.types.Node, str]]:
+    node = nodes.new("ShaderNodeCombineXYZ")
+    node.label = parameter_label_xyz(parameter)
+
+    # Assign the vector by treating the access as 3 scalar parameters.
+    channels = [None, None, None]
+    if parameter.channel is not None:
+        match parameter.channel:
+            case xc3_model_py.material.ChannelXyz.Xyz:
+                channels = ["x", "y", "z"]
+            case xc3_model_py.material.ChannelXyz.X:
+                channels = ["x", "x", "x"]
+            case xc3_model_py.material.ChannelXyz.Y:
+                channels = ["y", "y", "y"]
+            case xc3_model_py.material.ChannelXyz.Z:
+                channels = ["z", "z", "z"]
+
+    for channel, component in zip(channels, "XYZ"):
+        f = parameters.get_parameter(
+            xc3_model_py.shader_database.Parameter(
+                parameter.name, parameter.field, parameter.index, channel
+            )
+        )
+        if f is not None:
+            node.inputs[component].default_value = f
+
+    return node, "Vector"
+
+
+def parameter_label_xyz(p: xc3_model_py.material.AssignmentValueParameterXyz) -> str:
+    name = f"{p.name}.{p.field}"
+
+    if p.index is not None:
+        name += f"[{p.index}]"
+
+    if p.channel is not None:
+        match p.channel:
+            case xc3_model_py.material.ChannelXyz.Xyz:
+                name += ".xyz"
+            case xc3_model_py.material.ChannelXyz.X:
+                name += ".xxx"
+            case xc3_model_py.material.ChannelXyz.Y:
+                name += ".yyy"
+            case xc3_model_py.material.ChannelXyz.Z:
+                name += ".zzz"
+
+    return name
 
 
 def assign_attribute_xyz(
@@ -1194,11 +1320,11 @@ def used_assignments(
 ) -> Set[int]:
     visited = set()
 
-    assignments = output_assignments.assignments
+    assignments = output_assignments.exprs
     outputs = output_assignments.output_assignments
 
     if xyz := outputs[0].merge_xyz(assignments):
-        add_used_xyz_assignments(visited, assignments, xyz.assignments, xyz.assignment)
+        add_used_xyz_assignments(visited, assignments, xyz.exprs, xyz.expr)
     else:
         add_used_assignments(visited, assignments, outputs[0].x)
         add_used_assignments(visited, assignments, outputs[0].y)
@@ -1215,7 +1341,7 @@ def used_assignments(
     add_used_assignments(visited, assignments, outputs[2].z)
 
     if xyz := outputs[5].merge_xyz(assignments):
-        add_used_xyz_assignments(visited, assignments, xyz.assignments, xyz.assignment)
+        add_used_xyz_assignments(visited, assignments, xyz.exprs, xyz.expr)
     else:
         add_used_assignments(visited, assignments, outputs[5].x)
         add_used_assignments(visited, assignments, outputs[5].y)
@@ -1226,7 +1352,7 @@ def used_assignments(
 
 def add_used_assignments(
     visited: Set[int],
-    assignments: list[xc3_model_py.material.Assignment],
+    assignments: list[xc3_model_py.shader_database.OutputExpr],
     i: Optional[int],
 ):
     if i is not None:
@@ -1245,7 +1371,7 @@ def add_used_assignments(
 
 def add_used_xyz_assignments(
     visited: Set[int],
-    assignments: list[xc3_model_py.material.Assignment],
+    assignments: list[xc3_model_py.shader_database.OutputExpr],
     assignments_xyz: list[xc3_model_py.material.AssignmentXyz],
     i: int,
 ):
@@ -1263,7 +1389,7 @@ def add_used_xyz_assignments(
 
 def create_cached_func_group_node(
     nodes,
-    func: xc3_model_py.material.AssignmentFunc,
+    func: xc3_model_py.shader_database.OutputExprFunc,
     node_group_name: str,
     create_node_tree,
 ) -> bpy.types.Node:
@@ -1277,7 +1403,7 @@ def create_cached_func_group_node(
 
 
 def assign_func_args(
-    func: xc3_model_py.material.AssignmentFunc,
+    func: xc3_model_py.shader_database.OutputExprFunc,
     params: list[int | str],
     assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
     links,

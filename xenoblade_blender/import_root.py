@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import typing
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -11,7 +12,11 @@ from mathutils import Matrix
 
 from xenoblade_blender.fur_shell import import_fur_shells
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
+
 from .import_material import import_material
 
 
@@ -466,7 +471,7 @@ def import_mesh(
                 outline_vertex_colors = data
 
     # The validate call may modify and reindex geometry.
-    # Assign normals now that the mesh has been updated.
+    # Assign normals to an attribute to use later.
     for attribute in vertex_buffer.attributes:
         if attribute.attribute_type in [
             xc3_model_py.vertex.AttributeType.Normal,
@@ -485,8 +490,8 @@ def import_mesh(
     blender_mesh.update()
     blender_mesh.validate()
 
-    # Calculating normals for invalid meshes seems to cause inconsistent crashes.
-    # Setting normals after updating and validating is more reliable on some Blender versions.
+    # Assigning custom normals can cause crashes if the topology changes.
+    # Setting normals after updating and validating is more reliable.
     if attribute := blender_mesh.color_attributes.get("VertexNormal"):
         normals = np.zeros(len(blender_mesh.vertices) * 4)
         attribute.data.foreach_get("color", normals)

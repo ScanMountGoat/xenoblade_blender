@@ -1,5 +1,6 @@
 import math
 import time
+import typing
 from pathlib import Path
 
 import bpy
@@ -10,7 +11,10 @@ from mathutils import Matrix
 
 from xenoblade_blender.import_root import init_logging
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
 
 
 class ImportIdcm(bpy.types.Operator, ImportHelper):

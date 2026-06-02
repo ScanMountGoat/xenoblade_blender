@@ -1,5 +1,6 @@
 import copy
 import math
+import typing
 from typing import Optional, Tuple
 
 import bmesh
@@ -7,7 +8,10 @@ import bpy
 import numpy as np
 from mathutils import Matrix
 
-from . import xc3_model_py
+if typing.TYPE_CHECKING:
+    from xc3_model_py import xc3_model_py
+else:
+    from . import xc3_model_py
 
 
 class ExportException(Exception):
