@@ -11,6 +11,7 @@ from xenoblade_blender.node_group import (
     greater_xyz_node_group,
     less_xyz_node_group,
     monochrome_xyz_node_group,
+    monochrome_xyz_vector_node_group,
     normal_map_xy_final_node_group,
     normal_map_xyz_node_group,
     power_xyz_node_group,
@@ -1050,9 +1051,11 @@ def assign_func_xyz(
             return node, "Vector"
         case xc3_model_py.material.OperationXyz.Monochrome:
             # TODO: handle monochrome x.x, y.y, z.z, factor.x
-            node = group_node(func, "MonochromeXYZ", monochrome_xyz_node_group)
-            assign_args(func, node, ["X", "Y", "Z", "Factor"])
-            return node, "X"
+            node = group_node(
+                func, "MonochromeXYZVector", monochrome_xyz_vector_node_group
+            )
+            assign_args(func, node, ["Vector", "Factor"])
+            return node, "Vector"
         # TODO: Fix merging for monochrome xyz?
         case xc3_model_py.material.OperationXyz.Negate:
             node = nodes.new("ShaderNodeVectorMath")
@@ -1183,7 +1186,7 @@ def assign_value_xyz(
     elif texture := value.texture():
         return assign_texture_xyz(texture, assignment_outputs, nodes, links, textures)
     elif parameter := value.parameter():
-        assign_parameter_xyz(parameter, nodes, parameters)
+        return assign_parameter_xyz(parameter, nodes, parameters)
     else:
         return None
 

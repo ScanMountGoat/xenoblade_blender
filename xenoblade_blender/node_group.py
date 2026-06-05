@@ -644,7 +644,6 @@ def math_xyz_node_group(name: str, op: str, inputs: list[str]):
 
 
 def monochrome_xyz_node_group(name: str):
-    # Apply a scalar operation to independent XYZ components.
     node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
     node_tree.interface.new_socket(
@@ -674,34 +673,67 @@ def monochrome_xyz_node_group(name: str):
         in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
     )
 
-    rgb_coeffs = nodes.new("ShaderNodeCombineXYZ")
-    rgb_coeffs.inputs["X"].default_value = 0.01
-    rgb_coeffs.inputs["Y"].default_value = 0.01
-    rgb_coeffs.inputs["Z"].default_value = 0.01
-
     input_xyz = nodes.new("ShaderNodeCombineXYZ")
     links.new(input_node.outputs["X"], input_xyz.inputs["X"])
     links.new(input_node.outputs["Y"], input_xyz.inputs["Y"])
     links.new(input_node.outputs["Z"], input_xyz.inputs["Z"])
 
-    dot = nodes.new("ShaderNodeVectorMath")
-    dot.operation = "DOT_PRODUCT"
-    links.new(input_xyz.outputs["Vector"], dot.inputs[0])
-    links.new(rgb_coeffs.outputs["Vector"], dot.inputs[1])
-
-    mix = nodes.new("ShaderNodeMix")
-    mix.data_type = "VECTOR"
-    links.new(input_node.outputs["Factor"], mix.inputs["Factor"])
-    links.new(input_xyz.outputs["Vector"], mix.inputs["A"])
-    links.new(dot.outputs["Value"], mix.inputs["B"])
+    monochrome = create_node_group(
+        nodes, "MonochromeXYZVector", monochrome_xyz_vector_node_group
+    )
+    links.new(input_xyz.outputs["Vector"], monochrome.inputs["Vector"])
+    links.new(input_node.outputs["Factor"], monochrome.inputs["Factor"])
 
     output_xyz = nodes.new("ShaderNodeSeparateXYZ")
-    links.new(mix.outputs["Result"], output_xyz.inputs["Vector"])
+    links.new(monochrome.outputs["Vector"], output_xyz.inputs["Vector"])
 
     output_node = nodes.new("NodeGroupOutput")
     links.new(output_xyz.outputs["X"], output_node.inputs["X"])
     links.new(output_xyz.outputs["Y"], output_node.inputs["Y"])
     links.new(output_xyz.outputs["Z"], output_node.inputs["Z"])
+
+    layout_nodes(output_node, links)
+
+    return node_tree
+
+
+def monochrome_xyz_vector_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    node_tree.interface.new_socket(
+        in_out="OUTPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketVector", name="Vector"
+    )
+    node_tree.interface.new_socket(
+        in_out="INPUT", socket_type="NodeSocketFloat", name="Factor"
+    )
+
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    input_node = nodes.new("NodeGroupInput")
+
+    rgb_coeffs = nodes.new("ShaderNodeCombineXYZ")
+    rgb_coeffs.inputs["X"].default_value = 0.01
+    rgb_coeffs.inputs["Y"].default_value = 0.01
+    rgb_coeffs.inputs["Z"].default_value = 0.01
+
+    dot = nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    links.new(input_node.outputs["Vector"], dot.inputs[0])
+    links.new(rgb_coeffs.outputs["Vector"], dot.inputs[1])
+
+    mix = nodes.new("ShaderNodeMix")
+    mix.data_type = "VECTOR"
+    links.new(input_node.outputs["Factor"], mix.inputs["Factor"])
+    links.new(input_node.outputs["Vector"], mix.inputs["A"])
+    links.new(dot.outputs["Value"], mix.inputs["B"])
+
+    output_node = nodes.new("NodeGroupOutput")
+    links.new(mix.outputs["Result"], output_node.inputs["Vector"])
 
     layout_nodes(output_node, links)
 
