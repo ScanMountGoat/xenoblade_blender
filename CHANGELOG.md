@@ -4,8 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Changed
+* Reduced the number of shader nodes for some imported materials.
+
 ### Fixed
 * Fixed an issue where exported Xenoblade Chronicles X DE wimdo models would have visible seams in some cases.
+* Fixed an issue where materials would import with incorrect normal map assignments in some cases.
+* Fixed an issue where map materials would use the wrong texture assignments in some cases.
+* Fixed an issue where materials would import with the wrong values for parameters in some cases.
 
 ## 0.23.2 - 2026-05-07
 ### Fixed

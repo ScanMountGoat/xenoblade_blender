@@ -512,10 +512,11 @@ def import_mesh(
     # Only non instanced character meshes are skinned in practice.
     if buffers.weights is not None:
         # Calculate the index offset based on the weight group for this mesh.
-        technique_type = models.materials[mesh.material_index].technique_type
+        technique = models.materials[mesh.material_index].techniques[-1]
+
         lod_item_index = 0 if mesh.lod_item_index is None else mesh.lod_item_index
         start_index = buffers.weights.weights_start_index(
-            mesh.flags2, lod_item_index, technique_type
+            mesh.flags2, lod_item_index, technique.technique_type
         )
 
         bone_names = []
