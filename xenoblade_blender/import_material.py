@@ -104,6 +104,8 @@ def import_material(
                 material.parameters,
             )
             assignment_outputs_xyz.append(node_output)
+        else:
+            assignment_outputs_xyz.append(None)
 
     if has_alpha:
         assign_index(
@@ -336,6 +338,9 @@ def material_images_samplers(material, blender_images, samplers):
     offset = 0
     if len(material.techniques) > 1:
         offset = material.techniques[0].material_texture_count
+        if offset >= len(material.textures):
+            # TODO: Does this only happen for xcxde?
+            offset = 0
 
     for i, texture in enumerate(material.textures[offset:]):
         name = f"s{i}"
