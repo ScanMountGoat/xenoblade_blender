@@ -925,7 +925,10 @@ def assign_output_xyz(
     parameters: xc3_model_py.material.MaterialParameters,
 ) -> Optional[Tuple[bpy.types.Node, str]]:
     if func := expr_xyz.func():
-        return assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
+        result = assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
+        if result is not None:
+            node, output = result
+            return assign_xyz_channel(node, output, func.channel, nodes, links)
     elif value := expr_xyz.value():
         return assign_value_xyz(
             value, assignment_outputs, nodes, links, textures, parameters
@@ -1092,6 +1095,46 @@ def assign_func_xyz(
         case _:
             # TODO: This case shouldn't happen?
             return None
+
+
+def assign_xyz_channel(
+    node,
+    output_name,
+    channel: Optional[xc3_model_py.shader_database.ChannelXyz],
+    nodes,
+    links,
+) -> Tuple[bpy.types.Node, str]:
+    output = channel_xyz_name(channel)
+    if output == "Vector":
+        # Return the original output if all XYZ channels are used.
+        return node, output_name
+    else:
+        # Avoid creating more than one separate XYZ for each node.
+        xyz_name = f"{node.name}.xyz"
+        xyz_node = nodes.get(xyz_name)
+        if xyz_node is None:
+            xyz_node = nodes.new("ShaderNodeSeparateXYZ")
+            xyz_node.name = xyz_name
+            links.new(node.outputs[output_name], xyz_node.inputs["Vector"])
+
+        return xyz_node, output
+
+
+def channel_xyz_name(channel: Optional[xc3_model_py.shader_database.ChannelXyz]) -> str:
+    match channel:
+        case xc3_model_py.shader_database.ChannelXyz.Xyz:
+            return "Vector"
+        case xc3_model_py.shader_database.ChannelXyz.X:
+            return "X"
+        case xc3_model_py.shader_database.ChannelXyz.Y:
+            return "Y"
+        case xc3_model_py.shader_database.ChannelXyz.Z:
+            return "Z"
+        case xc3_model_py.shader_database.ChannelXyz.W:
+            return "W"
+
+    # TODO: How to handle the None case?
+    return "Vector"
 
 
 def assign_mix_xyz(
