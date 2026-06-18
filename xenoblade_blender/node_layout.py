@@ -15,8 +15,7 @@ def layout_nodes(root: bpy.types.Node, links: bpy.types.NodeLinks):
 
     # Assign each node to a layer.
     layers = []
-    node_layer = {}
-    assign_node_layers(root, child_nodes, layers, 0, node_layer)
+    assign_node_layers(root, child_nodes, layers)
 
     # Basic layered graph layout.
     margin_x = 100
@@ -38,28 +37,34 @@ def assign_node_layers(
     node: bpy.types.Node,
     child_nodes: dict[bpy.types.Node, list[bpy.types.Node]],
     layers: list[list[bpy.types.Node]],
-    layer: int,
-    node_layer: dict[str, int],
 ):
-    # Assign each node to only one layer.
-    # Assign to the deepest layer to make edges go from left to right.
-    # This assumes the graph is acyclic.
-    if previous_layer := node_layer.get(node.name):
-        if layer <= previous_layer:
-            return
+    node_layer = {}
 
-        layers[previous_layer].remove(node)
+    # Use a stack instead of recursion to avoid the recursion limit for complex shaders.
+    stack = [(node, 0)]
+    while len(stack) > 0:
+        node, layer = stack.pop()
 
-    node_layer[node.name] = layer
+        # Assign each node to only one layer.
+        # Assign to the deepest layer to make edges go from left to right.
+        # This assumes the graph is acyclic.
+        if previous_layer := node_layer.get(node.name):
+            if layer <= previous_layer:
+                continue
 
-    if layer >= len(layers):
-        layers.append([])
+            layers[previous_layer].remove(node)
 
-    layers[layer].append(node)
+        node_layer[node.name] = layer
 
-    if children := child_nodes.get(node):
-        for child in children:
-            assign_node_layers(child, child_nodes, layers, layer + 1, node_layer)
+        if layer >= len(layers):
+            layers.append([])
+
+        layers[layer].append(node)
+
+        if children := child_nodes.get(node):
+            # Pop children from the stack in order to limit crossed edges.
+            for child in reversed(children):
+                stack.append((child, layer + 1))
 
 
 def node_dimensions(node: bpy.types.Node) -> Tuple[float, float]:
