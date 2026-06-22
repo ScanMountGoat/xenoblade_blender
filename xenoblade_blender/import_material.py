@@ -849,11 +849,13 @@ def set_sampler(
         # TODO: Check if U and V have the same address mode.
         match sampler.address_mode_u:
             case xc3_model_py.AddressMode.ClampToEdge:
-                node.extension = "CLIP"
+                node.extension = "EXTEND"
             case xc3_model_py.AddressMode.Repeat:
                 node.extension = "REPEAT"
             case xc3_model_py.AddressMode.MirrorRepeat:
                 node.extension = "MIRROR"
+            case _:
+                node.extension = "EXTEND"
 
 
 def assign_math(
