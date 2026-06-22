@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 0.23.4 - 2026-06-22
+### Fixed
+* Fixed an issue where image texture nodes would incorrectly use "Clip" instead of "Extend". This fixes rendering issues for some materials.
+
 ## 0.23.3 - 2026-06-17
 ### Changed
 * Reduced the number of shader nodes for some imported materials.
