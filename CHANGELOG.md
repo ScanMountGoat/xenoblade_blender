@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## unreleased
+### Fixed
+* Fixed an issue where exported Xenoblade Chronicles X DE wimdo models would have rendering errors in game in some cases.
+
 ## 0.23.4 - 2026-06-22
 ### Fixed
 * Fixed an issue where image texture nodes would incorrectly use "Clip" instead of "Extend". This fixes rendering issues for some materials.
