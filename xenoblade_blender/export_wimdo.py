@@ -179,7 +179,9 @@ def export_wimdo(
         message += " Simplify or quantize weights or limit the number of vertices."
         raise ExportException(message)
 
-    root.buffers.weights.update_weights(combined_weights)
+    # TODO: Create weights if there are none?
+    if root.buffers.weights is not None:
+        root.buffers.weights.update_weights(combined_weights)
 
     lod_data = root.models.lod_data
     if lod_data is not None:
