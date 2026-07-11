@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## unreleased
+## 0.23.5 - 2026-07-11
 ### Fixed
 * Fixed an issue where exported Xenoblade Chronicles X DE wimdo models would have rendering errors in game in some cases.
 * Fixed an issue where wimdo export would fail for models without any bone information like `chr/un` models for Xenoblade Chronicles X Definitive Edition.
