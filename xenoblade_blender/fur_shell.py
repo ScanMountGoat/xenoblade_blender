@@ -37,7 +37,10 @@ def import_fur_shells(
 def set_modifier_input_property(modifier: bpy.types.Modifier, name: str, value):
     # Inputs don't use the specified name.
     id = modifier.node_group.interface.items_tree[name].identifier
-    modifier[id] = value
+    if bpy.app.version >= (5, 2, 0):
+        getattr(modifier.properties.inputs, id).value = value
+    else:
+        modifier[id] = value
 
 
 def set_modifier_output_property_name(
@@ -45,7 +48,10 @@ def set_modifier_output_property_name(
 ):
     # Output names use a special naming convention.
     id = modifier.node_group.interface.items_tree[name].identifier
-    modifier[f"{id}_attribute_name"] = value
+    if bpy.app.version >= (5, 2, 0):
+        getattr(modifier.properties.outputs, id).attribute_name = value
+    else:
+        modifier[f"{id}_attribute_name"] = value
 
 
 def fur_shell_geometry_node_group(name: str):
@@ -127,10 +133,10 @@ def fur_shell_geometry_node_group(name: str):
         # This is only present in 4.1.
         capture_index.data_type = "INT"
 
-    links.new(instances.outputs["Instances"], capture_index.inputs[0])
+    links.new(instances.outputs["Instances"], capture_index.inputs["Geometry"])
 
     index = nodes.new("GeometryNodeInputIndex")
-    links.new(index.outputs["Index"], capture_index.inputs[1])
+    links.new(index.outputs["Index"], capture_index.inputs["Index"])
 
     realize_instances = nodes.new("GeometryNodeRealizeInstances")
     links.new(capture_index.outputs["Geometry"], realize_instances.inputs["Geometry"])
@@ -149,7 +155,7 @@ def fur_shell_geometry_node_group(name: str):
     # Vertex shader instance "scale" by translating along normal.
     index_plus_one = nodes.new("ShaderNodeMath")
     index_plus_one.operation = "ADD"
-    links.new(capture_index.outputs[1], index_plus_one.inputs[0])
+    links.new(capture_index.outputs["Index"], index_plus_one.inputs[0])
     index_plus_one.inputs[1].default_value = 1.0
 
     instance_scale = nodes.new("ShaderNodeMath")
@@ -216,7 +222,7 @@ def fur_shell_geometry_node_group(name: str):
     # Vertex shader instance alpha.
     alpha_factor = nodes.new("ShaderNodeMath")
     alpha_factor.operation = "MULTIPLY"
-    links.new(capture_index.outputs[1], alpha_factor.inputs[0])
+    links.new(capture_index.outputs["Index"], alpha_factor.inputs[0])
     links.new(alpha_param.outputs["Value"], alpha_factor.inputs[1])
     alpha_factor.use_clamp = True
 

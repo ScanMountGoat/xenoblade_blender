@@ -582,7 +582,10 @@ def find_fur_modifier(blender_mesh: bpy.types.Object) -> Optional[bpy.types.Modi
 def get_modifier_input_property(modifier: bpy.types.Modifier, name: str):
     # Inputs don't use the specified name.
     id = modifier.node_group.interface.items_tree[name].identifier
-    return modifier[id]
+    if bpy.app.version >= (5, 2, 0):
+        return getattr(modifier.properties.inputs, id).value
+    else:
+        return modifier[id]
 
 
 def export_outline_alpha(blender_mesh, positions):
