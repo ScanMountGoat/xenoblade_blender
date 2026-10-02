@@ -262,11 +262,12 @@ def import_material(
         # Approximate the lighting ramp by multiplying base color.
         # This preserves compatibility with Cycles.
         mix_ramp = nodes.new("ShaderNodeMix")
+        mix_ramp.label = "Toon Lighting"
         mix_ramp.data_type = "RGBA"
         mix_ramp.blend_type = "MULTIPLY"
         mix_ramp.inputs["Factor"].default_value = 1.0
-        links.new(texture_node.outputs["Color"], mix_ramp.inputs["A"])
-        links.new(mix_ao.outputs["Result"], mix_ramp.inputs["B"])
+        links.new(mix_ao.outputs["Result"], mix_ramp.inputs["A"])
+        links.new(texture_node.outputs["Color"], mix_ramp.inputs["B"])
 
         if texture_node.image is not None:
             # Don't connect the toon nodes if the gradient texture is missing.
