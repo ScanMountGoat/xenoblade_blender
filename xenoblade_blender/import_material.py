@@ -116,6 +116,7 @@ def import_material(
         )
 
     mix_ao = nodes.new("ShaderNodeMix")
+    mix_ao.label = "Ambient Occlusion"
     mix_ao.data_type = "RGBA"
     mix_ao.blend_type = "MULTIPLY"
     mix_ao.inputs["B"].default_value = (1.0, 1.0, 1.0, 1.0)
