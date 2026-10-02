@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## unreleased
+### Added
+* Added support for additive blending to generated materials.
+
 ### Changed
 * Improved accuracy of material assignments for Xenoblade Chronicles X Definitive Edition ambient occlusion.
 

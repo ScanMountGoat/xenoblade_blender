@@ -280,13 +280,28 @@ def import_material(
     links.new(final_albedo.outputs["Result"], base_color.inputs["Color"])
     base_color.inputs["Gamma"].default_value = 2.2
 
-    if material.state_flags.blend_mode == xc3_model_py.material.BlendMode.Multiply:
-        # Workaround for Blender not supporting alpha blending modes.
-        transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
-        links.new(base_color.outputs["Color"], transparent_bsdf.inputs["Color"])
-        links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
-    else:
-        links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
+    # TODO: Improve node layout when not using the bsdf node.
+    # TODO: Multiply inverted?
+    match material.state_flags.blend_mode:
+        case xc3_model_py.material.BlendMode.Multiply:
+            # Use a workaround for multiply blending compatible with Cycles.
+            transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
+            links.new(base_color.outputs["Color"], transparent_bsdf.inputs["Color"])
+            links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+        case xc3_model_py.material.BlendMode.Add | xc3_model_py.material.BlendMode.Unk2:
+            # Use a workaround for additive blending compatible with Cycles.
+            # TODO: Multiply by source alpha for BlendMode.Unk2
+            links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
+
+            transparent_bsdf = nodes.new("ShaderNodeBsdfTransparent")
+            links.new(transparent_bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+
+            add_shader = nodes.new("ShaderNodeAddShader")
+            links.new(bsdf.outputs["BSDF"], add_shader.inputs[0])
+            links.new(transparent_bsdf.outputs["BSDF"], add_shader.inputs[1])
+            links.new(add_shader.outputs["Shader"], output_node.inputs["Surface"])
+        case _:
+            links.new(base_color.outputs["Color"], bsdf.inputs["Base Color"])
 
     if has_alpha:
         blender_material.blend_method = "BLEND"
