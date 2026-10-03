@@ -1,7 +1,6 @@
 import copy
 import math
 import typing
-from typing import Optional, Tuple
 
 import bmesh
 import bpy
@@ -66,7 +65,7 @@ def get_bone_transform(m: Matrix) -> Matrix:
     return p @ m @ p.inverted()
 
 
-def parse_int(name: str) -> Optional[int]:
+def parse_int(name: str) -> int | None:
     try:
         value = int(name)
     except:
@@ -75,7 +74,7 @@ def parse_int(name: str) -> Optional[int]:
     return value
 
 
-def extract_name_index(name: str) -> Tuple[str, Optional[int]]:
+def extract_name_index(name: str) -> tuple[str, int | None]:
     # Extract name and index from different naming conventions.
     # Use >= to ignore any additional parts like file extension.
     name_parts = name.split(".")
@@ -571,7 +570,7 @@ def mesh_has_outlines(blender_mesh: bpy.types.Object) -> bool:
     return False
 
 
-def find_fur_modifier(blender_mesh: bpy.types.Object) -> Optional[bpy.types.Modifier]:
+def find_fur_modifier(blender_mesh: bpy.types.Object) -> bpy.types.Modifier | None:
     for modifier in blender_mesh.modifiers:
         if modifier.type == "NODES" and modifier.name == "FurShellGeometryNodes":
             return modifier
@@ -688,7 +687,7 @@ def extract_mesh_index(mesh_name, original_meshes, material_index):
     return mesh_index
 
 
-def extract_toon_gradient_row(mesh_data) -> Optional[float]:
+def extract_toon_gradient_row(mesh_data) -> float | None:
     for node in mesh_data.materials[0].node_tree.nodes:
         if node.label == "Toon Gradient Row":
             return node.outputs[0].default_value
@@ -917,7 +916,7 @@ def get_texture_assignments(mesh_data, material, image_textures):
     return old_to_new_index
 
 
-def image_index_to_replace(images, image_name: str) -> Optional[int]:
+def image_index_to_replace(images, image_name: str) -> int | None:
     # Find the original image to replace.
     # TODO: handle new images without an index?
     image_name, image_index = extract_name_index(image_name)

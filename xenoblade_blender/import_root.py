@@ -3,7 +3,6 @@ import math
 import os
 import typing
 from pathlib import Path
-from typing import Dict, Optional
 
 import bpy
 import numpy as np
@@ -197,7 +196,7 @@ def import_image(image, png: bytes, model_name: str, i: int):
 
 def import_monolib_shader_images(
     path: str, flip: bool
-) -> Optional[Dict[str, bpy.types.Image]]:
+) -> dict[str, bpy.types.Image] | None:
     # Assume the path is in a game dump.
     for parent in Path(path).parents:
         folder = parent.joinpath("monolib").joinpath("shader")
@@ -228,7 +227,7 @@ def import_map_root(
     root,
     root_collection: bpy.types.Collection,
     blender_images: list[bpy.types.Image],
-    shader_images: Dict[str, bpy.types.Image],
+    shader_images: dict[str, bpy.types.Image],
     import_all_meshes: bool,
     flip_uvs: bool,
 ):
@@ -320,7 +319,7 @@ def import_model_root(
     root,
     model_name,
     blender_images: list[bpy.types.Image],
-    shader_images: Dict[str, bpy.types.Image],
+    shader_images: dict[str, bpy.types.Image],
     root_obj,
     import_all_meshes: bool,
     import_outlines: bool,
@@ -373,7 +372,7 @@ def import_model_root(
 
 def import_mesh(
     operator,
-    root_obj: Optional[bpy.types.Object],
+    root_obj: bpy.types.Object | None,
     collection: bpy.types.Collection,
     buffers,
     models,

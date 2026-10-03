@@ -1,12 +1,10 @@
-from typing import Tuple
-
 import bpy
 
 
 def layout_nodes(root: bpy.types.Node, links: bpy.types.NodeLinks):
     # Finding links for each node input searches all links.
     # Cache connected nodes to only iterate over the links once.
-    child_nodes = dict()
+    child_nodes = {}
     for link in links.values():
         if link.to_node not in child_nodes:
             child_nodes[link.to_node] = []
@@ -67,7 +65,7 @@ def assign_node_layers(
                 stack.append((child, layer + 1))
 
 
-def node_dimensions(node: bpy.types.Node) -> Tuple[float, float]:
+def node_dimensions(node: bpy.types.Node) -> tuple[float, float]:
     # Width and height aren't updated until nodes are drawn on screen.
     # Guess the final dimensions with a default of (140, 100).
     default_dimensions = {

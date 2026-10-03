@@ -1,5 +1,4 @@
 import typing
-from typing import Dict, Optional, Set, Tuple
 
 import bpy
 
@@ -33,7 +32,7 @@ def import_material(
     name: str,
     material: xc3_model_py.material.Material,
     blender_images: list[bpy.types.Image],
-    shader_images: Dict[str, bpy.types.Image],
+    shader_images: dict[str, bpy.types.Image],
     image_textures,
     samplers,
 ) -> bpy.types.Material:
@@ -63,8 +62,8 @@ def import_material(
     mat_id = output_assignments.mat_id()
 
     textures = material_images_samplers(material, blender_images, samplers)
-    for name, image in shader_images.items():
-        textures[name] = (image, None)
+    for texture_name, image in shader_images.items():
+        textures[texture_name] = (image, None)
 
     has_alpha = material.state_flags.blend_mode not in [
         xc3_model_py.material.BlendMode.Disabled,
@@ -382,11 +381,11 @@ def assign_normal_map(
     nodes,
     links,
     bsdf,
-    x_assignment: Optional[int],
-    y_assignment: Optional[int],
-    intensity_assignment: Optional[int],
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
-) -> Optional[bpy.types.Node]:
+    x_assignment: int | None,
+    y_assignment: int | None,
+    intensity_assignment: int | None,
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
+) -> bpy.types.Node | None:
     if x_assignment is None or y_assignment is None:
         return None
 
@@ -425,14 +424,12 @@ def assign_normal_map(
 
 def assign_output(
     assignment: xc3_model_py.shader_database.OutputExpr,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
-    textures: Dict[
-        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
-    ],
+    textures: dict[str, tuple[bpy.types.Image | None, xc3_model_py.Sampler | None]],
     parameters: xc3_model_py.material.MaterialParameters,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     if func := assignment.func():
         return assign_func(func, assignment_outputs, nodes, links)
     elif value := assignment.value():
@@ -445,10 +442,10 @@ def assign_output(
 
 def assign_func(
     func: xc3_model_py.shader_database.OutputExprFunc,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     def mix_rgba_node(ty):
         return assign_mix_rgba(
             func,
@@ -664,8 +661,8 @@ def assign_func(
 
 
 def assign_index(
-    i: Optional[int],
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    i: int | None,
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     links,
     output,
 ):
@@ -680,12 +677,12 @@ def assign_index(
 
 def assign_value(
     value: xc3_model_py.shader_database.Value,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     textures,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     if f := value.float():
         # TODO: Assign these directly to reduce links?
         node = nodes.new("ShaderNodeValue")
@@ -728,14 +725,14 @@ def assign_float(output, f):
 
 def assign_attribute(
     attribute: xc3_model_py.shader_database.Attribute, nodes, links
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = import_attribute(attribute.name, nodes)
     return assign_channel(attribute.name, attribute.channel, node, nodes, links)
 
 
 def assign_channel(
-    name: str, channel: Optional[str], node, nodes, links
-) -> Tuple[bpy.types.Node, str]:
+    name: str, channel: str | None, node, nodes, links
+) -> tuple[bpy.types.Node, str]:
     output = channel_name(channel)
     if output == "Alpha":
         # Alpha isn't part of the RGB node.
@@ -752,7 +749,7 @@ def assign_channel(
         return rgb_node, output
 
 
-def channel_name(channel: Optional[str]) -> str:
+def channel_name(channel: str | None) -> str:
     match channel:
         case "x":
             return "Red"
@@ -769,11 +766,11 @@ def channel_name(channel: Optional[str]) -> str:
 
 def assign_mix_rgba(
     func: xc3_model_py.shader_database.OutputExprFunc,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     blend_type: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeMix")
     node.data_type = "RGBA"
     node.blend_type = blend_type
@@ -792,11 +789,11 @@ def assign_mix_rgba(
 
 def assign_texture(
     texture: xc3_model_py.shader_database.Texture,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     textures,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     name = texture_assignment_name(texture)
 
     # Don't use the above name for node caching for any of the texture nodes.
@@ -840,9 +837,7 @@ def import_texture(
     name: str,
     label: str,
     nodes,
-    textures: Dict[
-        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
-    ],
+    textures: dict[str, tuple[bpy.types.Image | None, xc3_model_py.Sampler | None]],
 ):
     node = nodes.new("ShaderNodeTexImage")
     node.name = name
@@ -860,7 +855,7 @@ def import_texture(
 
 def set_sampler(
     node: bpy.types.Node,
-    sampler: Optional[xc3_model_py.Sampler],
+    sampler: xc3_model_py.Sampler | None,
 ):
     if sampler is not None:
         # TODO: Check if U and V have the same address mode.
@@ -877,11 +872,11 @@ def set_sampler(
 
 def assign_math(
     func: xc3_model_py.shader_database.OutputExprFunc,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     op: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeMath")
     node.operation = op
     node.name = func_name(func)
@@ -934,15 +929,13 @@ def texture_assignment_name(texture):
 
 def assign_output_xyz(
     expr_xyz: xc3_model_py.shader_database.OutputExprXyz,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
-    assignment_outputs_xyz: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
+    assignment_outputs_xyz: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
-    textures: Dict[
-        str, Tuple[Optional[bpy.types.Image], Optional[xc3_model_py.Sampler]]
-    ],
+    textures: dict[str, tuple[bpy.types.Image | None, xc3_model_py.Sampler | None]],
     parameters: xc3_model_py.material.MaterialParameters,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     if func := expr_xyz.func():
         result = assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
         if result is not None:
@@ -956,10 +949,10 @@ def assign_output_xyz(
 
 def assign_func_xyz(
     func: xc3_model_py.shader_database.OutputExprFuncXyz,
-    assignment_outputs_xyz: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs_xyz: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     def mix_rgba_node(ty):
         return assign_mix_xyz(
             func,
@@ -1119,10 +1112,10 @@ def assign_func_xyz(
 def assign_xyz_channel(
     node,
     output_name,
-    channel: Optional[xc3_model_py.shader_database.ChannelXyz],
+    channel: xc3_model_py.shader_database.ChannelXyz | None,
     nodes,
     links,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     output = channel_xyz_name(channel)
     if output == "Vector":
         # Return the original output if all XYZ channels are used.
@@ -1139,7 +1132,7 @@ def assign_xyz_channel(
         return xyz_node, output
 
 
-def channel_xyz_name(channel: Optional[xc3_model_py.shader_database.ChannelXyz]) -> str:
+def channel_xyz_name(channel: xc3_model_py.shader_database.ChannelXyz | None) -> str:
     match channel:
         case xc3_model_py.shader_database.ChannelXyz.Xyz:
             return "Vector"
@@ -1158,11 +1151,11 @@ def channel_xyz_name(channel: Optional[xc3_model_py.shader_database.ChannelXyz])
 
 def assign_mix_xyz(
     func: xc3_model_py.shader_database.OutputExprFuncXyz,
-    assignment_outputs_xyz: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs_xyz: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     blend_type: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     # TODO: Custom nodes with vector math to support negative values?
     node = nodes.new("ShaderNodeMix")
     node.data_type = "RGBA"
@@ -1197,11 +1190,11 @@ def assign_mix_xyz(
 
 def assign_math_xyz(
     func,
-    assignments_xyz: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignments_xyz: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     op: str,
-) -> Tuple[bpy.types.Node, str]:
+) -> tuple[bpy.types.Node, str]:
     node = nodes.new("ShaderNodeVectorMath")
     node.operation = op
     node.name = func_xyz_name(func)
@@ -1219,12 +1212,12 @@ def assign_math_xyz(
 
 def assign_value_xyz(
     value: xc3_model_py.shader_database.ValueXyz,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     textures,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     if floats := value.float():
         if all(f >= 0.0 and f <= 1.0 for f in floats):
             # Use an RGB node if possible to show a preview color.
@@ -1251,7 +1244,7 @@ def assign_parameter_xyz(
     parameter: xc3_model_py.shader_database.ParameterXyz,
     nodes,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     node = nodes.new("ShaderNodeCombineXYZ")
     node.label = parameter_label_xyz(parameter)
 
@@ -1302,7 +1295,7 @@ def parameter_label_xyz(p: xc3_model_py.shader_database.ParameterXyz) -> str:
 
 def assign_attribute_xyz(
     attribute: xc3_model_py.shader_database.AttributeXyz, nodes, links
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     node = import_attribute(attribute.name, nodes)
     return assign_channel_xyz(attribute.name, attribute.channel, node, nodes, links)
 
@@ -1331,11 +1324,11 @@ def import_attribute(name: str, nodes) -> bpy.types.Node:
 
 def assign_channel_xyz(
     name: str,
-    channel: Optional[xc3_model_py.shader_database.ChannelXyz],
+    channel: xc3_model_py.shader_database.ChannelXyz | None,
     node,
     nodes,
     links,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     match channel:
         case xc3_model_py.shader_database.ChannelXyz.Xyz:
             return node, "Color"
@@ -1354,11 +1347,11 @@ def assign_channel_xyz(
 # TODO: Share code with scalar version.
 def assign_texture_xyz(
     texture: xc3_model_py.shader_database.TextureXyz,
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     nodes,
     links,
     textures,
-) -> Optional[Tuple[bpy.types.Node, str]]:
+) -> tuple[bpy.types.Node, str] | None:
     name = texture_assignment_name(texture)
 
     # Don't use the above name for node caching for any of the texture nodes.
@@ -1376,7 +1369,7 @@ def assign_texture_xyz(
 
 def used_assignments(
     output_assignments: xc3_model_py.material.OutputAssignments, has_alpha: bool
-) -> Tuple[Set[int], Set[int]]:
+) -> tuple[set[int], set[int]]:
     visited = set()
     visited_xyz = set()
 
@@ -1412,27 +1405,25 @@ def used_assignments(
 
 
 def add_used_assignments(
-    visited: Set[int],
+    visited: set[int],
     assignments: list[xc3_model_py.shader_database.OutputExpr],
-    i: Optional[int],
+    i: int | None,
 ):
-    if i is not None:
-        if i not in visited:
-            visited.add(i)
+    if i is not None and i not in visited:
+        visited.add(i)
 
-            assignment = assignments[i]
-            if func := assignment.func():
-                for arg in func.args:
-                    add_used_assignments(visited, assignments, arg)
-            elif value := assignment.value():
-                if texture := value.texture():
-                    for coord in texture.texcoords:
-                        add_used_assignments(visited, assignments, coord)
+        assignment = assignments[i]
+        if func := assignment.func():
+            for arg in func.args:
+                add_used_assignments(visited, assignments, arg)
+        elif (value := assignment.value()) and (texture := value.texture()):
+            for coord in texture.texcoords:
+                add_used_assignments(visited, assignments, coord)
 
 
 def add_used_xyz_assignments(
-    visited: Set[int],
-    visited_xyz: Set[int],
+    visited: set[int],
+    visited_xyz: set[int],
     exprs: list[xc3_model_py.shader_database.OutputExpr],
     exprs_xyz: list[xc3_model_py.shader_database.OutputExprXyz],
     i: int,
@@ -1444,11 +1435,10 @@ def add_used_xyz_assignments(
         if func := assignment.func():
             for arg in func.args:
                 add_used_xyz_assignments(visited, visited_xyz, exprs, exprs_xyz, arg)
-        elif value := assignment.value():
+        elif (value := assignment.value()) and (texture := value.texture()):
             # Collect the scalar assignments for texture coordinates.
-            if texture := value.texture():
-                for coord in texture.texcoords:
-                    add_used_assignments(visited, exprs, coord)
+            for coord in texture.texcoords:
+                add_used_assignments(visited, exprs, coord)
 
 
 def create_cached_func_group_node(
@@ -1469,7 +1459,7 @@ def create_cached_func_group_node(
 def assign_func_args(
     func: xc3_model_py.shader_database.OutputExprFunc,
     params: list[int | str],
-    assignment_outputs: list[Optional[Tuple[bpy.types.Node, str]]],
+    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
     links,
     node: bpy.types.Node,
 ):
@@ -1485,7 +1475,7 @@ def create_cached_func_xyz_group_node(
 ) -> bpy.types.Node:
     name = func_xyz_name(func)
     node = nodes.get(name)
-    if node is None or True:
+    if node is None:
         node = create_node_group(nodes, node_group_name, create_node_tree)
         node.name = name
 
