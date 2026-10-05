@@ -214,6 +214,9 @@ def import_material(
         if "gTToonGrad" in shader_images:
             texture_node.image = shader_images["gTToonGrad"]
 
+        # HACK: Fix a faceted appearance from the layer weight facing ratio.
+        texture_node.interpolation = "Closest"
+
         uvs = create_node_group(nodes, "ToonGradUVs", toon_grad_uvs_node_group)
         links.new(uvs.outputs["Vector"], texture_node.inputs["Vector"])
 
