@@ -7,6 +7,7 @@ from xenoblade_blender.node_group import (
     clamp_xyz_node_group,
     create_node_group,
     fresnel_blend_node_group,
+    gbuffer_node_group,
     greater_xyz_node_group,
     less_xyz_node_group,
     monochrome_xyz_node_group,
@@ -65,16 +66,9 @@ def import_material(
     for texture_name, image in shader_images.items():
         textures[texture_name] = (image, None)
 
-    has_alpha = material.state_flags.blend_mode not in [
-        xc3_model_py.material.BlendMode.Disabled,
-        xc3_model_py.material.BlendMode.Disabled2,
-    ]
-
     # Create nodes for each unique assignment.
     # Storing the output name allows using a single node for values with multiple channels.
-    used_expr_indices, used_expr_xyz_indices = used_assignments(
-        output_assignments, has_alpha
-    )
+    used_expr_indices, used_expr_xyz_indices = used_assignments(output_assignments)
     assignment_outputs = []
     for i, expr in enumerate(output_assignments.exprs):
         if i in used_expr_indices:
@@ -106,13 +100,53 @@ def import_material(
         else:
             assignment_outputs_xyz.append(None)
 
-    if has_alpha:
+    gbuffer = create_node_group(nodes, "G-buffer", gbuffer_node_group)
+
+    # Skip unused outputs like velocity.
+    for i in [0, 1, 2, 5]:
+        if output_assignments.output_assignments[i].xyz is not None:
+            assign_index(
+                output_assignments.output_assignments[i].xyz,
+                assignment_outputs_xyz,
+                links,
+                gbuffer.inputs[f"Output{i}.rgb"],
+            )
+        else:
+            node = nodes.new("ShaderNodeCombineXYZ")
+            assign_index(
+                output_assignments.output_assignments[i].x,
+                assignment_outputs,
+                links,
+                node.inputs["X"],
+            )
+            assign_index(
+                output_assignments.output_assignments[i].y,
+                assignment_outputs,
+                links,
+                node.inputs["Y"],
+            )
+            assign_index(
+                output_assignments.output_assignments[i].z,
+                assignment_outputs,
+                links,
+                node.inputs["Z"],
+            )
+            links.new(node.outputs["Vector"], gbuffer.inputs[f"Output{i}.rgb"])
+
         assign_index(
-            output_assignments.output_assignments[0].w,
+            output_assignments.output_assignments[i].w,
             assignment_outputs,
             links,
-            bsdf.inputs["Alpha"],
+            gbuffer.inputs[f"Output{i}.a"],
         )
+
+    has_alpha = material.state_flags.blend_mode not in [
+        xc3_model_py.material.BlendMode.Disabled,
+        xc3_model_py.material.BlendMode.Disabled2,
+    ]
+
+    if has_alpha and output_assignments.output_assignments[0].w is not None:
+        links.new(gbuffer.outputs["Output0.a"], bsdf.inputs["Alpha"])
 
     mix_ao = nodes.new("ShaderNodeMix")
     mix_ao.label = "Ambient Occlusion"
@@ -122,43 +156,14 @@ def import_material(
     mix_ao.inputs["Factor"].default_value = 1.0
 
     # RGB base color.
-    if output_assignments.output_assignments[0].xyz is not None:
-        assign_index(
-            output_assignments.output_assignments[0].xyz,
-            assignment_outputs_xyz,
-            links,
-            mix_ao.inputs["A"],
-        )
-    else:
-        base_color = nodes.new("ShaderNodeCombineColor")
-        links.new(base_color.outputs["Color"], mix_ao.inputs["A"])
+    links.new(gbuffer.outputs["Output0.rgb"], mix_ao.inputs["A"])
 
-        assign_index(
-            output_assignments.output_assignments[0].x,
-            assignment_outputs,
-            links,
-            base_color.inputs["Red"],
-        )
-        assign_index(
-            output_assignments.output_assignments[0].y,
-            assignment_outputs,
-            links,
-            base_color.inputs["Green"],
-        )
-        assign_index(
-            output_assignments.output_assignments[0].z,
-            assignment_outputs,
-            links,
-            base_color.inputs["Blue"],
-        )
+    o2_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(gbuffer.outputs["Output2.rgb"], o2_xyz.inputs["Vector"])
 
     # Single channel ambient occlusion.
-    assign_index(
-        output_assignments.output_assignments[2].z,
-        assignment_outputs,
-        links,
-        mix_ao.inputs["B"],
-    )
+    if output_assignments.output_assignments[2].z is not None:
+        links.new(o2_xyz.outputs["Z"], mix_ao.inputs["B"])
 
     normal_map = assign_normal_map(
         nodes,
@@ -168,14 +173,23 @@ def import_material(
         output_assignments.output_assignments[2].y,
         output_assignments.normal_intensity,
         assignment_outputs,
+        o2_xyz,
     )
 
-    assign_index(
-        output_assignments.output_assignments[1].x,
-        assignment_outputs,
-        links,
-        bsdf.inputs["Metallic"],
-    )
+    o1_xyz = nodes.new("ShaderNodeSeparateXYZ")
+    links.new(gbuffer.outputs["Output1.rgb"], o1_xyz.inputs["Vector"])
+
+    if output_assignments.output_assignments[1].x is not None:
+        links.new(o1_xyz.outputs["X"], bsdf.inputs["Metallic"])
+
+    # Invert glossiness to get roughness.
+    invert = nodes.new("ShaderNodeMath")
+    invert.operation = "SUBTRACT"
+    invert.inputs[0].default_value = 1.0
+    if output_assignments.output_assignments[1].y is not None:
+        links.new(o1_xyz.outputs["Y"], invert.inputs[1])
+
+    links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
     if (
         output_assignments.output_assignments[5].x is not None
@@ -186,51 +200,10 @@ def import_material(
         # Xenoblade X models typically use specular but don't have a mat id value yet.
         # TODO: use the material render flags instead for better accuracy.
         if mat_id in [2, 5] or mat_id is None:
-            output = bsdf.inputs["Specular Tint"]
+            links.new(gbuffer.outputs["Output5.rgb"], bsdf.inputs["Specular Tint"])
         else:
-            output = bsdf.inputs["Emission Color"]
+            links.new(gbuffer.outputs["Output5.rgb"], bsdf.inputs["Emission Color"])
             bsdf.inputs["Emission Strength"].default_value = 1.0
-
-        if output_assignments.output_assignments[5].xyz is not None:
-            assign_index(
-                output_assignments.output_assignments[5].xyz,
-                assignment_outputs_xyz,
-                links,
-                output,
-            )
-        else:
-            color = nodes.new("ShaderNodeCombineColor")
-            assign_index(
-                output_assignments.output_assignments[5].x,
-                assignment_outputs,
-                links,
-                color.inputs["Red"],
-            )
-            assign_index(
-                output_assignments.output_assignments[5].y,
-                assignment_outputs,
-                links,
-                color.inputs["Green"],
-            )
-            assign_index(
-                output_assignments.output_assignments[5].z,
-                assignment_outputs,
-                links,
-                color.inputs["Blue"],
-            )
-            links.new(color.outputs["Color"], output)
-
-    # Invert glossiness to get roughness.
-    invert = nodes.new("ShaderNodeMath")
-    invert.operation = "SUBTRACT"
-    invert.inputs[0].default_value = 1.0
-    assign_index(
-        output_assignments.output_assignments[1].y,
-        assignment_outputs,
-        links,
-        invert.inputs[1],
-    )
-    links.new(invert.outputs["Value"], bsdf.inputs["Roughness"])
 
     final_albedo = mix_ao
 
@@ -385,6 +358,7 @@ def assign_normal_map(
     y_assignment: int | None,
     intensity_assignment: int | None,
     assignment_outputs: list[tuple[bpy.types.Node, str] | None],
+    output2_xyz: bpy.types.Node,
 ) -> bpy.types.Node | None:
     if x_assignment is None or y_assignment is None:
         return None
@@ -396,18 +370,8 @@ def assign_normal_map(
     normals.inputs["Y"].default_value = 0.5
     normals.inputs["Strength"].default_value = 1.0
 
-    assign_index(
-        x_assignment,
-        assignment_outputs,
-        links,
-        normals.inputs["X"],
-    )
-    assign_index(
-        y_assignment,
-        assignment_outputs,
-        links,
-        normals.inputs["Y"],
-    )
+    links.new(output2_xyz.outputs["X"], normals.inputs["X"])
+    links.new(output2_xyz.outputs["Y"], normals.inputs["Y"])
 
     if intensity_assignment is not None:
         assign_index(
@@ -1368,7 +1332,7 @@ def assign_texture_xyz(
 
 
 def used_assignments(
-    output_assignments: xc3_model_py.material.OutputAssignments, has_alpha: bool
+    output_assignments: xc3_model_py.material.OutputAssignments,
 ) -> tuple[set[int], set[int]]:
     visited = set()
     visited_xyz = set()
@@ -1384,8 +1348,7 @@ def used_assignments(
         add_used_assignments(visited, exprs, outputs[0].y)
         add_used_assignments(visited, exprs, outputs[0].z)
 
-    if has_alpha:
-        add_used_assignments(visited, exprs, outputs[0].w)
+    add_used_assignments(visited, exprs, outputs[0].w)
 
     add_used_assignments(visited, exprs, outputs[1].x)
     add_used_assignments(visited, exprs, outputs[1].y)

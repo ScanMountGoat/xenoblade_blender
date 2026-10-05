@@ -738,3 +738,43 @@ def monochrome_xyz_vector_node_group(name: str):
     layout_nodes(output_node, links)
 
     return node_tree
+
+
+def gbuffer_node_group(name: str):
+    node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
+
+    # Create a node that contains all the possible G-Buffer inputs.
+    nodes = node_tree.nodes
+    links = node_tree.links
+
+    # TODO: use floats for 1 and 2?
+    # Skip unused outputs like velocity.
+    for i in [0, 1, 2, 5]:
+        node_tree.interface.new_socket(
+            in_out="INPUT", socket_type="NodeSocketVector", name=f"Output{i}.rgb"
+        )
+        node_tree.interface.new_socket(
+            in_out="INPUT", socket_type="NodeSocketFloat", name=f"Output{i}.a"
+        )
+
+        node_tree.interface.new_socket(
+            in_out="OUTPUT", socket_type="NodeSocketVector", name=f"Output{i}.rgb"
+        )
+        node_tree.interface.new_socket(
+            in_out="OUTPUT", socket_type="NodeSocketFloat", name=f"Output{i}.a"
+        )
+
+    input_node = nodes.new("NodeGroupInput")
+    output_node = nodes.new("NodeGroupOutput")
+
+    for i in [0, 1, 2, 5]:
+        links.new(
+            input_node.outputs[f"Output{i}.rgb"], output_node.inputs[f"Output{i}.rgb"]
+        )
+        links.new(
+            input_node.outputs[f"Output{i}.a"], output_node.inputs[f"Output{i}.a"]
+        )
+
+    layout_nodes(output_node, links)
+
+    return node_tree

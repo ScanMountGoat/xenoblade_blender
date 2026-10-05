@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 * Improved accuracy of material assignments for Xenoblade Chronicles X Definitive Edition ambient occlusion.
+* Reworked material nodes to include a node for all the in game fragment shader outputs. This ensures that all the important input textures and values are available for editing.
 
 ## 0.23.6 - 2026-07-27
 ### Fixed
