@@ -396,7 +396,7 @@ def assign_output(
     links,
     textures: dict[str, tuple[bpy.types.Image | None, xc3_model_py.Sampler | None]],
     parameters: xc3_model_py.material.MaterialParameters,
-) -> tuple[bpy.types.Node, str] | None:
+) -> tuple[bpy.types.Node, str] | float | None:
     if func := assignment.func():
         return assign_func(func, assignment_outputs, nodes, links)
     elif value := assignment.value():
@@ -629,14 +629,21 @@ def assign_func(
 
 def assign_index(
     i: int | None,
-    assignment_outputs: list[tuple[bpy.types.Node, str] | None],
+    assignment_outputs: list[
+        tuple[bpy.types.Node, str] | float | tuple[float, float, float] | None
+    ],
     links,
     output,
 ):
     if i is not None:
-        if node_output := assignment_outputs[i]:
-            node, output_name = node_output
-            links.new(node.outputs[output_name], output)
+        node_output = assignment_outputs[i]
+        if node_output is not None:
+            try:
+                # Assign floats directly to reduce links and improve load times.
+                assign_float(output, node_output)
+            except:
+                node, output_name = node_output
+                links.new(node.outputs[output_name], output)
         else:
             # Set defaults to match xc3_wgpu and make debugging easier.
             assign_float(output, 0.0)
@@ -649,12 +656,10 @@ def assign_value(
     links,
     textures,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> tuple[bpy.types.Node, str] | None:
+) -> tuple[bpy.types.Node, str] | float | None:
     if f := value.float():
-        # TODO: Assign these directly to reduce links?
-        node = nodes.new("ShaderNodeValue")
-        node.outputs[0].default_value = f
-        return node, "Value"
+        # Don't create nodes or links for constants to improve loading times.
+        return f
     elif attribute := value.attribute():
         return assign_attribute(attribute, nodes, links)
     elif texture := value.texture():
@@ -687,7 +692,15 @@ def assign_float(output, f):
     try:
         output.default_value = [f] * len(output.default_value)
     except:
-        output.default_value = f
+        try:
+            output.default_value = f
+        except:
+            try:
+                # Assign XYZ to color socket.
+                output.default_value = (f[0], f[1], f[2], 1.0)
+            except:
+                # Assign XYZ to float socket.
+                output.default_value = f[0]
 
 
 def assign_attribute(
@@ -902,7 +915,7 @@ def assign_output_xyz(
     links,
     textures: dict[str, tuple[bpy.types.Image | None, xc3_model_py.Sampler | None]],
     parameters: xc3_model_py.material.MaterialParameters,
-) -> tuple[bpy.types.Node, str] | None:
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     if func := expr_xyz.func():
         result = assign_func_xyz(func, assignment_outputs_xyz, nodes, links)
         if result is not None:
@@ -1184,19 +1197,10 @@ def assign_value_xyz(
     links,
     textures,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> tuple[bpy.types.Node, str] | None:
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     if floats := value.float():
-        if all(f >= 0.0 and f <= 1.0 for f in floats):
-            # Use an RGB node if possible to show a preview color.
-            node = nodes.new("ShaderNodeRGB")
-            node.outputs[0].default_value = (floats[0], floats[1], floats[2], 1.0)
-            return node, "Color"
-        else:
-            node = nodes.new("ShaderNodeCombineXYZ")
-            node.inputs["X"].default_value = floats[0]
-            node.inputs["Y"].default_value = floats[1]
-            node.inputs["Z"].default_value = floats[2]
-            return node, "Vector"
+        # Don't create nodes or links for constants to improve loading times.
+        return floats
     elif attribute := value.attribute():
         return assign_attribute_xyz(attribute, nodes, links)
     elif texture := value.texture():
