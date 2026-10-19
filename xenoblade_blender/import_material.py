@@ -9,6 +9,7 @@ from xenoblade_blender.node_group import (
     fresnel_blend_node_group,
     gbuffer_node_group,
     greater_xyz_node_group,
+    inverse_sqrt_xyz_node_group,
     less_xyz_node_group,
     monochrome_xyz_node_group,
     monochrome_xyz_vector_node_group,
@@ -20,6 +21,7 @@ from xenoblade_blender.node_group import (
     tex_matrix_node_group,
     tex_parallax_node_group,
     toon_grad_uvs_node_group,
+    truncate_xyz_node_group,
 )
 from xenoblade_blender.node_layout import layout_nodes
 
@@ -602,7 +604,7 @@ def assign_func(
         case xc3_model_py.shader_database.Operation.Uint:
             return None
         case xc3_model_py.shader_database.Operation.Truncate:
-            return None
+            return math_node("TRUNC")
         case xc3_model_py.shader_database.Operation.FloatBitsToInt:
             return None
         case xc3_model_py.shader_database.Operation.IntBitsToFloat:
@@ -610,7 +612,7 @@ def assign_func(
         case xc3_model_py.shader_database.Operation.UintBitsToFloat:
             return None
         case xc3_model_py.shader_database.Operation.InverseSqrt:
-            return None
+            return math_node("INVERSE_SQRT")
         case xc3_model_py.shader_database.Operation.Not:
             return None
         case xc3_model_py.shader_database.Operation.LeftShift:
@@ -622,7 +624,14 @@ def assign_func(
         case xc3_model_py.shader_database.Operation.PartialDerivativeY:
             return None
         case xc3_model_py.shader_database.Operation.Exp2:
-            return None
+            node = nodes.new("ShaderNodeMath")
+            node.name = func_name(func)
+            node.operation = "POWER"
+
+            node.inputs[0].default_value = 2.0
+            assign_args(func, node, [1])
+
+            return node, "Value"
         case xc3_model_py.shader_database.Operation.Log2:
             return None
         case xc3_model_py.shader_database.Operation.Sin:
@@ -1052,7 +1061,6 @@ def assign_func_xyz(
             )
             assign_args(func, node, ["Vector", "Factor"])
             return node, "Vector"
-        # TODO: Fix merging for monochrome xyz?
         case xc3_model_py.shader_database.OperationXyz.Negate:
             node = nodes.new("ShaderNodeVectorMath")
             node.name = func_xyz_name(func)
@@ -1068,7 +1076,9 @@ def assign_func_xyz(
         case xc3_model_py.shader_database.OperationXyz.Uint:
             return None
         case xc3_model_py.shader_database.OperationXyz.Truncate:
-            return None
+            node = group_node(func, "TruncateXYZ", truncate_xyz_node_group)
+            assign_args(func, node, ["Value"])
+            return node, "Vector"
         case xc3_model_py.shader_database.OperationXyz.FloatBitsToInt:
             return None
         case xc3_model_py.shader_database.OperationXyz.IntBitsToFloat:
@@ -1076,7 +1086,9 @@ def assign_func_xyz(
         case xc3_model_py.shader_database.OperationXyz.UintBitsToFloat:
             return None
         case xc3_model_py.shader_database.OperationXyz.InverseSqrt:
-            return None
+            node = group_node(func, "InverseSqrtXYZ", inverse_sqrt_xyz_node_group)
+            assign_args(func, node, ["Value"])
+            return node, "Vector"
         case xc3_model_py.shader_database.OperationXyz.Not:
             return None
         case xc3_model_py.shader_database.OperationXyz.LeftShift:
@@ -1084,7 +1096,12 @@ def assign_func_xyz(
         case xc3_model_py.shader_database.OperationXyz.RightShift:
             return None
         case xc3_model_py.shader_database.OperationXyz.Exp2:
-            return None
+            node = nodes.new("ShaderNodeVectorMath")
+            node.name = func_xyz_name(func)
+            node.operation = "POWER"
+            node.inputs[0].default_value = (2.0, 2.0, 2.0)
+            assign_args(func, node, [1])
+            return node, "Vector"
         case xc3_model_py.shader_database.OperationXyz.Log2:
             return None
         case xc3_model_py.shader_database.OperationXyz.Sin:

@@ -534,6 +534,14 @@ def greater_xyz_node_group(name: str):
     return math_xyz_node_group(name, "GREATER_THAN", ["Value", "Threshold"])
 
 
+def inverse_sqrt_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "INVERSE_SQRT", ["Value"])
+
+
+def truncate_xyz_node_group(name: str):
+    return math_xyz_node_group(name, "TRUNC", ["Value"])
+
+
 def clamp_xyz_node_group(name: str):
     node_tree = bpy.data.node_groups.new(name, "ShaderNodeTree")
 
