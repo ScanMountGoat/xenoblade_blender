@@ -104,37 +104,43 @@ def import_material(
 
     # Skip unused outputs like velocity.
     for i in [0, 1, 2, 5]:
-        if output_assignments.output_assignments[i].xyz is not None:
+        output_assignment = output_assignments.output_assignments[i]
+        if output_assignment.xyz is not None:
             assign_index(
-                output_assignments.output_assignments[i].xyz,
+                output_assignment.xyz,
                 assignment_outputs_xyz,
                 links,
                 gbuffer.inputs[f"Output{i}.rgb"],
             )
         else:
-            node = nodes.new("ShaderNodeCombineXYZ")
-            assign_index(
-                output_assignments.output_assignments[i].x,
-                assignment_outputs,
-                links,
-                node.inputs["X"],
-            )
-            assign_index(
-                output_assignments.output_assignments[i].y,
-                assignment_outputs,
-                links,
-                node.inputs["Y"],
-            )
-            assign_index(
-                output_assignments.output_assignments[i].z,
-                assignment_outputs,
-                links,
-                node.inputs["Z"],
-            )
-            links.new(node.outputs["Vector"], gbuffer.inputs[f"Output{i}.rgb"])
+            if (
+                output_assignment.x is not None
+                or output_assignment.y is not None
+                or output_assignment.z is not None
+            ):
+                node = nodes.new("ShaderNodeCombineXYZ")
+                assign_index(
+                    output_assignment.x,
+                    assignment_outputs,
+                    links,
+                    node.inputs["X"],
+                )
+                assign_index(
+                    output_assignment.y,
+                    assignment_outputs,
+                    links,
+                    node.inputs["Y"],
+                )
+                assign_index(
+                    output_assignment.z,
+                    assignment_outputs,
+                    links,
+                    node.inputs["Z"],
+                )
+                links.new(node.outputs["Vector"], gbuffer.inputs[f"Output{i}.rgb"])
 
         assign_index(
-            output_assignments.output_assignments[i].w,
+            output_assignment.w,
             assignment_outputs,
             links,
             gbuffer.inputs[f"Output{i}.a"],
@@ -158,6 +164,7 @@ def import_material(
     # RGB base color.
     links.new(gbuffer.outputs["Output0.rgb"], mix_ao.inputs["A"])
 
+    # TODO: remove this node if not used
     o2_xyz = nodes.new("ShaderNodeSeparateXYZ")
     links.new(gbuffer.outputs["Output2.rgb"], o2_xyz.inputs["Vector"])
 
