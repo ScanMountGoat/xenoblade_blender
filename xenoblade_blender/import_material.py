@@ -681,9 +681,13 @@ def assign_value(
     elif texture := value.texture():
         return assign_texture(texture, assignment_outputs, nodes, links, textures)
     elif parameter := value.parameter():
+        f = parameters.get_parameter(parameter)
+        if parameter.name != "U_Mate":
+            # Assign non editable global values directly to simplify node setups.
+            return f
+
         node = nodes.new("ShaderNodeValue")
         node.label = parameter_label(parameter)
-        f = parameters.get_parameter(parameter)
         if f is not None:
             node.outputs[0].default_value = f
         return node, "Value"
@@ -1239,10 +1243,7 @@ def assign_parameter_xyz(
     parameter: xc3_model_py.shader_database.ParameterXyz,
     nodes,
     parameters: xc3_model_py.material.MaterialParameters,
-) -> tuple[bpy.types.Node, str] | None:
-    node = nodes.new("ShaderNodeCombineXYZ")
-    node.label = parameter_label_xyz(parameter)
-
+) -> tuple[bpy.types.Node, str] | tuple[float, float, float] | None:
     # Assign the vector by treating the access as 3 scalar parameters.
     channels = [None, None, None]
     if parameter.channel is not None:
@@ -1256,14 +1257,25 @@ def assign_parameter_xyz(
             case xc3_model_py.shader_database.ChannelXyz.Z:
                 channels = ["z", "z", "z"]
 
-    for channel, component in zip(channels, "XYZ"):
+    xyz_values = [0.0, 0.0, 0.0]
+    for i, channel in enumerate(channels):
         f = parameters.get_parameter(
             xc3_model_py.shader_database.Parameter(
                 parameter.name, parameter.field, parameter.index, channel
             )
         )
         if f is not None:
-            node.inputs[component].default_value = f
+            xyz_values[i] = f
+
+    if parameter.name != "U_Mate":
+        # Assign non editable global values directly to simplify node setups.
+        return xyz_values
+
+    node = nodes.new("ShaderNodeCombineXYZ")
+    node.label = parameter_label_xyz(parameter)
+
+    for value, component in zip(xyz_values, "XYZ"):
+        node.inputs[component].default_value = value
 
     return node, "Vector"
 
