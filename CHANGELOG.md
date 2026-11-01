@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## unreleased
 ### Changed
 * Optimized import times for importing models and maps.
+* Improved the accuracy of vertex splitting for wimdo model export.
 
 ## 0.23.7 - 2026-10-05
 ### Added

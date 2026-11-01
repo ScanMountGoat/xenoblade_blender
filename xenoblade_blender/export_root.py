@@ -1,6 +1,7 @@
 import copy
 import math
 import typing
+from itertools import chain
 
 import bmesh
 import bpy
@@ -117,7 +118,7 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
     # Transfer the original normals to a custom attribute.
     # This allows us to edit the mesh without affecting custom normals.
     normals_color = mesh.data.attributes.new(
-        name="_custom_normals", type="FLOAT_VECTOR", domain="CORNER"
+        name="_xenoblade_blender_custom_normals", type="FLOAT_VECTOR", domain="CORNER"
     )
     normals_color.data.foreach_set("vector", loop_normals)
 
@@ -131,25 +132,15 @@ def process_export_mesh(context: bpy.types.Context, mesh: bpy.types.Object):
         bm.to_mesh(mesh.data)
         bm.free()
 
-    # Blender stores normals and UVs per loop rather than per vertex.
-    # Edges with more than one value per vertex need to be split.
+    # Blender stores normals, colors, and UVs per loop rather than per vertex.
+    # Vertices with more than one value per vertex need to be split.
     split_duplicate_loop_attributes(mesh)
-    # Rarely this will create some loose verts
-    bm = bmesh.new()
-    bm.from_mesh(mesh.data)
-
-    unlinked_verts = [v for v in bm.verts if len(v.link_faces) == 0]
-    bmesh.ops.delete(bm, geom=unlinked_verts, context="VERTS")
-
-    bm.to_mesh(mesh.data)
-    mesh.data.update()
-    bm.clear()
 
     # Extract the custom normals preserved in the custom attribute.
     # Attributes should not be affected by splitting or triangulating.
     # This avoids the datatransfer modifier not handling vertices at the same position.
     loop_normals = np.zeros(len(mesh.data.loops) * 3, dtype=np.float32)
-    normals = mesh.data.attributes["_custom_normals"]
+    normals = mesh.data.attributes["_xenoblade_blender_custom_normals"]
     normals.data.foreach_get("vector", loop_normals)
 
     # Assign the preserved custom normals to the temp mesh.
@@ -161,70 +152,55 @@ def split_duplicate_loop_attributes(mesh: bpy.types.Object):
     bm = bmesh.new()
     bm.from_mesh(mesh.data)
 
-    edges_to_split: list[bmesh.types.BMEdge] = []
+    # The original normals are preserved in an attribute.
+    normal_layer = bm.loops.layers.float_vector.get("_xenoblade_blender_custom_normals")
 
-    add_duplicate_normal_edges(edges_to_split, bm)
+    # Create new vertices for loops with different attribute values for the same vertex.
+    for vert in bm.verts:
+        if len(vert.link_loops) < 2:
+            continue
 
-    for layer_name in bm.loops.layers.uv.keys():
-        uv_layer = bm.loops.layers.uv.get(layer_name)
-        add_duplicate_uv_edges(edges_to_split, bm, uv_layer)
+        for loop in vert.link_loops[1:]:
+            if should_separate_loop(bm, vert, loop, normal_layer):
+                bmesh.utils.loop_separate(loop)
 
-    # Duplicate edges cause problems with split_edges.
-    edges_to_split = list(set(edges_to_split))
-
-    # Don't modify the mesh if no edges need to be split.
-    # This check also seems to prevent a potential crash.
-    if len(edges_to_split) > 0:
-        bmesh.ops.split_edges(bm, edges=edges_to_split)
-        bm.to_mesh(mesh.data)
-        mesh.data.update()
-
-    bm.clear()
-
-    # Check if any edges were split.
-    return len(edges_to_split) > 0
+    bm.to_mesh(mesh.data)
+    mesh.data.update()
+    bm.free()
 
 
-def add_duplicate_normal_edges(edges_to_split, bm):
-    # The original normals are preserved in a custom attribute.
-    normal_layer = bm.loops.layers.float_vector.get("_custom_normals")
+def should_separate_loop(bm, vert, loop, normal_layer) -> bool:
+    # Small fluctuations in normal vectors are expected during processing.
+    # Check if the angle between normals is sufficiently large.
+    # Assume normal vectors are normalized to have length 1.0.
+    normal1 = vert.link_loops[0][normal_layer]
+    normal2 = loop[normal_layer]
+    if not math.isclose(normal1.dot(normal2), 1.0, abs_tol=0.001, rel_tol=0.001):
+        return True
 
-    # Find edges connected to vertices with more than one normal.
-    # This allows converting to per vertex later by splitting edges.
-    index_to_normal = {}
-    for face in bm.faces:
-        for loop in face.loops:
-            vertex_index = loop.vert.index
-            normal = loop[normal_layer]
-            # Small fluctuations in normal vectors are expected during processing.
-            # Check if the angle between normals is sufficiently large.
-            # Assume normal vectors are normalized to have length 1.0.
-            if vertex_index not in index_to_normal:
-                index_to_normal[vertex_index] = normal
-            elif not math.isclose(
-                normal.dot(index_to_normal[vertex_index]),
-                1.0,
-                abs_tol=0.001,
-                rel_tol=0.001,
-            ):
-                # Get any edges containing this vertex.
-                edges_to_split.extend(loop.vert.link_edges)
+    for uv_layer in bm.loops.layers.uv:
+        # Use strict equality since UVs are unlikely to change unintentionally.
+        # TODO: Should UV comparison use a tolerance instead?
+        uv1 = vert.link_loops[0][uv_layer]
+        uv2 = loop[uv_layer]
+        if uv1.uv != uv2.uv:
+            return True
 
+    for layer_name, color_layer in chain(
+        bm.loops.layers.color.items(), bm.loops.layers.float_color.items()
+    ):
+        # Custom normals need a less strict check performed above.
+        if layer_name == "_xenoblade_blender_custom_normals":
+            continue
 
-def add_duplicate_uv_edges(edges_to_split, bm, uv_layer):
-    # Blender stores uvs per loop rather than per vertex.
-    # Find edges connected to vertices with more than one uv coord.
-    # This allows converting to per vertex later by splitting edges.
-    index_to_uv = {}
-    for face in bm.faces:
-        for loop in face.loops:
-            vertex_index = loop.vert.index
-            uv = loop[uv_layer].uv
-            # Use strict equality since UVs are unlikely to change unintentionally.
-            if vertex_index not in index_to_uv:
-                index_to_uv[vertex_index] = uv
-            elif uv != index_to_uv[vertex_index]:
-                edges_to_split.extend(loop.vert.link_edges)
+        # Use strict equality since colors are unlikely to change unintentionally.
+        # TODO: Should color comparison use a tolerance instead?
+        color1 = vert.link_loops[0][color_layer]
+        color2 = loop[color_layer]
+        if color1 != color2:
+            return True
+
+    return False
 
 
 def export_mesh(
